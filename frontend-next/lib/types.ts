@@ -467,3 +467,135 @@ export interface ELearningStats {
   enrollments: { total: number; completed: number };
   certificates: { total: number };
 }
+
+// ============== QUIZ TYPES ==============
+
+export type QuestionType = 'mcq' | 'multiple_select' | 'true_false' | 'short_answer' | 'matching' | 'fill_blank';
+export type QuizType = 'practice' | 'graded' | 'final_exam';
+export type Difficulty = 'easy' | 'medium' | 'hard';
+export type AttemptStatus = 'in_progress' | 'completed' | 'abandoned' | 'timed_out';
+
+export interface QuestionOption {
+  text_fr: string;
+  text_en?: string;
+  image_url?: string;
+}
+
+export interface ELearningQuestion {
+  id: number;
+  question_text_fr: string;
+  question_text_en?: string;
+  question_type: QuestionType;
+  explanation_fr?: string;
+  explanation_en?: string;
+  image_url?: string;
+  options?: QuestionOption[];
+  correct_answer?: number | number[] | boolean | string | string[];
+  points: number;
+  difficulty: Difficulty;
+  category_id?: number;
+  tags?: string[];
+  is_active: boolean;
+  created_by?: number;
+  created_at?: string;
+  quiz_count?: number;
+}
+
+export interface ELearningQuiz {
+  id: number;
+  title_fr: string;
+  title_en?: string;
+  description_fr?: string;
+  quiz_type: QuizType;
+  time_limit_minutes?: number;
+  passing_score: number;
+  max_attempts: number;
+  shuffle_questions: boolean;
+  shuffle_options: boolean;
+  show_correct_answers: boolean;
+  show_explanation: boolean;
+  allow_retake: boolean;
+  status: 'draft' | 'published';
+  created_by?: number;
+  created_at?: string;
+  question_count?: number;
+  total_points?: number;
+  questions?: ELearningQuestion[];
+}
+
+export interface QuizAttempt {
+  id: number;
+  user_id: number;
+  quiz_id: number;
+  enrollment_id?: number;
+  attempt_number: number;
+  status: AttemptStatus;
+  started_at: string;
+  completed_at?: string;
+  time_spent_seconds: number;
+  score?: number;
+  max_score: number;
+  correct_count: number;
+  total_questions: number;
+  passed: boolean;
+  responses?: QuizResponse[];
+  quiz?: ELearningQuiz;
+}
+
+export interface QuizResponse {
+  question_id: number;
+  question_text_fr?: string;
+  question_text_en?: string;
+  question_type?: QuestionType;
+  image_url?: string;
+  options?: QuestionOption[];
+  user_answer: number | number[] | boolean | string | null;
+  correct_answer?: number | number[] | boolean | string | string[];
+  is_correct: boolean;
+  points_earned: number;
+  points_possible: number;
+  explanation_fr?: string;
+  explanation_en?: string;
+  feedback_fr?: string;
+  feedback_en?: string;
+}
+
+export interface QuizAttemptResultAttempt {
+  id: number;
+  quiz_id: number;
+  quiz_title_fr: string;
+  quiz_title_en?: string;
+  status: AttemptStatus;
+  score: number;
+  score_percent: number;
+  max_score: number;
+  correct_count: number;
+  total_questions: number;
+  passed: boolean;
+  time_spent_seconds: number;
+  started_at: string;
+  completed_at?: string;
+}
+
+export interface QuizAttemptResult {
+  attempt: QuizAttemptResultAttempt;
+  results: QuizResponse[];
+  summary: {
+    total_questions: number;
+    correct: number;
+    incorrect: number;
+    score_percent: number;
+    passed: boolean;
+  };
+}
+
+export interface QuizQuestionForStudent {
+  id: number;
+  question_text_fr: string;
+  question_text_en?: string;
+  question_type: QuestionType;
+  image_url?: string;
+  options?: QuestionOption[];
+  points: number;
+  order: number;
+}

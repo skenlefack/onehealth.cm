@@ -4042,67 +4042,117 @@ const PageBuilder = ({ page, onSave, isDark, token, onClose }) => {
                         </div>
                       </div>
 
-                      {/* Content Preview for text_image blocks */}
-                      {(section.type === 'text_image' || section.type === 'text-image') && section.content && (
+                      {/* Content Preview for text_image blocks - supports both formats */}
+                      {(section.type === 'text_image' || section.type === 'text-image') && (
                         <div style={{
                           padding: '12px 12px 12px 46px',
                           borderTop: `1px solid ${isDark ? '#1e293b' : '#f1f5f9'}`,
-                          background: isDark ? '#0f172a40' : '#fafbfc',
+                          background: isDark ? '#0f172a40' : 'linear-gradient(135deg, #fafbfc 0%, #f1f5f9 100%)',
                           display: 'flex',
                           gap: '12px',
                           alignItems: 'flex-start'
                         }}>
-                          {/* Image thumbnail */}
-                          {section.content?.image?.src && (
-                            <div style={{
-                              width: '60px',
-                              height: '45px',
-                              borderRadius: '6px',
-                              overflow: 'hidden',
-                              flexShrink: 0,
-                              background: isDark ? '#1e293b' : '#e2e8f0'
-                            }}>
-                              <img
-                                src={section.content.image.src.startsWith('http') ? section.content.image.src : `http://localhost:5000${section.content.image.src}`}
-                                alt=""
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            </div>
-                          )}
-                          {/* Text preview */}
+                          {/* Image thumbnail - supports both formats */}
+                          {(() => {
+                            const imgSrc = section.image?.src || section.content?.image?.src;
+                            if (imgSrc) {
+                              return (
+                                <div style={{
+                                  width: '64px',
+                                  height: '48px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  flexShrink: 0,
+                                  background: isDark ? '#1e293b' : '#e2e8f0',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                  border: `2px solid ${isDark ? '#334155' : '#ffffff'}`
+                                }}>
+                                  <img
+                                    src={imgSrc.startsWith('http') ? imgSrc : `http://localhost:5000${imgSrc}`}
+                                    alt=""
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              );
+                            }
+                            return (
+                              <div style={{
+                                width: '64px',
+                                height: '48px',
+                                borderRadius: '8px',
+                                background: isDark ? '#1e293b' : '#e2e8f0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: isDark ? '#475569' : '#94a3b8',
+                                fontSize: '18px',
+                                flexShrink: 0
+                              }}>
+                                🖼️
+                              </div>
+                            );
+                          })()}
+                          {/* Text preview - supports both formats */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{
                               margin: 0,
                               fontSize: '12px',
-                              fontWeight: '600',
-                              color: isDark ? '#e2e8f0' : '#334155',
+                              fontWeight: '700',
+                              color: isDark ? '#e2e8f0' : '#1e293b',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               marginBottom: '4px'
                             }}>
-                              {section.content?.title?.[activeLang] || section.content?.[`title_${activeLang}`] || 'Sans titre'}
+                              {/* Title - support direct format (section.title) and wrapper format (section.content.title) */}
+                              {section.title?.[activeLang] || section.title?.fr || section.content?.title?.[activeLang] || section.content?.[`title_${activeLang}`] || 'Sans titre'}
                             </p>
                             <p style={{
                               margin: 0,
                               fontSize: '11px',
-                              color: isDark ? '#64748b' : '#94a3b8',
+                              color: isDark ? '#64748b' : '#64748b',
                               display: '-webkit-box',
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden'
+                              overflow: 'hidden',
+                              lineHeight: '1.4'
                             }}>
                               {(() => {
-                                const isLegacy = section.content?.content && typeof section.content.content === 'object';
-                                if (isLegacy) {
-                                  const contentArray = section.content.content?.[activeLang] || [];
-                                  const firstPara = contentArray.find(item => item.type === 'paragraph');
-                                  return firstPara?.text || 'Pas de contenu';
+                                // Direct format: section.content = { fr: [{type: 'paragraph', text: '...'}] }
+                                const directContent = section.content?.[activeLang] || section.content?.fr || [];
+                                if (Array.isArray(directContent)) {
+                                  const firstPara = directContent.find(item => item.type === 'paragraph');
+                                  if (firstPara?.text) return firstPara.text;
                                 }
-                                const paragraphs = section.content?.[`paragraphs_${activeLang}`] || [];
-                                return paragraphs[0] || 'Pas de contenu';
+                                // Wrapper format: section.content.content = { fr: [...] }
+                                const wrapperContent = section.content?.content?.[activeLang] || section.content?.content?.fr || [];
+                                if (Array.isArray(wrapperContent)) {
+                                  const firstPara = wrapperContent.find(item => item.type === 'paragraph');
+                                  if (firstPara?.text) return firstPara.text;
+                                }
+                                // Legacy flat format
+                                const legacyParagraphs = section.content?.[`paragraphs_${activeLang}`] || [];
+                                if (legacyParagraphs[0]) return legacyParagraphs[0];
+                                return 'Cliquez pour modifier le contenu...';
                               })()}
                             </p>
+                            {/* Layout indicator */}
+                            <div style={{
+                              marginTop: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <span style={{
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: isDark ? '#334155' : '#e2e8f0',
+                                color: isDark ? '#94a3b8' : '#64748b'
+                              }}>
+                                {(section.layout || 'text-left-image-right') === 'image-left-text-right' ? '◨ Image gauche' : '◧ Image droite'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -5532,17 +5582,44 @@ const TextImageBlockEditor = ({ block, onUpdate, isDark, activeLang, styles, tok
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
           {[
-            { value: 'text-left-image-right', label: 'Texte | Image', icon: '◧' },
-            { value: 'image-left-text-right', label: 'Image | Texte', icon: '◨' }
+            {
+              value: 'text-left-image-right',
+              label: 'Texte | Image',
+              visual: (
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '24px', height: '32px', borderRadius: '4px', background: 'currentColor', opacity: 0.3 }}></div>
+                  <div style={{ width: '20px', height: '32px', borderRadius: '4px', background: 'currentColor', opacity: 0.7 }}></div>
+                </div>
+              )
+            },
+            {
+              value: 'image-left-text-right',
+              label: 'Image | Texte',
+              visual: (
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '20px', height: '32px', borderRadius: '4px', background: 'currentColor', opacity: 0.7 }}></div>
+                  <div style={{ width: '24px', height: '32px', borderRadius: '4px', background: 'currentColor', opacity: 0.3 }}></div>
+                </div>
+              )
+            },
+            {
+              value: 'full-width',
+              label: 'Pleine largeur',
+              visual: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '44px', height: '14px', borderRadius: '3px', background: 'currentColor', opacity: 0.3 }}></div>
+                  <div style={{ width: '32px', height: '18px', borderRadius: '3px', background: 'currentColor', opacity: 0.7 }}></div>
+                </div>
+              )
+            }
           ].map(opt => (
             <button
               key={opt.value}
               onClick={() => updateLayout(opt.value)}
               style={{
-                flex: 1,
-                padding: '16px',
+                padding: '14px 8px',
                 background: getLayout() === opt.value
                   ? `linear-gradient(135deg, ${colors.cameroonGreen} 0%, #059669 100%)`
                   : (isDark ? '#1e293b' : '#ffffff'),
@@ -5550,13 +5627,13 @@ const TextImageBlockEditor = ({ block, onUpdate, isDark, activeLang, styles, tok
                 border: `2px solid ${getLayout() === opt.value ? colors.cameroonGreen : (isDark ? '#334155' : '#e2e8f0')}`,
                 borderRadius: '12px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px',
                 fontWeight: '600',
                 transition: 'all 0.2s ease',
                 boxShadow: getLayout() === opt.value ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
               }}
             >
-              <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>{opt.icon}</span>
+              {opt.visual}
               {opt.label}
             </button>
           ))}
@@ -8175,6 +8252,304 @@ const BlockPreview = ({ section, isDark, lang }) => {
           </div>
         </div>
       );
+
+    case 'text_image':
+    case 'text-image': {
+      // Support both formats: direct (block.title) and wrapper (block.content.title)
+      const isDirectFormat = section.title && typeof section.title === 'object';
+      const isWrapperFormat = c?.title && typeof c.title === 'object';
+
+      // Get title based on format
+      const blockTitle = isDirectFormat
+        ? (section.title?.[lang] || section.title?.fr || '')
+        : isWrapperFormat
+          ? (c.title?.[lang] || c.title?.fr || '')
+          : (c[`title_${lang}`] || '');
+
+      // Get content paragraphs
+      let paragraphs = [];
+      if (isDirectFormat) {
+        const contentArray = section.content?.[lang] || section.content?.fr || [];
+        paragraphs = contentArray.filter(item => item.type === 'paragraph').map(item => item.text || '');
+      } else if (isWrapperFormat) {
+        const contentArray = c.content?.[lang] || c.content?.fr || [];
+        paragraphs = contentArray.filter(item => item.type === 'paragraph').map(item => item.text || '');
+      } else {
+        paragraphs = c[`paragraphs_${lang}`] || [];
+      }
+
+      // Get list items
+      let listItems = [];
+      if (isDirectFormat) {
+        const contentArray = section.content?.[lang] || section.content?.fr || [];
+        const listBlock = contentArray.find(item => item.type === 'list');
+        listItems = listBlock?.items || [];
+      } else if (isWrapperFormat) {
+        const contentArray = c.content?.[lang] || c.content?.fr || [];
+        const listBlock = contentArray.find(item => item.type === 'list');
+        listItems = listBlock?.items || [];
+      } else {
+        listItems = c[`list_${lang}`] || [];
+      }
+
+      // Get image
+      const imageSrc = isDirectFormat ? section.image?.src : c.image?.src;
+      const imageAlt = isDirectFormat
+        ? (section.image?.alt?.[lang] || '')
+        : (c.image?.alt?.[lang] || c.image?.[`alt_${lang}`] || '');
+      const imageWidth = isDirectFormat ? section.image?.width : c.image?.width;
+      const imageHeight = isDirectFormat ? section.image?.height : c.image?.height;
+
+      // Get layout
+      const layout = isDirectFormat ? (section.layout || 'text-left-image-right') : (c.layout || 'text-left-image-right');
+      const isImageLeft = layout === 'image-left-text-right';
+      const isFullWidth = layout === 'full-width';
+
+      return (
+        <div style={{
+          padding: '48px 40px',
+          background: isDark ? '#0f172a' : '#ffffff'
+        }}>
+          {/* Title with gradient underline */}
+          {blockTitle && (
+            <div style={{ marginBottom: '32px', textAlign: isFullWidth ? 'center' : 'left' }}>
+              <h2 style={{
+                margin: '0 0 12px',
+                fontSize: '28px',
+                fontWeight: '700',
+                color: isDark ? '#f1f5f9' : '#1e293b'
+              }}>
+                {blockTitle}
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: isFullWidth ? 'center' : 'flex-start' }}>
+                <div style={{ height: '4px', width: '60px', background: `linear-gradient(90deg, ${colors.cameroonGreen}, ${colors.primary})`, borderRadius: '2px' }}></div>
+                <div style={{ height: '4px', width: '30px', background: `${colors.cameroonGreen}40`, borderRadius: '2px' }}></div>
+                <div style={{ height: '4px', width: '15px', background: `${colors.primary}30`, borderRadius: '2px' }}></div>
+              </div>
+            </div>
+          )}
+
+          {/* Content grid - full width layout */}
+          {isFullWidth ? (
+            <div>
+              {/* Text content centered */}
+              <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                {paragraphs.length > 0 && paragraphs.map((para, idx) => (
+                  <p key={idx} style={{
+                    margin: '0 0 16px',
+                    fontSize: '15px',
+                    lineHeight: '1.7',
+                    color: isDark ? '#94a3b8' : '#64748b',
+                    textAlign: 'justify'
+                  }}>
+                    {para.length > 200 ? para.substring(0, 200) + '...' : para}
+                  </p>
+                ))}
+                {listItems.length > 0 && (
+                  <ul style={{ margin: '16px 0', padding: 0, listStyle: 'none' }}>
+                    {listItems.slice(0, 5).map((item, idx) => (
+                      <li key={idx} style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        marginBottom: '10px'
+                      }}>
+                        <span style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: `linear-gradient(135deg, ${colors.cameroonGreen}, ${colors.primary})`,
+                          marginTop: '6px',
+                          flexShrink: 0
+                        }}></span>
+                        <span style={{ fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                          {item.length > 80 ? item.substring(0, 80) + '...' : item}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {/* Image centered below text */}
+              {imageSrc && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
+                  <div style={{
+                    position: 'relative',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                    maxWidth: '600px'
+                  }}>
+                    <img
+                      src={imageSrc.startsWith('http') ? imageSrc : `http://localhost:5000${imageSrc}`}
+                      alt={imageAlt}
+                      style={{
+                        width: '100%',
+                        maxHeight: '350px',
+                        objectFit: 'contain',
+                        background: isDark ? '#1e293b' : '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '8px'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+          /* Content grid - side by side layout */
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: imageSrc ? '1fr 1fr' : '1fr',
+            gap: '40px',
+            alignItems: 'center'
+          }}>
+            {/* Text content - order based on layout */}
+            <div style={{ order: isImageLeft ? 2 : 1 }}>
+              {/* Paragraphs */}
+              {paragraphs.length > 0 && paragraphs.map((para, idx) => (
+                <p key={idx} style={{
+                  margin: '0 0 16px',
+                  fontSize: '15px',
+                  lineHeight: '1.7',
+                  color: isDark ? '#94a3b8' : '#64748b',
+                  textAlign: 'justify'
+                }}>
+                  {para.length > 200 ? para.substring(0, 200) + '...' : para}
+                </p>
+              ))}
+
+              {/* List items */}
+              {listItems.length > 0 && (
+                <ul style={{ margin: '16px 0 0', padding: 0, listStyle: 'none' }}>
+                  {listItems.slice(0, 5).map((item, idx) => (
+                    <li key={idx} style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      marginBottom: '10px'
+                    }}>
+                      <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: `linear-gradient(135deg, ${colors.cameroonGreen}, ${colors.primary})`,
+                        marginTop: '6px',
+                        flexShrink: 0
+                      }}></span>
+                      <span style={{
+                        fontSize: '14px',
+                        color: isDark ? '#94a3b8' : '#64748b'
+                      }}>
+                        {item.length > 80 ? item.substring(0, 80) + '...' : item}
+                      </span>
+                    </li>
+                  ))}
+                  {listItems.length > 5 && (
+                    <li style={{ fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', marginLeft: '20px' }}>
+                      ... et {listItems.length - 5} autres éléments
+                    </li>
+                  )}
+                </ul>
+              )}
+
+              {/* Empty state */}
+              {paragraphs.length === 0 && listItems.length === 0 && (
+                <p style={{
+                  color: isDark ? '#475569' : '#cbd5e1',
+                  fontStyle: 'italic',
+                  fontSize: '14px'
+                }}>
+                  Ajoutez du contenu dans l'onglet "Contenu"
+                </p>
+              )}
+            </div>
+
+            {/* Image - order based on layout */}
+            {imageSrc && (
+              <div style={{ order: isImageLeft ? 1 : 2 }}>
+                <div style={{
+                  position: 'relative',
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.1)'
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    inset: '-2px',
+                    background: `linear-gradient(135deg, ${colors.cameroonGreen}30, ${colors.primary}30)`,
+                    borderRadius: '18px',
+                    zIndex: -1
+                  }}></div>
+                  <img
+                    src={imageSrc.startsWith('http') ? imageSrc : `http://localhost:5000${imageSrc}`}
+                    alt={imageAlt}
+                    style={{
+                      width: '100%',
+                      maxHeight: '300px',
+                      objectFit: 'contain',
+                      background: isDark ? '#1e293b' : '#f8fafc',
+                      borderRadius: '16px',
+                      padding: '8px'
+                    }}
+                  />
+                </div>
+                {imageAlt && (
+                  <p style={{
+                    textAlign: 'center',
+                    fontSize: '12px',
+                    color: isDark ? '#64748b' : '#94a3b8',
+                    marginTop: '12px',
+                    fontStyle: 'italic'
+                  }}>
+                    {imageAlt}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Placeholder when no image */}
+            {!imageSrc && (
+              <div style={{ order: isImageLeft ? 1 : 2, display: 'none' }}></div>
+            )}
+          </div>
+          )}
+
+          {/* Layout indicator */}
+          <div style={{
+            marginTop: '24px',
+            paddingTop: '16px',
+            borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            justifyContent: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <span style={{
+              fontSize: '11px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              background: isDark ? '#334155' : '#e2e8f0',
+              color: isDark ? '#94a3b8' : '#64748b'
+            }}>
+              📐 {isFullWidth ? 'Pleine largeur' : isImageLeft ? 'Image à gauche' : 'Image à droite'}
+            </span>
+            {imageSrc && (
+              <span style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: isDark ? '#334155' : '#e2e8f0',
+                color: isDark ? '#94a3b8' : '#64748b'
+              }}>
+                🖼️ {imageWidth || 'auto'}×{imageHeight || 'auto'}px
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     default:
       return (
@@ -12701,6 +13076,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const [enrollments, setEnrollments] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
+  const [certificates, setCertificates] = useState([]);
 
   // UI states
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -12732,6 +13108,12 @@ const OHELearningPage = ({ isDark, token }) => {
   const [questionDifficultyFilter, setQuestionDifficultyFilter] = useState('all');
   const [quizSearch, setQuizSearch] = useState('');
   const [quizTypeFilter, setQuizTypeFilter] = useState('all');
+  const [certificateSearch, setCertificateSearch] = useState('');
+  const [certificateStatusFilter, setCertificateStatusFilter] = useState('all');
+  const [pathSearch, setPathSearch] = useState('');
+  const [pathStatusFilter, setPathStatusFilter] = useState('all');
+  const [selectedPath, setSelectedPath] = useState(null);
+  const [showPathCoursesModal, setShowPathCoursesModal] = useState(false);
 
   // Fetch functions
   const fetchStats = async () => {
@@ -12790,6 +13172,15 @@ const OHELearningPage = ({ isDark, token }) => {
     }
   };
 
+  const fetchCertificates = async () => {
+    try {
+      const res = await api.get('/elearning/certificates/all', token);
+      if (res.success) setCertificates(res.data);
+    } catch (error) {
+      console.error('Fetch certificates error:', error);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchCourses();
@@ -12797,6 +13188,7 @@ const OHELearningPage = ({ isDark, token }) => {
     fetchLearningPaths();
     fetchQuestions();
     fetchQuizzes();
+    fetchCertificates();
   }, [token]);
 
   // Course CRUD
@@ -13086,6 +13478,106 @@ const OHELearningPage = ({ isDark, token }) => {
     }
   };
 
+  // Certificate handlers
+  const handleRevokeCertificate = async (cert) => {
+    setConfirmDialog({
+      title: 'Révoquer ce certificat ?',
+      message: `Êtes-vous sûr de vouloir révoquer le certificat de "${cert.recipient_name}" ?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await api.put(`/elearning/certificates/${cert.id}/revoke`, { reason: 'Révoqué par administrateur' }, token);
+          if (res.success) {
+            setToast({ message: 'Certificat révoqué', type: 'success' });
+            fetchCertificates();
+          }
+        } catch (error) {
+          setToast({ message: 'Erreur', type: 'error' });
+        }
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const handleReinstateCertificate = async (cert) => {
+    try {
+      const res = await api.put(`/elearning/certificates/${cert.id}/reinstate`, {}, token);
+      if (res.success) {
+        setToast({ message: 'Certificat réactivé', type: 'success' });
+        fetchCertificates();
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur', type: 'error' });
+    }
+  };
+
+  // Path courses handlers
+  const handleAddPathCourse = async (pathId, courseId) => {
+    try {
+      const res = await api.post(`/elearning/paths/${pathId}/courses`, { course_id: courseId, is_required: true }, token);
+      if (res.success) {
+        setToast({ message: 'Cours ajouté au parcours', type: 'success' });
+        fetchLearningPaths();
+        // Refresh selected path
+        if (selectedPath) {
+          const pathRes = await api.get(`/elearning/paths/${selectedPath.slug}`, token);
+          if (pathRes.success) setSelectedPath(pathRes.data);
+        }
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur', type: 'error' });
+    }
+  };
+
+  const handleRemovePathCourse = async (pathId, courseId) => {
+    try {
+      const res = await api.delete(`/elearning/paths/${pathId}/courses/${courseId}`, token);
+      if (res.success) {
+        setToast({ message: 'Cours retiré du parcours', type: 'success' });
+        fetchLearningPaths();
+        // Refresh selected path
+        if (selectedPath) {
+          const pathRes = await api.get(`/elearning/paths/${selectedPath.slug}`, token);
+          if (pathRes.success) setSelectedPath(pathRes.data);
+        }
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur', type: 'error' });
+    }
+  };
+
+  const handleDeletePath = async (path) => {
+    setConfirmDialog({
+      title: 'Supprimer ce parcours ?',
+      message: `Êtes-vous sûr de vouloir supprimer "${path.title_fr}" ?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await api.delete(`/elearning/paths/${path.id}`, token);
+          if (res.success) {
+            setToast({ message: 'Parcours supprimé', type: 'success' });
+            fetchLearningPaths();
+          }
+        } catch (error) {
+          setToast({ message: 'Erreur de suppression', type: 'error' });
+        }
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const viewPathCourses = async (path) => {
+    try {
+      const res = await api.get(`/elearning/paths/${path.slug}`, token);
+      if (res.success) {
+        setSelectedPath(res.data);
+        setShowPathCoursesModal(true);
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur de chargement', type: 'error' });
+    }
+  };
+
   // View course curriculum
   const viewCourseCurriculum = async (course) => {
     try {
@@ -13125,6 +13617,23 @@ const OHELearningPage = ({ isDark, token }) => {
     return true;
   });
 
+  // Filtered certificates
+  const filteredCertificates = certificates.filter(c => {
+    if (certificateSearch && !c.certificate_number?.toLowerCase().includes(certificateSearch.toLowerCase()) &&
+        !c.recipient_name?.toLowerCase().includes(certificateSearch.toLowerCase()) &&
+        !c.username?.toLowerCase().includes(certificateSearch.toLowerCase())) return false;
+    if (certificateStatusFilter !== 'all' && c.status !== certificateStatusFilter) return false;
+    return true;
+  });
+
+  // Filtered paths
+  const filteredPaths = learningPaths.filter(p => {
+    if (pathSearch && !p.title_fr?.toLowerCase().includes(pathSearch.toLowerCase()) &&
+        !p.title_en?.toLowerCase().includes(pathSearch.toLowerCase())) return false;
+    if (pathStatusFilter !== 'all' && p.status !== pathStatusFilter) return false;
+    return true;
+  });
+
   // Tab definitions
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -13133,6 +13642,7 @@ const OHELearningPage = ({ isDark, token }) => {
     { id: 'paths', label: 'Parcours', icon: Award },
     { id: 'questions', label: 'Banque Questions', icon: HelpCircle },
     { id: 'quizzes', label: 'Quiz', icon: FileQuestion },
+    { id: 'certificates', label: 'Certificats', icon: Award },
     { id: 'categories', label: 'Catégories', icon: Tag },
     { id: 'enrollments', label: 'Inscriptions', icon: Users }
   ].filter(t => !t.hidden);
@@ -13572,15 +14082,35 @@ const OHELearningPage = ({ isDark, token }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Parcours Diplômants</h2>
-          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{learningPaths.length} parcours</p>
+          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredPaths.length} parcours</p>
         </div>
         <button onClick={() => { setEditingPath(null); setShowPathModal(true); }} style={styles.btnPrimary}>
           <Plus size={18} /> Nouveau Parcours
         </button>
       </div>
 
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 2, minWidth: '200px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+          <input
+            type="text"
+            placeholder="Rechercher un parcours..."
+            value={pathSearch}
+            onChange={e => setPathSearch(e.target.value)}
+            style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
+          />
+        </div>
+        <select value={pathStatusFilter} onChange={e => setPathStatusFilter(e.target.value)} style={{ ...styles.select, minWidth: '150px' }}>
+          <option value="all">Tous les statuts</option>
+          <option value="draft">Brouillon</option>
+          <option value="published">Publié</option>
+          <option value="archived">Archivé</option>
+        </select>
+      </div>
+
       {/* Paths Grid */}
-      {learningPaths.length === 0 ? (
+      {filteredPaths.length === 0 ? (
         <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
           <Award size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
           <h3 style={{ margin: '0 0 8px' }}>Aucun parcours</h3>
@@ -13588,7 +14118,7 @@ const OHELearningPage = ({ isDark, token }) => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-          {learningPaths.map(path => (
+          {filteredPaths.map(path => (
             <div key={path.id} style={{ ...styles.card, borderLeft: `4px solid ${colors.purple}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
@@ -13607,9 +14137,9 @@ const OHELearningPage = ({ isDark, token }) => {
                 </div>
               </div>
 
-              {path.short_description_fr && (
+              {path.description_fr && (
                 <p style={{ margin: '0 0 12px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                  {path.short_description_fr.substring(0, 120)}...
+                  {path.description_fr.substring(0, 120)}...
                 </p>
               )}
 
@@ -13620,19 +14150,13 @@ const OHELearningPage = ({ isDark, token }) => {
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => { setEditingPath(path); setShowPathModal(true); }} style={{ ...styles.btnSecondary, flex: 1 }}>
-                  <Edit3 size={16} /> Modifier
+                <button onClick={() => viewPathCourses(path)} style={{ ...styles.btnSecondary, flex: 1 }}>
+                  <BookOpen size={16} /> Cours
                 </button>
-                <button onClick={() => setConfirmDialog({
-                  title: 'Supprimer ce parcours ?',
-                  message: `Êtes-vous sûr de vouloir supprimer "${path.title_fr}" ?`,
-                  type: 'danger',
-                  onConfirm: async () => {
-                    await api.delete(`/elearning/paths/${path.id}`, token);
-                    fetchLearningPaths();
-                    setConfirmDialog(null);
-                  }
-                })} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                <button onClick={() => { setEditingPath(path); setShowPathModal(true); }} style={styles.btnIcon}>
+                  <Edit3 size={16} />
+                </button>
+                <button onClick={() => handleDeletePath(path)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -14021,6 +14545,150 @@ const OHELearningPage = ({ isDark, token }) => {
   );
 
   // ============ RENDER ENROLLMENTS TAB ============
+  // ============ RENDER CERTIFICATES TAB ============
+  const renderCertificates = () => {
+    const getCertStatusBadge = (status) => {
+      const config = {
+        active: { label: 'Actif', color: colors.success },
+        expired: { label: 'Expiré', color: colors.warning },
+        revoked: { label: 'Révoqué', color: colors.error },
+        pending: { label: 'En attente', color: colors.textSecondary }
+      };
+      const c = config[status] || config.active;
+      return (
+        <span style={{
+          padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+          background: `${c.color}20`, color: c.color
+        }}>
+          {c.label}
+        </span>
+      );
+    };
+
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Certificats</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredCertificates.length} certificats émis</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 2, minWidth: '200px' }}>
+            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+            <input
+              type="text"
+              placeholder="Rechercher par numéro, nom..."
+              value={certificateSearch}
+              onChange={e => setCertificateSearch(e.target.value)}
+              style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
+            />
+          </div>
+          <select value={certificateStatusFilter} onChange={e => setCertificateStatusFilter(e.target.value)} style={{ ...styles.select, minWidth: '150px' }}>
+            <option value="all">Tous les statuts</option>
+            <option value="active">Actif</option>
+            <option value="expired">Expiré</option>
+            <option value="revoked">Révoqué</option>
+          </select>
+        </div>
+
+        {/* Certificates Table */}
+        {filteredCertificates.length === 0 ? (
+          <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
+            <Award size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px' }}>Aucun certificat</h3>
+            <p style={styles.textMuted}>Les certificats seront générés automatiquement lorsque les apprenants termineront leurs cours.</p>
+          </div>
+        ) : (
+          <div style={styles.card}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Numéro</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Titulaire</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Cours/Parcours</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Date</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Score</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Statut</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCertificates.map(cert => (
+                    <tr key={cert.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: '13px', color: colors.primary }}>{cert.certificate_number}</span>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div>
+                          <div style={{ fontWeight: '500', color: colors.text }}>{cert.recipient_name}</div>
+                          <div style={{ fontSize: '12px', color: colors.textSecondary }}>{cert.username || cert.user_email}</div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {cert.enrollable_type === 'learning_path' ? (
+                            <Award size={16} color={colors.purple} />
+                          ) : (
+                            <BookOpen size={16} color={colors.primary} />
+                          )}
+                          <span style={{ color: colors.text, fontSize: '13px' }}>{cert.course_title_fr || cert.title_fr}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px', color: colors.textSecondary, fontSize: '13px' }}>
+                        {new Date(cert.issue_date).toLocaleDateString('fr-FR')}
+                        {cert.expiry_date && (
+                          <div style={{ fontSize: '11px', color: colors.warning }}>
+                            Expire: {new Date(cert.expiry_date).toLocaleDateString('fr-FR')}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        {cert.final_score ? (
+                          <span style={{ fontWeight: '600', color: cert.final_score >= 70 ? colors.success : colors.warning }}>
+                            {Math.round(cert.final_score)}%
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        {getCertStatusBadge(cert.status)}
+                      </td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          {cert.status === 'active' ? (
+                            <button
+                              onClick={() => handleRevokeCertificate(cert)}
+                              title="Révoquer"
+                              style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
+                            >
+                              <XCircle size={16} />
+                            </button>
+                          ) : cert.status === 'revoked' ? (
+                            <button
+                              onClick={() => handleReinstateCertificate(cert)}
+                              title="Réactiver"
+                              style={{ ...styles.btnIcon, background: `${colors.success}15`, color: colors.success }}
+                            >
+                              <CheckCircle size={16} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderEnrollments = () => (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -15183,8 +15851,86 @@ const OHELearningPage = ({ isDark, token }) => {
       {activeTab === 'paths' && renderPaths()}
       {activeTab === 'questions' && renderQuestions()}
       {activeTab === 'quizzes' && renderQuizzes()}
+      {activeTab === 'certificates' && renderCertificates()}
       {activeTab === 'categories' && renderCategories()}
       {activeTab === 'enrollments' && renderEnrollments()}
+
+      {/* Path Courses Modal */}
+      {showPathCoursesModal && selectedPath && (
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modalContent, maxWidth: '800px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: colors.text }}>Cours du parcours: {selectedPath.title_fr}</h3>
+              <button onClick={() => { setShowPathCoursesModal(false); setSelectedPath(null); }} style={styles.btnSecondary}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Current courses in path */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ color: colors.text, marginBottom: '10px' }}>Cours inclus ({selectedPath.courses?.length || 0})</h4>
+              {selectedPath.courses?.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedPath.courses.map((course, idx) => (
+                    <div key={course.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px',
+                      background: isDark ? colors.surfaceHover : colors.background,
+                      borderRadius: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ color: colors.textSecondary, fontWeight: '500' }}>{idx + 1}.</span>
+                        <span style={{ color: colors.text }}>{course.title_fr}</span>
+                        {course.is_required && (
+                          <span style={{ padding: '2px 8px', background: colors.primary + '20', color: colors.primary, borderRadius: '4px', fontSize: '11px' }}>
+                            Obligatoire
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleRemovePathCourse(selectedPath.id, course.id)}
+                        style={{ ...styles.btnSecondary, padding: '6px 12px' }}
+                      >
+                        <X size={14} /> Retirer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: colors.textSecondary }}>Aucun cours dans ce parcours</p>
+              )}
+            </div>
+
+            {/* Add courses */}
+            <div>
+              <h4 style={{ color: colors.text, marginBottom: '10px' }}>Ajouter des cours</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                {courses.filter(c => !selectedPath.courses?.find(pc => pc.id === c.id) && c.status === 'published').map(course => (
+                  <div key={course.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px',
+                    background: isDark ? colors.surface : colors.background,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border}`
+                  }}>
+                    <span style={{ color: colors.text }}>{course.title_fr}</span>
+                    <button
+                      onClick={() => handleAddPathCourse(selectedPath.id, course.id)}
+                      style={{ ...styles.btnPrimary, padding: '6px 12px' }}
+                    >
+                      <Plus size={14} /> Ajouter
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

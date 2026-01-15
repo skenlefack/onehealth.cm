@@ -165,6 +165,38 @@ export interface Translation {
     pathDescription: string;
     requiredCourses: string;
     optionalCourses: string;
+    // Quiz
+    quizTitle: string;
+    startQuiz: string;
+    continueQuiz: string;
+    submitQuiz: string;
+    nextQuestion: string;
+    previousQuestion: string;
+    questionOf: string;
+    timeRemaining: string;
+    quizCompleted: string;
+    yourScore: string;
+    passingScore: string;
+    passed: string;
+    failed: string;
+    retakeQuiz: string;
+    viewResults: string;
+    correctAnswer: string;
+    yourAnswer: string;
+    explanation: string;
+    quizHistory: string;
+    attempt: string;
+    score: string;
+    status: string;
+    maxAttempts: string;
+    attemptsUsed: string;
+    selectAnswer: string;
+    selectAnswers: string;
+    typeAnswer: string;
+    trueOption: string;
+    falseOption: string;
+    confirmSubmit: string;
+    unansweredQuestions: string;
   };
   landing: {
     selectLanguage: string;
@@ -362,6 +394,38 @@ export const translations: Record<Language, Translation> = {
       pathDescription: 'Description du parcours',
       requiredCourses: 'Cours obligatoires',
       optionalCourses: 'Cours optionnels',
+      // Quiz
+      quizTitle: 'Quiz',
+      startQuiz: 'Commencer le quiz',
+      continueQuiz: 'Reprendre le quiz',
+      submitQuiz: 'Soumettre',
+      nextQuestion: 'Suivant',
+      previousQuestion: 'Précédent',
+      questionOf: 'Question {current} sur {total}',
+      timeRemaining: 'Temps restant',
+      quizCompleted: 'Quiz terminé !',
+      yourScore: 'Votre score',
+      passingScore: 'Score requis',
+      passed: 'Réussi',
+      failed: 'Échoué',
+      retakeQuiz: 'Reprendre le quiz',
+      viewResults: 'Voir les résultats',
+      correctAnswer: 'Bonne réponse',
+      yourAnswer: 'Votre réponse',
+      explanation: 'Explication',
+      quizHistory: 'Historique des tentatives',
+      attempt: 'Tentative',
+      score: 'Score',
+      status: 'Statut',
+      maxAttempts: 'Tentatives max',
+      attemptsUsed: '{used} sur {max} tentatives utilisées',
+      selectAnswer: 'Sélectionnez une réponse',
+      selectAnswers: 'Sélectionnez toutes les réponses correctes',
+      typeAnswer: 'Entrez votre réponse',
+      trueOption: 'Vrai',
+      falseOption: 'Faux',
+      confirmSubmit: 'Êtes-vous sûr de vouloir soumettre ?',
+      unansweredQuestions: 'Vous avez {count} question(s) sans réponse',
     },
     landing: {
       selectLanguage: 'Choisissez votre langue • Choose your language',
@@ -560,6 +624,38 @@ export const translations: Record<Language, Translation> = {
       pathDescription: 'Path description',
       requiredCourses: 'Required courses',
       optionalCourses: 'Optional courses',
+      // Quiz
+      quizTitle: 'Quiz',
+      startQuiz: 'Start quiz',
+      continueQuiz: 'Continue quiz',
+      submitQuiz: 'Submit',
+      nextQuestion: 'Next',
+      previousQuestion: 'Previous',
+      questionOf: 'Question {current} of {total}',
+      timeRemaining: 'Time remaining',
+      quizCompleted: 'Quiz completed!',
+      yourScore: 'Your score',
+      passingScore: 'Required score',
+      passed: 'Passed',
+      failed: 'Failed',
+      retakeQuiz: 'Retake quiz',
+      viewResults: 'View results',
+      correctAnswer: 'Correct answer',
+      yourAnswer: 'Your answer',
+      explanation: 'Explanation',
+      quizHistory: 'Attempt history',
+      attempt: 'Attempt',
+      score: 'Score',
+      status: 'Status',
+      maxAttempts: 'Max attempts',
+      attemptsUsed: '{used} of {max} attempts used',
+      selectAnswer: 'Select an answer',
+      selectAnswers: 'Select all correct answers',
+      typeAnswer: 'Enter your answer',
+      trueOption: 'True',
+      falseOption: 'False',
+      confirmSubmit: 'Are you sure you want to submit?',
+      unansweredQuestions: 'You have {count} unanswered question(s)',
     },
     landing: {
       selectLanguage: 'Choisissez votre langue • Choose your language',

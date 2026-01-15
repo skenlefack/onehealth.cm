@@ -2954,4 +2954,360 @@ router.get('/quizzes/:id/attempts', auth, async (req, res) => {
   }
 });
 
+// ============================================
+// CERTIFICATS
+// ============================================
+
+// GET /api/elearning/certificates - Liste des certificats de l'utilisateur
+router.get('/certificates', auth, async (req, res) => {
+  try {
+    const [certificates] = await db.query(`
+      SELECT c.*,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_fr ELSE lp.title_fr END as course_title_fr,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_en ELSE lp.title_en END as course_title_en,
+        CASE WHEN c.enrollable_type = 'course' THEN co.thumbnail ELSE lp.thumbnail END as thumbnail
+      FROM certificates c
+      LEFT JOIN courses co ON c.enrollable_type = 'course' AND c.enrollable_id = co.id
+      LEFT JOIN learning_paths lp ON c.enrollable_type = 'learning_path' AND c.enrollable_id = lp.id
+      WHERE c.user_id = ?
+      ORDER BY c.issue_date DESC
+    `, [req.user.id]);
+
+    res.json({ success: true, data: certificates });
+  } catch (error) {
+    console.error('Get certificates error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/certificates/all - Liste de tous les certificats (admin)
+router.get('/certificates/all', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, search, enrollable_type } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    if (status) {
+      whereClause += ' AND c.status = ?';
+      params.push(status);
+    }
+
+    if (enrollable_type) {
+      whereClause += ' AND c.enrollable_type = ?';
+      params.push(enrollable_type);
+    }
+
+    if (search) {
+      whereClause += ' AND (c.certificate_number LIKE ? OR c.recipient_name LIKE ? OR u.username LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    const [[{ total }]] = await db.query(`
+      SELECT COUNT(*) as total FROM certificates c
+      LEFT JOIN users u ON c.user_id = u.id
+      ${whereClause}
+    `, params);
+
+    const [certificates] = await db.query(`
+      SELECT c.*,
+        u.username, u.email as user_email,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_fr ELSE lp.title_fr END as course_title_fr,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_en ELSE lp.title_en END as course_title_en
+      FROM certificates c
+      LEFT JOIN users u ON c.user_id = u.id
+      LEFT JOIN courses co ON c.enrollable_type = 'course' AND c.enrollable_id = co.id
+      LEFT JOIN learning_paths lp ON c.enrollable_type = 'learning_path' AND c.enrollable_id = lp.id
+      ${whereClause}
+      ORDER BY c.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, parseInt(limit), offset]);
+
+    res.json({
+      success: true,
+      data: certificates,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Get all certificates error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/certificates/:id - Détail d'un certificat
+router.get('/certificates/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [certificates] = await db.query(`
+      SELECT c.*,
+        u.username, u.email as user_email,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_fr ELSE lp.title_fr END as course_title_fr,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_en ELSE lp.title_en END as course_title_en,
+        CASE WHEN c.enrollable_type = 'course' THEN co.thumbnail ELSE lp.thumbnail END as thumbnail
+      FROM certificates c
+      LEFT JOIN users u ON c.user_id = u.id
+      LEFT JOIN courses co ON c.enrollable_type = 'course' AND c.enrollable_id = co.id
+      LEFT JOIN learning_paths lp ON c.enrollable_type = 'learning_path' AND c.enrollable_id = lp.id
+      WHERE c.id = ?
+    `, [id]);
+
+    if (certificates.length === 0) {
+      return res.status(404).json({ success: false, message: 'Certificat non trouvé' });
+    }
+
+    // Vérifier si l'utilisateur a le droit de voir ce certificat
+    const cert = certificates[0];
+    if (cert.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Accès non autorisé' });
+    }
+
+    res.json({ success: true, data: cert });
+  } catch (error) {
+    console.error('Get certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/certificates/verify/:code - Vérification publique d'un certificat
+router.get('/certificates/verify/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    const [certificates] = await db.query(`
+      SELECT c.id, c.certificate_number, c.recipient_name, c.title_fr, c.title_en,
+        c.final_score, c.total_hours, c.issue_date, c.expiry_date, c.status,
+        c.signatory_name, c.signatory_title, c.enrollable_type,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_fr ELSE lp.title_fr END as course_title_fr,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_en ELSE lp.title_en END as course_title_en
+      FROM certificates c
+      LEFT JOIN courses co ON c.enrollable_type = 'course' AND c.enrollable_id = co.id
+      LEFT JOIN learning_paths lp ON c.enrollable_type = 'learning_path' AND c.enrollable_id = lp.id
+      WHERE c.verification_code = ? OR c.certificate_number = ?
+    `, [code, code]);
+
+    if (certificates.length === 0) {
+      return res.json({ success: false, valid: false, message: 'Certificat non trouvé' });
+    }
+
+    const cert = certificates[0];
+
+    // Incrémenter le compteur de vérifications
+    await db.query(`
+      UPDATE certificates SET verified_count = verified_count + 1, last_verified_at = NOW() WHERE id = ?
+    `, [cert.id]);
+
+    // Vérifier si le certificat est expiré
+    let isValid = cert.status === 'active';
+    if (cert.expiry_date && new Date(cert.expiry_date) < new Date()) {
+      isValid = false;
+      await db.query("UPDATE certificates SET status = 'expired' WHERE id = ?", [cert.id]);
+      cert.status = 'expired';
+    }
+
+    res.json({
+      success: true,
+      valid: isValid,
+      data: {
+        certificate_number: cert.certificate_number,
+        recipient_name: cert.recipient_name,
+        title_fr: cert.title_fr,
+        title_en: cert.title_en,
+        course_title_fr: cert.course_title_fr,
+        course_title_en: cert.course_title_en,
+        final_score: cert.final_score,
+        total_hours: cert.total_hours,
+        issue_date: cert.issue_date,
+        expiry_date: cert.expiry_date,
+        status: cert.status,
+        signatory_name: cert.signatory_name,
+        signatory_title: cert.signatory_title,
+        enrollable_type: cert.enrollable_type
+      }
+    });
+  } catch (error) {
+    console.error('Verify certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/elearning/certificates/generate - Générer un certificat
+router.post('/certificates/generate', auth, async (req, res) => {
+  try {
+    const { enrollment_id } = req.body;
+
+    // Vérifier l'inscription
+    const [enrollments] = await db.query(`
+      SELECT e.*,
+        CASE WHEN e.enrollable_type = 'course' THEN c.title_fr ELSE lp.title_fr END as title_fr,
+        CASE WHEN e.enrollable_type = 'course' THEN c.title_en ELSE lp.title_en END as title_en,
+        CASE WHEN e.enrollable_type = 'course' THEN c.certificate_enabled ELSE lp.certificate_enabled END as cert_enabled,
+        CASE WHEN e.enrollable_type = 'course' THEN c.certificate_validity_months ELSE lp.certificate_validity_months END as validity_months,
+        CASE WHEN e.enrollable_type = 'course' THEN c.duration_hours ELSE lp.duration_hours END as total_hours,
+        u.username, u.email, u.first_name, u.last_name
+      FROM enrollments e
+      LEFT JOIN courses c ON e.enrollable_type = 'course' AND e.enrollable_id = c.id
+      LEFT JOIN learning_paths lp ON e.enrollable_type = 'learning_path' AND e.enrollable_id = lp.id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.id = ? AND e.user_id = ?
+    `, [enrollment_id, req.user.id]);
+
+    if (enrollments.length === 0) {
+      return res.status(404).json({ success: false, message: 'Inscription non trouvée' });
+    }
+
+    const enrollment = enrollments[0];
+
+    // Vérifier si l'inscription est complétée
+    if (enrollment.status !== 'completed') {
+      return res.status(400).json({ success: false, message: 'Cours non terminé' });
+    }
+
+    // Vérifier si les certificats sont activés
+    if (!enrollment.cert_enabled) {
+      return res.status(400).json({ success: false, message: 'Certificats non disponibles pour ce cours' });
+    }
+
+    // Vérifier si un certificat existe déjà
+    const [existing] = await db.query(`
+      SELECT id FROM certificates WHERE enrollment_id = ? AND status = 'active'
+    `, [enrollment_id]);
+
+    if (existing.length > 0) {
+      return res.status(400).json({ success: false, message: 'Un certificat existe déjà' });
+    }
+
+    // Générer le certificat
+    const certificateNumber = generateCertificateNumber();
+    const verificationCode = `${certificateNumber}-${Date.now().toString(36)}`.toUpperCase();
+    const recipientName = enrollment.first_name && enrollment.last_name
+      ? `${enrollment.first_name} ${enrollment.last_name}`
+      : enrollment.username;
+    const issueDate = new Date();
+    let expiryDate = null;
+    if (enrollment.validity_months) {
+      expiryDate = new Date();
+      expiryDate.setMonth(expiryDate.getMonth() + enrollment.validity_months);
+    }
+
+    const [result] = await db.query(`
+      INSERT INTO certificates (
+        certificate_number, user_id, enrollable_type, enrollable_id, enrollment_id,
+        title_fr, title_en, recipient_name, recipient_email, final_score, total_hours,
+        issue_date, expiry_date, verification_code, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+    `, [
+      certificateNumber, req.user.id, enrollment.enrollable_type, enrollment.enrollable_id,
+      enrollment_id, enrollment.title_fr, enrollment.title_en, recipientName, enrollment.email,
+      enrollment.final_score, enrollment.total_hours, issueDate, expiryDate, verificationCode
+    ]);
+
+    // Mettre à jour l'inscription avec l'ID du certificat
+    await db.query('UPDATE enrollments SET certificate_id = ? WHERE id = ?', [result.insertId, enrollment_id]);
+
+    const [newCert] = await db.query('SELECT * FROM certificates WHERE id = ?', [result.insertId]);
+
+    res.status(201).json({ success: true, data: newCert[0], message: 'Certificat généré' });
+  } catch (error) {
+    console.error('Generate certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/elearning/certificates/:id/revoke - Révoquer un certificat (admin)
+router.put('/certificates/:id/revoke', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const [existing] = await db.query('SELECT * FROM certificates WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Certificat non trouvé' });
+    }
+
+    await db.query(`
+      UPDATE certificates SET status = 'revoked', revoked_at = NOW(), revoked_by = ?, revoked_reason = ?
+      WHERE id = ?
+    `, [req.user.id, reason || 'Révoqué par administrateur', id]);
+
+    res.json({ success: true, message: 'Certificat révoqué' });
+  } catch (error) {
+    console.error('Revoke certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/elearning/certificates/:id/reinstate - Réactiver un certificat (admin)
+router.put('/certificates/:id/reinstate', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db.query('SELECT * FROM certificates WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Certificat non trouvé' });
+    }
+
+    await db.query(`
+      UPDATE certificates SET status = 'active', revoked_at = NULL, revoked_by = NULL, revoked_reason = NULL
+      WHERE id = ?
+    `, [id]);
+
+    res.json({ success: true, message: 'Certificat réactivé' });
+  } catch (error) {
+    console.error('Reinstate certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/certificates/:id/download - Télécharger le PDF du certificat
+router.get('/certificates/:id/download', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [certificates] = await db.query(`
+      SELECT c.*,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_fr ELSE lp.title_fr END as course_title_fr,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_en ELSE lp.title_en END as course_title_en,
+        CASE WHEN c.enrollable_type = 'course' THEN co.thumbnail ELSE lp.thumbnail END as thumbnail
+      FROM certificates c
+      LEFT JOIN courses co ON c.enrollable_type = 'course' AND c.enrollable_id = co.id
+      LEFT JOIN learning_paths lp ON c.enrollable_type = 'learning_path' AND c.enrollable_id = lp.id
+      WHERE c.id = ?
+    `, [id]);
+
+    if (certificates.length === 0) {
+      return res.status(404).json({ success: false, message: 'Certificat non trouvé' });
+    }
+
+    const cert = certificates[0];
+
+    // Vérifier les droits
+    if (cert.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Accès non autorisé' });
+    }
+
+    // Si un PDF existe déjà, rediriger vers celui-ci
+    if (cert.pdf_url) {
+      return res.redirect(cert.pdf_url);
+    }
+
+    // Sinon, générer le PDF à la volée (version simplifiée)
+    // En production, utiliser une bibliothèque comme PDFKit ou Puppeteer
+    res.json({
+      success: true,
+      message: 'PDF generation not implemented yet',
+      data: cert
+    });
+  } catch (error) {
+    console.error('Download certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;

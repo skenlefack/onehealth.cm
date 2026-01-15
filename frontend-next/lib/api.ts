@@ -4,7 +4,8 @@ import {
   OHWROrganization, OHWRMaterial, OHWRDocument, OHWRMapMarker,
   ELearningCategory, ELearningCourse, ELearningLearningPath,
   ELearningCourseCurriculum, ELearningEnrollment, ELearningCertificate,
-  ELearningStats, ELearningLesson
+  ELearningStats, ELearningLesson, ELearningQuiz, QuizAttempt,
+  QuizAttemptResult, QuizQuestionForStudent
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -443,4 +444,146 @@ export async function verifyELearningCertificate(code: string): Promise<ApiRespo
 // Stats
 export async function getELearningStats(): Promise<ApiResponse<ELearningStats>> {
   return fetchApi<ELearningStats>('/elearning/stats');
+}
+
+// === QUIZ ===
+
+// Get quiz details
+export async function getQuiz(quizId: number, token?: string): Promise<ApiResponse<ELearningQuiz>> {
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetchApi<ELearningQuiz>(`/elearning/quizzes/${quizId}`, { headers });
+}
+
+// Start a quiz attempt
+export async function startQuizAttempt(quizId: number, token: string, enrollmentId?: number): Promise<ApiResponse<{
+  attempt_id: number;
+  attempt_number: number;
+  questions: QuizQuestionForStudent[];
+  time_limit_minutes: number | null;
+  started_at: string;
+}>> {
+  return fetchApi(`/elearning/quizzes/${quizId}/start`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ enrollment_id: enrollmentId })
+  });
+}
+
+// Get attempt details (for resuming)
+export async function getQuizAttempt(attemptId: number, token: string): Promise<ApiResponse<{
+  attempt: QuizAttempt;
+  questions: QuizQuestionForStudent[];
+  time_remaining_seconds: number | null;
+}>> {
+  return fetchApi(`/elearning/attempts/${attemptId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Submit quiz answers
+export async function submitQuizAttempt(attemptId: number, responses: Record<number, any>, token: string): Promise<ApiResponse<QuizAttemptResult>> {
+  return fetchApi<QuizAttemptResult>(`/elearning/attempts/${attemptId}/submit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ responses })
+  });
+}
+
+// Get quiz results
+export async function getQuizAttemptResults(attemptId: number, token: string): Promise<ApiResponse<QuizAttemptResult>> {
+  return fetchApi<QuizAttemptResult>(`/elearning/attempts/${attemptId}/results`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Abandon quiz attempt
+export async function abandonQuizAttempt(attemptId: number, token: string): Promise<ApiResponse<{ message: string }>> {
+  return fetchApi<{ message: string }>(`/elearning/attempts/${attemptId}/abandon`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Get user's quiz history for a specific quiz
+export async function getQuizHistory(quizId: number, token: string): Promise<ApiResponse<QuizAttempt[]>> {
+  return fetchApi<QuizAttempt[]>(`/elearning/quizzes/${quizId}/history`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// ============== LEARNING PATHS ==============
+
+// Get all learning paths
+export async function getLearningPaths(params?: {
+  page?: number;
+  limit?: number;
+  level?: string;
+  category_id?: number;
+  search?: string;
+}): Promise<ApiResponse<ELearningLearningPath[]>> {
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.set('page', String(params.page));
+  if (params?.limit) queryParams.set('limit', String(params.limit));
+  if (params?.level) queryParams.set('level', params.level);
+  if (params?.category_id) queryParams.set('category_id', String(params.category_id));
+  if (params?.search) queryParams.set('search', params.search);
+
+  const query = queryParams.toString();
+  return fetchApi<ELearningLearningPath[]>(`/elearning/paths${query ? `?${query}` : ''}`);
+}
+
+// Get single learning path by slug
+export async function getLearningPath(slug: string, token?: string): Promise<ApiResponse<ELearningLearningPath & { courses: ELearningCourse[] }>> {
+  return fetchApi<ELearningLearningPath & { courses: ELearningCourse[] }>(`/elearning/paths/${slug}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+  });
+}
+
+// Enroll in learning path
+export async function enrollInPath(pathId: number, token: string): Promise<ApiResponse<{ enrollment_id: number }>> {
+  return fetchApi<{ enrollment_id: number }>('/elearning/enroll', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ enrollable_type: 'learning_path', enrollable_id: pathId })
+  });
+}
+
+// ============== CERTIFICATES ==============
+
+// Get user's certificates
+export async function getMyCertificates(token: string): Promise<ApiResponse<ELearningCertificate[]>> {
+  return fetchApi<ELearningCertificate[]>('/elearning/certificates', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Verify certificate (public)
+export async function verifyCertificate(code: string): Promise<ApiResponse<{
+  valid: boolean;
+  certificate_number?: string;
+  recipient_name?: string;
+  title_fr?: string;
+  title_en?: string;
+  course_title_fr?: string;
+  course_title_en?: string;
+  final_score?: number;
+  total_hours?: number;
+  issue_date?: string;
+  expiry_date?: string;
+  status?: string;
+  signatory_name?: string;
+  signatory_title?: string;
+  enrollable_type?: string;
+}>> {
+  return fetchApi(`/elearning/certificates/verify/${code}`);
+}
+
+// Generate certificate
+export async function generateCertificate(enrollmentId: number, token: string): Promise<ApiResponse<ELearningCertificate>> {
+  return fetchApi<ELearningCertificate>('/elearning/certificates/generate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ enrollment_id: enrollmentId })
+  });
 }

@@ -81,26 +81,29 @@ export default async function DynamicPage({ params }: PageProps) {
       )}
 
       {/* Page Content */}
-      <section className={`${page.show_title ? 'py-12' : 'pt-32 pb-20'} px-[5%] bg-white min-h-screen`}>
-        <div className="max-w-6xl mx-auto">
+      <section className={`${page.show_title ? 'py-8 md:py-12' : 'pt-28 pb-16'} bg-gradient-to-b from-white to-gray-50/30 min-h-screen`}>
+        <div className="max-w-7xl mx-auto px-4 md:px-[5%]">
           {/* Render structured sections */}
           {sections.length > 0 ? (
-            <div className="space-y-12">
-              {sections.map((section) => (
+            <div className="space-y-4">
+              {sections.map((section, index) => (
                 <PageSectionRenderer
                   key={section.id}
                   section={section}
                   lang={lang as Language}
+                  index={index}
                 />
               ))}
             </div>
           ) : (
             /* Render raw HTML content if no sections */
             page.content && (
-              <div
-                className="prose prose-lg max-w-none"
-                dangerouslySetInnerHTML={{ __html: page.content }}
-              />
+              <div className="bg-white rounded-2xl p-8 md:p-12 shadow-sm">
+                <div
+                  className="prose prose-lg max-w-none prose-headings:text-gray-800 prose-p:text-gray-600 prose-a:text-oh-blue"
+                  dangerouslySetInnerHTML={{ __html: page.content }}
+                />
+              </div>
             )
           )}
         </div>
