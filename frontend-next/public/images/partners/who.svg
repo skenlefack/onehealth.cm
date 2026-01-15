@@ -1,0 +1,10 @@
+<svg width="200" height="80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="white"/>
+  <circle cx="40" cy="40" r="30" fill="#009EDB"/>
+  <text x="40" y="36" font-family="Arial, sans-serif" font-size="10" fill="white" text-anchor="middle">WHO</text>
+  <text x="40" y="50" font-family="Arial, sans-serif" font-size="8" fill="white" text-anchor="middle">OMS</text>
+  <text x="130" y="30" font-family="Arial, sans-serif" font-size="9" fill="#009EDB" text-anchor="middle">World Health</text>
+  <text x="130" y="42" font-family="Arial, sans-serif" font-size="9" fill="#009EDB" text-anchor="middle">Organization</text>
+  <text x="130" y="58" font-family="Arial, sans-serif" font-size="8" fill="#666" text-anchor="middle">Organisation mondiale</text>
+  <text x="130" y="68" font-family="Arial, sans-serif" font-size="8" fill="#666" text-anchor="middle">de la sante</text>
+</svg>

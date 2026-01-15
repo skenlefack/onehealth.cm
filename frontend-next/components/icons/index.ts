@@ -1,0 +1,1 @@
+export { OneHealthLogo } from './OneHealthLogo';

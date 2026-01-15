@@ -1,0 +1,10 @@
+<svg width="200" height="80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="white"/>
+  <circle cx="40" cy="40" r="28" fill="#009EDB"/>
+  <text x="40" y="35" font-family="Arial Black, sans-serif" font-size="10" fill="white" text-anchor="middle">WOAH</text>
+  <text x="40" y="50" font-family="Arial, sans-serif" font-size="7" fill="white" text-anchor="middle">ex-OIE</text>
+  <text x="130" y="32" font-family="Arial, sans-serif" font-size="9" fill="#009EDB" text-anchor="middle">World Organisation</text>
+  <text x="130" y="44" font-family="Arial, sans-serif" font-size="9" fill="#009EDB" text-anchor="middle">for Animal Health</text>
+  <text x="130" y="60" font-family="Arial, sans-serif" font-size="8" fill="#666" text-anchor="middle">Organisation mondiale</text>
+  <text x="130" y="70" font-family="Arial, sans-serif" font-size="8" fill="#666" text-anchor="middle">de la santé animale</text>
+</svg>
