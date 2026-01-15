@@ -540,15 +540,6 @@ export async function getLearningPath(slug: string, token?: string): Promise<Api
   });
 }
 
-// Enroll in learning path
-export async function enrollInPath(pathId: number, token: string): Promise<ApiResponse<{ enrollment_id: number }>> {
-  return fetchApi<{ enrollment_id: number }>('/elearning/enroll', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ enrollable_type: 'learning_path', enrollable_id: pathId })
-  });
-}
-
 // ============== CERTIFICATES ==============
 
 // Get user's certificates

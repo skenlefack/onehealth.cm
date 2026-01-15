@@ -1888,31 +1888,31 @@ router.post('/questions', auth, authorize('admin', 'editor'), async (req, res) =
         question_text_fr, question_text_en,
         question_type,
         explanation_fr, explanation_en,
+        hint_fr, hint_en,
         image_url, audio_url, video_url,
-        options, correct_answer,
+        options, correct_answer, answer_feedback,
         points, difficulty,
         category_id, tags,
-        time_limit_seconds,
-        hint_fr, hint_en,
-        feedback_correct_fr, feedback_correct_en,
-        feedback_incorrect_fr, feedback_incorrect_en,
         created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       question_text_fr, question_text_en,
       question_type,
       explanation_fr, explanation_en,
+      hint_fr, hint_en,
       image_url, audio_url, video_url,
       JSON.stringify(options || []),
       JSON.stringify(correct_answer || null),
+      JSON.stringify({
+        correct_fr: feedback_correct_fr || null,
+        correct_en: feedback_correct_en || null,
+        incorrect_fr: feedback_incorrect_fr || null,
+        incorrect_en: feedback_incorrect_en || null
+      }),
       points || 1,
       difficulty || 'medium',
-      category_id,
+      category_id || null,
       JSON.stringify(tags || []),
-      time_limit_seconds || null,
-      hint_fr, hint_en,
-      feedback_correct_fr, feedback_correct_en,
-      feedback_incorrect_fr, feedback_incorrect_en,
       req.user.id
     ]);
 
@@ -2192,12 +2192,9 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
         show_score_immediately,
         allow_review,
         allow_retake,
-        require_passing_to_proceed,
-        negative_marking,
-        negative_marking_percent,
         status,
         created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title_fr, title_en,
       description_fr, description_en,
@@ -2213,9 +2210,6 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
       show_score_immediately !== false,
       allow_review !== false,
       allow_retake !== false,
-      require_passing_to_proceed || false,
-      negative_marking || false,
-      negative_marking_percent || 0,
       status || 'draft',
       req.user.id
     ]);
@@ -2347,8 +2341,6 @@ router.post('/quizzes/:id/questions', auth, authorize('admin', 'editor'), async 
       JOIN questions q ON qq.question_id = q.id
       WHERE qq.quiz_id = ?
     `, [id]);
-
-    await db.query('UPDATE quizzes SET total_points = ? WHERE id = ?', [totalPoints, id]);
 
     res.json({ success: true, message: 'Questions ajoutées au quiz', data: { totalPoints } });
   } catch (error) {

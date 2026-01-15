@@ -35,9 +35,10 @@ export default async function CertificateVerifyPage({ params }: PageProps) {
 
   // Verify the certificate
   const result = await verifyCertificate(code);
+  const cert = result.data;
 
   const getStatusInfo = () => {
-    if (!result.success || !result.data?.valid) {
+    if (!result.success || !cert?.valid) {
       return {
         icon: XCircle,
         color: 'text-red-500',
@@ -49,8 +50,6 @@ export default async function CertificateVerifyPage({ params }: PageProps) {
           : 'This verification code does not match any valid certificate.',
       };
     }
-
-    const cert = result.data.certificate;
 
     if (cert?.status === 'revoked') {
       return {
@@ -92,7 +91,6 @@ export default async function CertificateVerifyPage({ params }: PageProps) {
 
   const statusInfo = getStatusInfo();
   const StatusIcon = statusInfo.icon;
-  const cert = result.data?.certificate;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -143,7 +141,7 @@ export default async function CertificateVerifyPage({ params }: PageProps) {
           </div>
 
           {/* Certificate Details (if valid or expired) */}
-          {cert && result.data?.valid && (
+          {cert && cert.valid && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {/* Certificate Header */}
               <div className="bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-4 text-white">
@@ -209,11 +207,11 @@ export default async function CertificateVerifyPage({ params }: PageProps) {
                       </span>
                     </div>
                     <p className="font-semibold text-slate-800">
-                      {new Date(cert.issue_date).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+                      {cert.issue_date ? new Date(cert.issue_date).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
-                      })}
+                      }) : '-'}
                     </p>
                   </div>
 
@@ -257,18 +255,20 @@ export default async function CertificateVerifyPage({ params }: PageProps) {
               <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
                 <div className="flex items-center justify-between text-sm text-slate-500">
                   <span>
-                    {language === 'fr' ? 'Code de vérification:' : 'Verification code:'} <code className="font-mono bg-slate-200 px-2 py-0.5 rounded">{cert.verification_code}</code>
+                    {language === 'fr' ? 'Code de vérification:' : 'Verification code:'} <code className="font-mono bg-slate-200 px-2 py-0.5 rounded">{code}</code>
                   </span>
-                  <span>
-                    {language === 'fr' ? 'Vérifié' : 'Verified'} {cert.verified_count || 0}x
-                  </span>
+                  {cert.signatory_name && (
+                    <span>
+                      {language === 'fr' ? 'Signé par' : 'Signed by'}: {cert.signatory_name}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
           {/* Invalid Certificate Message */}
-          {(!result.success || !result.data?.valid || cert?.status === 'revoked') && (
+          {(!result.success || !cert?.valid || cert?.status === 'revoked') && (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center">
               <p className="text-slate-600 mb-4">
                 {language === 'fr'
