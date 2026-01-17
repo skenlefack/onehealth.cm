@@ -91,8 +91,8 @@ export default async function HomePage({ params }: PageProps) {
       {/* Section 2: À propos / Hero Section */}
       <HeroSection lang={lang as Language} t={t} content={getSection('hero')?.content} />
 
-      {/* Section 3: Notre Approche / Les Trois Piliers */}
-      <PillarsSection t={t} content={getSection('pillars')?.content} />
+      {/* Section 3: Notre Approche / Les Quatre Piliers */}
+      <PillarsSection t={t} content={getSection('pillars')?.content} lang={lang} />
 
       {/* Section 4: Stratégie de Mise en Oeuvre */}
       <ImplementationStrategySection lang={lang as Language} t={t} content={getSection('implementation')?.content} />

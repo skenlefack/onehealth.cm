@@ -1,0 +1,96 @@
+# Docker Compose - Local Development
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: onehealth-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-onehealth_cms}
+      MYSQL_USER: ${DB_USER:-onehealth}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-devpassword}
+    # Uncomment to expose MySQL port externally (requires stopping local MySQL)
+    # ports:
+    #   - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/config/database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - onehealth-network
+
+  # Backend API (Express.js)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: onehealth-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      DB_HOST: db
+      DB_USER: ${DB_USER:-onehealth}
+      DB_PASSWORD: ${DB_PASSWORD:-devpassword}
+      DB_NAME: ${DB_NAME:-onehealth_cms}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      FRONTEND_URL: http://localhost:3002
+      ADMIN_URL: http://localhost:3001
+    ports:
+      - "5001:5000"  # Use 5001 externally to avoid conflict with local backend
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - onehealth-network
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend-next
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5000/api
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:5000
+        BACKEND_INTERNAL_URL: http://backend:5000
+    container_name: onehealth-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      BACKEND_INTERNAL_URL: http://backend:5000
+    ports:
+      - "3003:3002"  # Use 3003 externally to avoid conflict with local frontend
+    depends_on:
+      - backend
+    networks:
+      - onehealth-network
+
+  # Admin Panel (React)
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: /api
+    container_name: onehealth-admin
+    restart: unless-stopped
+    ports:
+      - "3004:80"  # Use 3004 externally to avoid conflict with local admin
+    depends_on:
+      - backend
+    networks:
+      - onehealth-network
+
+networks:
+  onehealth-network:
+    driver: bridge
+
+volumes:
+  mysql_data:

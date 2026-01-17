@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
-import { Mail, Phone, Facebook, Twitter, Linkedin, Youtube, Map, GraduationCap, ChevronDown } from 'lucide-react';
+import { Mail, Phone, Facebook, Twitter, Linkedin, Youtube, ChevronDown } from 'lucide-react';
 import { Language, MenuItem } from '@/lib/types';
 import { Translation } from '@/lib/translations';
-import { Button } from '@/components/ui';
+import { UserMenu } from '@/components/auth';
 import { cn } from '@/lib/utils';
 import { useLoading } from '@/lib/LoadingContext';
 import { getMenu, getSettings, SiteSettings } from '@/lib/api';
@@ -316,32 +316,9 @@ export function Header({ lang, t }: HeaderProps) {
             ))}
           </nav>
 
-          {/* CTA Buttons */}
-          <div className="flex gap-2">
-            <a
-              href={`/${lang}/ohwr-mapping`}
-              onClick={(e) => handleNavClick(e, `/${lang}/ohwr-mapping`)}
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={<Map size={16} />}
-              >
-                OHWR-Map
-              </Button>
-            </a>
-            <a
-              href={`/${lang}/oh-elearning`}
-              onClick={(e) => handleNavClick(e, `/${lang}/oh-elearning`)}
-            >
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<GraduationCap size={16} />}
-              >
-                OH E-learning
-              </Button>
-            </a>
+          {/* User Menu */}
+          <div className="flex items-center gap-3">
+            <UserMenu lang={lang} />
           </div>
         </div>
       </header>

@@ -10,12 +10,19 @@ const app = express();
 
 // Liste des origines autorisées
 const allowedOrigins = [
+  // Development
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'http://127.0.0.1:3002'
+  'http://127.0.0.1:3002',
+  // Production - add from environment variable
+  ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []),
+  // Default production domains
+  'https://onehealth.cm',
+  'https://www.onehealth.cm',
+  'https://admin.onehealth.cm'
 ];
 
 // Security middleware
@@ -91,6 +98,9 @@ app.use('/api/elearning', require('./routes/elearning'));
 // Upload
 app.use('/api/upload', require('./routes/upload'));
 
+// COHRM - Cameroon One Health Rumor Management
+app.use('/api/cohrm', require('./routes/cohrm'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
@@ -122,3 +132,4 @@ app.listen(PORT, () => {
 module.exports = app;
 // force reload Thu, Jan  8, 2026 12:56:20 AM
 
+// trigger restart

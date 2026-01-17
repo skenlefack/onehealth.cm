@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Tests
+test
+tests
+*.test.js
+coverage
+
+# Documentation
+*.md
+docs
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp
+temp
+*.tmp

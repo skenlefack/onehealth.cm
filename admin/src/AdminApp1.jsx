@@ -450,7 +450,7 @@ const LoginPage = ({ onLogin, isDark, setIsDark }) => {
             Plateforme de gestion du contenu pour la surveillance des zoonoses
           </p>
 
-          {/* Les 3 piliers */}
+          {/* Les 4 piliers */}
           <div style={{ display: 'flex', gap: '30px', marginTop: '50px', justifyContent: 'center' }}>
             {[
               { icon: Heart, label: 'Santé Humaine', color: colors.primary },

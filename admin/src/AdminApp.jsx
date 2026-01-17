@@ -1,5 +1,7 @@
 import PageBuilderPage from './PageBuilderPage';
+import COHRMSystemPage from './COHRMSystemPage';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, Polyline, Polygon, Autocomplete } from '@react-google-maps/api';
 import {
   LayoutDashboard, FileText, FolderTree, Image, Users, MessageSquare,
   Settings, Menu, X, Plus, Edit, Edit2, Edit3, Trash2, Eye, Search, Filter,
@@ -12,7 +14,10 @@ import {
   FolderOpen, Home, ExternalLink, MoreVertical, ArrowUp, ArrowDown,
   Columns, Square, Circle, Triangle, Star, Zap, Play, Pause, Camera,
   MapPin, GraduationCap, BookOpen, Award, Phone, Linkedin, Twitter,
-  HelpCircle, FileQuestion, ListChecks, Timer, Target, CheckCircle2, XCircle, File
+  HelpCircle, FileQuestion, ListChecks, Timer, Target, CheckCircle2, CheckCircle, XCircle, File,
+  Navigation, Map, Radio, AlertTriangle, Megaphone, Radar, Send, MessageCircle, Hash,
+  Wifi, WifiOff, Signal, Smartphone as SmartphoneIcon, Database, Server, TrendingDown,
+  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode
 } from 'lucide-react';
 
 // ============== COULEURS ONE HEALTH ==============
@@ -36,7 +41,17 @@ const colors = {
 };
 
 // ============== API CONFIG ==============
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
+
+const safeJson = async (res) => {
+  try {
+    const text = await res.text();
+    return text ? JSON.parse(text) : { success: false, message: 'Empty response' };
+  } catch (e) {
+    console.error('JSON parse error:', e);
+    return { success: false, message: 'Invalid JSON response' };
+  }
+};
 
 const api = {
   get: async (endpoint, token) => {
@@ -44,7 +59,7 @@ const api = {
       const res = await fetch(`${API_URL}${endpoint}`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       console.error('API Error:', error);
       return { success: false, message: 'Connection error' };
@@ -57,7 +72,7 @@ const api = {
         headers: { 'Authorization': token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Connection error' };
     }
@@ -69,7 +84,7 @@ const api = {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Connection error' };
     }
@@ -80,7 +95,7 @@ const api = {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Connection error' };
     }
@@ -92,11 +107,517 @@ const api = {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Upload error' };
     }
   }
+};
+
+// ============== SEARCHABLE SELECT COMPONENT ==============
+const SearchableSelect = ({
+  options = [],
+  value,
+  onChange,
+  placeholder = 'Sélectionner...',
+  searchPlaceholder = 'Rechercher...',
+  style = {},
+  isDark = false,
+  disabled = false,
+  allowEmpty = true,
+  emptyLabel = 'Tous'
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Sort options alphabetically
+  const sortedOptions = useMemo(() => {
+    return [...options].sort((a, b) => {
+      const labelA = (a.label || a.name || '').toLowerCase();
+      const labelB = (b.label || b.name || '').toLowerCase();
+      return labelA.localeCompare(labelB, 'fr');
+    });
+  }, [options]);
+
+  // Filter options based on search
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return sortedOptions;
+    const searchLower = search.toLowerCase();
+    return sortedOptions.filter(opt => {
+      const label = (opt.label || opt.name || '').toLowerCase();
+      const val = (opt.value || opt.slug || '').toLowerCase();
+      return label.includes(searchLower) || val.includes(searchLower);
+    });
+  }, [sortedOptions, search]);
+
+  // Get current label
+  const currentLabel = useMemo(() => {
+    if (!value) return allowEmpty ? emptyLabel : placeholder;
+    const found = options.find(o => (o.value || o.slug) === value);
+    return found ? (found.label || found.name) : value;
+  }, [value, options, allowEmpty, emptyLabel, placeholder]);
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus input when opening
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (optValue) => {
+    onChange({ target: { value: optValue } });
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  const baseStyle = {
+    position: 'relative',
+    ...style
+  };
+
+  const buttonStyle = {
+    width: '100%',
+    padding: '10px 14px',
+    paddingRight: '36px',
+    borderRadius: '10px',
+    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+    background: isDark ? '#1e293b' : '#ffffff',
+    color: isDark ? '#e2e8f0' : '#1e293b',
+    fontSize: '14px',
+    textAlign: 'left',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.6 : 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    transition: 'all 0.2s'
+  };
+
+  const dropdownStyle = {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: '4px',
+    background: isDark ? '#1e293b' : '#ffffff',
+    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+    borderRadius: '10px',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+    zIndex: 1000,
+    maxHeight: '280px',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column'
+  };
+
+  const searchInputStyle = {
+    padding: '10px 14px',
+    border: 'none',
+    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+    background: 'transparent',
+    color: isDark ? '#e2e8f0' : '#1e293b',
+    fontSize: '14px',
+    outline: 'none',
+    width: '100%'
+  };
+
+  const optionStyle = (isSelected) => ({
+    padding: '10px 14px',
+    cursor: 'pointer',
+    background: isSelected ? (isDark ? '#334155' : '#f1f5f9') : 'transparent',
+    color: isDark ? '#e2e8f0' : '#1e293b',
+    fontSize: '14px',
+    transition: 'background 0.15s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  });
+
+  return (
+    <div ref={containerRef} style={baseStyle}>
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        style={buttonStyle}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {currentLabel}
+        </span>
+        <ChevronDown
+          size={16}
+          style={{
+            position: 'absolute',
+            right: '12px',
+            transition: 'transform 0.2s',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+          }}
+        />
+      </button>
+
+      {isOpen && (
+        <div style={dropdownStyle}>
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={searchInputStyle}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {allowEmpty && (
+              <div
+                style={optionStyle(!value)}
+                onClick={() => handleSelect('')}
+                onMouseEnter={(e) => e.target.style.background = isDark ? '#334155' : '#f1f5f9'}
+                onMouseLeave={(e) => e.target.style.background = !value ? (isDark ? '#334155' : '#f1f5f9') : 'transparent'}
+              >
+                <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>{emptyLabel}</span>
+              </div>
+            )}
+            {filteredOptions.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px' }}>
+                Aucun résultat
+              </div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const optValue = opt.value || opt.slug;
+                const optLabel = opt.label || opt.name;
+                const isSelected = optValue === value;
+                return (
+                  <div
+                    key={optValue}
+                    style={optionStyle(isSelected)}
+                    onClick={() => handleSelect(optValue)}
+                    onMouseEnter={(e) => e.target.style.background = isDark ? '#334155' : '#f1f5f9'}
+                    onMouseLeave={(e) => e.target.style.background = isSelected ? (isDark ? '#334155' : '#f1f5f9') : 'transparent'}
+                  >
+                    {isSelected && <Check size={14} style={{ color: '#27AE60' }} />}
+                    <span>{optLabel}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============== GOOGLE MAPS API KEY ==============
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAg1WgVWG_g28PoTcUmbVrqAqOx19Hd0WQ';
+
+const googleMapsLibraries = ['places', 'drawing'];
+
+// ============== MAP LOCATION PICKER COMPONENT ==============
+const MapLocationPicker = ({
+  value = null, // { type: 'point'|'polyline'|'polygon', coordinates: [...] }
+  onChange,
+  isDark = false,
+  height = '400px',
+  defaultCenter = { lat: 7.3697, lng: 12.3547 }, // Cameroun centre
+  defaultZoom = 6
+}) => {
+  const [mode, setMode] = useState(value?.type || 'point'); // 'point', 'polyline', 'polygon'
+  const [marker, setMarker] = useState(value?.type === 'point' ? { lat: value.coordinates[0], lng: value.coordinates[1] } : null);
+  const [polylinePoints, setPolylinePoints] = useState(value?.type === 'polyline' ? value.coordinates.map(c => ({ lat: c[0], lng: c[1] })) : []);
+  const [polygonPoints, setPolygonPoints] = useState(value?.type === 'polygon' ? value.coordinates.map(c => ({ lat: c[0], lng: c[1] })) : []);
+  const [searchBox, setSearchBox] = useState(null);
+  const [mapCenter, setMapCenter] = useState(defaultCenter);
+  const mapRef = useRef(null);
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: googleMapsLibraries
+  });
+
+  // Update parent when coordinates change
+  useEffect(() => {
+    if (mode === 'point' && marker) {
+      onChange?.({ type: 'point', coordinates: [marker.lat, marker.lng] });
+    } else if (mode === 'polyline' && polylinePoints.length > 0) {
+      onChange?.({ type: 'polyline', coordinates: polylinePoints.map(p => [p.lat, p.lng]) });
+    } else if (mode === 'polygon' && polygonPoints.length > 0) {
+      onChange?.({ type: 'polygon', coordinates: polygonPoints.map(p => [p.lat, p.lng]) });
+    }
+  }, [mode, marker, polylinePoints, polygonPoints]);
+
+  const handleMapClick = (e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const point = { lat, lng };
+
+    if (mode === 'point') {
+      setMarker(point);
+    } else if (mode === 'polyline') {
+      setPolylinePoints([...polylinePoints, point]);
+    } else if (mode === 'polygon') {
+      setPolygonPoints([...polygonPoints, point]);
+    }
+  };
+
+  const handlePlaceSelect = () => {
+    if (searchBox) {
+      const place = searchBox.getPlace();
+      if (place.geometry) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        setMapCenter({ lat, lng });
+        if (mapRef.current) {
+          mapRef.current.panTo({ lat, lng });
+          mapRef.current.setZoom(15);
+        }
+        if (mode === 'point') {
+          setMarker({ lat, lng });
+        }
+      }
+    }
+  };
+
+  const clearCoordinates = () => {
+    if (mode === 'point') {
+      setMarker(null);
+    } else if (mode === 'polyline') {
+      setPolylinePoints([]);
+    } else if (mode === 'polygon') {
+      setPolygonPoints([]);
+    }
+    onChange?.(null);
+  };
+
+  const removeLastPoint = () => {
+    if (mode === 'polyline' && polylinePoints.length > 0) {
+      setPolylinePoints(polylinePoints.slice(0, -1));
+    } else if (mode === 'polygon' && polygonPoints.length > 0) {
+      setPolygonPoints(polygonPoints.slice(0, -1));
+    }
+  };
+
+  const containerStyle = {
+    width: '100%',
+    height: height,
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+  };
+
+  const controlsStyle = {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '12px',
+    flexWrap: 'wrap',
+    alignItems: 'center'
+  };
+
+  const buttonStyle = (active) => ({
+    padding: '8px 14px',
+    borderRadius: '8px',
+    border: `1px solid ${active ? '#27AE60' : (isDark ? '#334155' : '#e2e8f0')}`,
+    background: active ? '#27AE6020' : (isDark ? '#1e293b' : '#ffffff'),
+    color: active ? '#27AE60' : (isDark ? '#e2e8f0' : '#1e293b'),
+    fontSize: '13px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'all 0.2s'
+  });
+
+  const searchInputStyle = {
+    flex: 1,
+    minWidth: '200px',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+    background: isDark ? '#1e293b' : '#ffffff',
+    color: isDark ? '#e2e8f0' : '#1e293b',
+    fontSize: '14px',
+    outline: 'none'
+  };
+
+  const coordsDisplayStyle = {
+    marginTop: '12px',
+    padding: '12px',
+    borderRadius: '8px',
+    background: isDark ? '#0f172a' : '#f8fafc',
+    border: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
+    fontSize: '13px',
+    color: isDark ? '#94a3b8' : '#64748b'
+  };
+
+  if (loadError) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444', background: isDark ? '#1e293b' : '#fff', borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+        <AlertCircle size={32} style={{ marginBottom: '12px' }} />
+        <p>Erreur de chargement de Google Maps</p>
+        <p style={{ fontSize: '12px', marginTop: '8px' }}>Vérifiez votre clé API</p>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div style={{ padding: '60px', textAlign: 'center', background: isDark ? '#1e293b' : '#fff', borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+        <Loader size={32} className="spin" style={{ color: '#27AE60' }} />
+        <p style={{ marginTop: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Chargement de la carte...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Mode selection & Search */}
+      <div style={controlsStyle}>
+        <button type="button" style={buttonStyle(mode === 'point')} onClick={() => setMode('point')}>
+          <MapPin size={16} /> Point
+        </button>
+        <button type="button" style={buttonStyle(mode === 'polyline')} onClick={() => setMode('polyline')}>
+          <Activity size={16} /> Tracé
+        </button>
+        <button type="button" style={buttonStyle(mode === 'polygon')} onClick={() => setMode('polygon')}>
+          <Square size={16} /> Polygone
+        </button>
+        <div style={{ width: '1px', height: '24px', background: isDark ? '#334155' : '#e2e8f0' }} />
+        <Autocomplete
+          onLoad={setSearchBox}
+          onPlaceChanged={handlePlaceSelect}
+        >
+          <input
+            type="text"
+            placeholder="Rechercher un lieu..."
+            style={searchInputStyle}
+          />
+        </Autocomplete>
+      </div>
+
+      {/* Map */}
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={mapCenter}
+        zoom={defaultZoom}
+        onClick={handleMapClick}
+        onLoad={(map) => { mapRef.current = map; }}
+        options={{
+          styles: isDark ? [
+            { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+            { elementType: 'labels.text.stroke', stylers: [{ color: '#1e293b' }] },
+            { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] }
+          ] : [],
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true
+        }}
+      >
+        {/* Point Marker */}
+        {mode === 'point' && marker && (
+          <Marker position={marker} />
+        )}
+
+        {/* Polyline */}
+        {mode === 'polyline' && polylinePoints.length > 0 && (
+          <>
+            {polylinePoints.map((point, idx) => (
+              <Marker key={idx} position={point} label={String(idx + 1)} />
+            ))}
+            {polylinePoints.length > 1 && (
+              <Polyline
+                path={polylinePoints}
+                options={{
+                  strokeColor: '#3498DB',
+                  strokeWeight: 3,
+                  strokeOpacity: 0.8
+                }}
+              />
+            )}
+          </>
+        )}
+
+        {/* Polygon */}
+        {mode === 'polygon' && polygonPoints.length > 0 && (
+          <>
+            {polygonPoints.map((point, idx) => (
+              <Marker key={idx} position={point} label={String(idx + 1)} />
+            ))}
+            {polygonPoints.length > 2 && (
+              <Polygon
+                paths={polygonPoints}
+                options={{
+                  strokeColor: '#9B59B6',
+                  strokeWeight: 2,
+                  fillColor: '#9B59B6',
+                  fillOpacity: 0.2
+                }}
+              />
+            )}
+          </>
+        )}
+      </GoogleMap>
+
+      {/* Coordinates display & actions */}
+      <div style={coordsDisplayStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+          <div style={{ flex: 1 }}>
+            {mode === 'point' && marker && (
+              <div>
+                <strong style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}>Point:</strong> {marker.lat.toFixed(6)}, {marker.lng.toFixed(6)}
+              </div>
+            )}
+            {mode === 'polyline' && (
+              <div>
+                <strong style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}>Tracé ({polylinePoints.length} points):</strong>
+                {polylinePoints.length === 0 && ' Cliquez sur la carte pour ajouter des points'}
+              </div>
+            )}
+            {mode === 'polygon' && (
+              <div>
+                <strong style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}>Polygone ({polygonPoints.length} points):</strong>
+                {polygonPoints.length === 0 && ' Cliquez sur la carte pour dessiner'}
+                {polygonPoints.length > 0 && polygonPoints.length < 3 && ' (minimum 3 points)'}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {(mode === 'polyline' || mode === 'polygon') && (
+              <button
+                type="button"
+                onClick={removeLastPoint}
+                style={{ ...buttonStyle(false), padding: '6px 10px', fontSize: '12px' }}
+                disabled={(mode === 'polyline' ? polylinePoints : polygonPoints).length === 0}
+              >
+                <RotateCcw size={14} /> Annuler
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={clearCoordinates}
+              style={{ ...buttonStyle(false), padding: '6px 10px', fontSize: '12px', color: '#ef4444', borderColor: '#ef4444' }}
+            >
+              <Trash2 size={14} /> Effacer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // ============== STYLES ==============
@@ -723,7 +1244,8 @@ const ImagePicker = ({ value, onChange, isDark, token }) => {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      const res = await response.json();
+      const text = await response.text();
+      const res = text ? JSON.parse(text) : { success: false };
       if (res.success && res.data && res.data.length > 0) {
         onChange(res.data[0].url);
         setShowPicker(false);
@@ -1131,7 +1653,8 @@ const RichEditor = ({ value, onChange, isDark, height = '400px', token }) => {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      const data = await res.json();
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : { success: false };
       // data.data est un tableau
       if (data.success && data.data && data.data.length > 0) {
         const imgUrl = `http://localhost:5000${data.data[0].url}`;
@@ -1247,7 +1770,8 @@ const RichEditor = ({ value, onChange, isDark, height = '400px', token }) => {
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         });
-        const data = await res.json();
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : { success: false };
 
         if (data.success && data.data && data.data.length > 0) {
           const imgUrl = `http://localhost:5000${data.data[0].url}`;
@@ -1621,7 +2145,7 @@ const LoginPage = ({ onLogin, isDark, setIsDark }) => {
               </label>
             </div>
 
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: '600', borderRadius: '12px', border: 'none', background: `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: loading ? 0.7 : 1, boxShadow: '0 10px 30px rgba(0,122,51,0.3)', transition: 'all 0.3s ease' }}>
+            <button type="submit" disabled={loading} style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: '600', borderRadius: '12px', border: `2px solid ${colors.cameroonGreen}`, background: `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: loading ? 0.7 : 1, boxShadow: '0 10px 30px rgba(0,122,51,0.3)', transition: 'all 0.3s ease' }}>
               {loading ? <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} /> : <><Shield size={20} />Se connecter</>}
             </button>
           </form>
@@ -3095,7 +3619,7 @@ const PagesPage = ({ isDark, token, hasPermission = () => true }) => {
             // Grid View
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
               {filteredPages.map(page => {
-                const sectionsCount = page.sections ? JSON.parse(page.sections).length : 0;
+                const sectionsCount = (() => { try { return page.sections ? JSON.parse(page.sections).length : 0; } catch { return 0; } })();
                 return (
                   <div key={page.id} style={{
                     background: isDark ? '#0f172a' : '#ffffff',
@@ -3201,7 +3725,7 @@ const PagesPage = ({ isDark, token, hasPermission = () => true }) => {
             // List View
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filteredPages.map(page => {
-                const sectionsCount = page.sections ? JSON.parse(page.sections).length : 0;
+                const sectionsCount = (() => { try { return page.sections ? JSON.parse(page.sections).length : 0; } catch { return 0; } })();
                 return (
                   <div key={page.id} style={{
                     display: 'flex',
@@ -3539,7 +4063,7 @@ const PageBuilder = ({ page, onSave, isDark, token, onClose }) => {
       // === PILIERS ===
       pillars: {
         badge_fr: 'Notre Approche', badge_en: 'Our Approach',
-        title_fr: 'Les Trois Piliers One Health', title_en: 'The Three One Health Pillars',
+        title_fr: 'Les Quatre Piliers One Health', title_en: 'The Four One Health Pillars',
         subtitle_fr: 'Une approche intégrée pour la santé globale', subtitle_en: 'An integrated approach for global health',
         items: [
           {
@@ -3565,6 +4089,14 @@ const PageBuilder = ({ page, onSave, isDark, token, onClose }) => {
             desc_en: 'Ecosystem protection and biodiversity',
             features_fr: ['Protection écosystèmes', 'Qualité de l\'eau', 'Biodiversité'],
             features_en: ['Ecosystem protection', 'Water quality', 'Biodiversity']
+          },
+          {
+            icon: '🌱', iconBg: '#10B981',
+            title_fr: 'Santé des Végétaux', title_en: 'Plant Health',
+            desc_fr: 'Protection phytosanitaire et sécurité alimentaire végétale',
+            desc_en: 'Phytosanitary protection and plant-based food safety',
+            features_fr: ['Surveillance phytosanitaire', 'Protection des cultures', 'Sécurité alimentaire'],
+            features_en: ['Phytosanitary surveillance', 'Crop protection', 'Food safety']
           }
         ]
       },
@@ -6879,26 +7411,40 @@ const CTABannerBlockEditor = ({ block, onUpdate, isDark, activeLang, styles }) =
   </div>
 );
 
-// Pillars - Les 3 piliers One Health
+// Pillars - Les 4 piliers One Health
 const PillarsBlockEditor = ({ block, onUpdate, isDark, activeLang, styles }) => {
+  const pillars = block.content.pillars || [];
+
   const updatePillar = (idx, field, value) => {
-    const pillars = [...(block.content.pillars || [])];
-    pillars[idx] = { ...pillars[idx], [field]: value };
-    onUpdate('pillars', pillars);
+    const newPillars = [...pillars];
+    newPillars[idx] = { ...newPillars[idx], [field]: value };
+    onUpdate('pillars', newPillars);
   };
   const updateFeature = (pillarIdx, featureIdx, field, value) => {
-    const pillars = [...(block.content.pillars || [])];
-    const features = [...(pillars[pillarIdx].features || [])];
+    const newPillars = [...pillars];
+    const features = [...(newPillars[pillarIdx].features || [])];
     features[featureIdx] = { ...features[featureIdx], [field]: value };
-    pillars[pillarIdx] = { ...pillars[pillarIdx], features };
-    onUpdate('pillars', pillars);
+    newPillars[pillarIdx] = { ...newPillars[pillarIdx], features };
+    onUpdate('pillars', newPillars);
+  };
+  const movePillar = (idx, direction) => {
+    const newPillars = [...pillars];
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= newPillars.length) return;
+    [newPillars[idx], newPillars[newIdx]] = [newPillars[newIdx], newPillars[idx]];
+    onUpdate('pillars', newPillars);
+  };
+  const deletePillar = (idx) => {
+    if (window.confirm('Supprimer ce pilier ?')) {
+      onUpdate('pillars', pillars.filter((_, i) => i !== idx));
+    }
   };
 
   return (
     <div>
       <div style={styles.mb16}>
         <label style={styles.label}>📌 Titre section ({activeLang.toUpperCase()})</label>
-        <input value={block.content[`title_${activeLang}`] || ''} onChange={e => onUpdate(`title_${activeLang}`, e.target.value)} style={styles.input} placeholder="Les 3 Piliers One Health" />
+        <input value={block.content[`title_${activeLang}`] || ''} onChange={e => onUpdate(`title_${activeLang}`, e.target.value)} style={styles.input} placeholder="Les 4 Piliers One Health" />
       </div>
       <div style={styles.mb16}>
         <label style={styles.label}>🏷️ Badge ({activeLang.toUpperCase()})</label>
@@ -6906,9 +7452,57 @@ const PillarsBlockEditor = ({ block, onUpdate, isDark, activeLang, styles }) => 
       </div>
 
       <div style={styles.divider} />
-      <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '600' }}>🏛️ Piliers ({(block.content.pillars || []).length})</h5>
-      {(block.content.pillars || []).map((pillar, idx) => (
+      <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '600' }}>🏛️ Piliers ({pillars.length})</h5>
+      {pillars.map((pillar, idx) => (
         <div key={idx} style={{ padding: '16px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '12px', borderLeft: `4px solid ${pillar.color || '#007A33'}` }}>
+          {/* Header avec numéro, titre et boutons de contrôle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: pillar.color || '#007A33', background: `${pillar.color || '#007A33'}20`, padding: '4px 10px', borderRadius: '12px' }}>
+              #{idx + 1} {pillar[`title_${activeLang}`] || 'Pilier'}
+            </span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                onClick={() => movePillar(idx, -1)}
+                disabled={idx === 0}
+                style={{
+                  padding: '6px 10px',
+                  background: idx === 0 ? (isDark ? '#1e293b' : '#e2e8f0') : (isDark ? '#334155' : '#e2e8f0'),
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                  opacity: idx === 0 ? 0.5 : 1,
+                  fontSize: '14px'
+                }}
+                title="Monter"
+              >⬆️</button>
+              <button
+                onClick={() => movePillar(idx, 1)}
+                disabled={idx === pillars.length - 1}
+                style={{
+                  padding: '6px 10px',
+                  background: idx === pillars.length - 1 ? (isDark ? '#1e293b' : '#e2e8f0') : (isDark ? '#334155' : '#e2e8f0'),
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: idx === pillars.length - 1 ? 'not-allowed' : 'pointer',
+                  opacity: idx === pillars.length - 1 ? 0.5 : 1,
+                  fontSize: '14px'
+                }}
+                title="Descendre"
+              >⬇️</button>
+              <button
+                onClick={() => deletePillar(idx)}
+                style={{
+                  padding: '6px 10px',
+                  background: isDark ? '#7f1d1d' : '#fee2e2',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+                title="Supprimer"
+              >🗑️</button>
+            </div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <input value={pillar[`title_${activeLang}`] || ''} onChange={e => updatePillar(idx, `title_${activeLang}`, e.target.value)} style={styles.input} placeholder="Titre" />
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -6929,7 +7523,7 @@ const PillarsBlockEditor = ({ block, onUpdate, isDark, activeLang, styles }) => 
           </div>
         </div>
       ))}
-      <button onClick={() => onUpdate('pillars', [...(block.content.pillars || []), { title_fr: 'Nouveau pilier', title_en: 'New pillar', color: '#007A33', icon: '🏥', features: [] }])} style={{ ...styles.btnSecondary, fontSize: '12px', padding: '8px 12px' }}>+ Ajouter pilier</button>
+      <button onClick={() => onUpdate('pillars', [...pillars, { title_fr: 'Nouveau pilier', title_en: 'New pillar', color: '#007A33', icon: '🏥', features: [] }])} style={{ ...styles.btnSecondary, fontSize: '12px', padding: '8px 12px' }}>+ Ajouter pilier</button>
 
       <div style={styles.divider} />
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -7947,7 +8541,7 @@ const BlockPreview = ({ section, isDark, lang }) => {
                 {c[`badge_${lang}`]}
               </span>
             )}
-            <h2 style={{ margin: 0, fontSize: '32px', fontWeight: '700' }}>{c[`title_${lang}`] || 'Les 3 Piliers'}</h2>
+            <h2 style={{ margin: 0, fontSize: '32px', fontWeight: '700' }}>{c[`title_${lang}`] || 'Les 4 Piliers'}</h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${(c.pillars || []).length || 3}, 1fr)`, gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
             {(c.pillars || []).map((pillar, i) => (
@@ -11211,6 +11805,31 @@ const OHWRMappingPage = ({ isDark, token }) => {
   const [allOrganizations, setAllOrganizations] = useState([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
 
+  // Configurable types (from API)
+  const [configTypes, setConfigTypes] = useState({
+    materialTypes: [],
+    organizationTypes: [],
+    documentTypes: [],
+    expertCategories: []
+  });
+  const [loadingConfig, setLoadingConfig] = useState(false);
+
+  // Settings sub-tab
+  const [settingsTab, setSettingsTab] = useState('domains');
+
+  // Config type modals
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configModalType, setConfigModalType] = useState(''); // 'material-types', 'organization-types', etc.
+  const [editingConfigItem, setEditingConfigItem] = useState(null);
+  const [configForm, setConfigForm] = useState({
+    name: '', name_en: '', description: '', icon: 'box', color: '#64748b', is_active: true
+  });
+
+  // Map modal state
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapModalTarget, setMapModalTarget] = useState(null); // 'organization' or 'material'
+  const [tempGeolocation, setTempGeolocation] = useState(null);
+
   // Form validation errors
   const [formErrors, setFormErrors] = useState({});
 
@@ -11219,6 +11838,12 @@ const OHWRMappingPage = ({ isDark, token }) => {
 
   // View mode: 'list' or 'form'
   const [viewMode, setViewMode] = useState('list');
+
+  // Pending submissions for validation
+  const [pendingSubmissions, setPendingSubmissions] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [validationModal, setValidationModal] = useState(null); // { type, item, action }
+  const [rejectionReason, setRejectionReason] = useState('');
 
   // Form states
   const [expertForm, setExpertForm] = useState({
@@ -11237,13 +11862,15 @@ const OHWRMappingPage = ({ isDark, token }) => {
   const [orgForm, setOrgForm] = useState({
     name: '', acronym: '', type: 'government', description: '', mission: '',
     website: '', region: '', city: '', address: '',
-    contact_email: '', contact_phone: '', latitude: '', longitude: '', logo: ''
+    contact_email: '', contact_phone: '', latitude: '', longitude: '', logo: '',
+    geolocation: null // { type: 'point'|'polyline'|'polygon', coordinates: [...] }
   });
 
   const [materialForm, setMaterialForm] = useState({
     name: '', type: 'laboratory', description: '', status: 'available',
     organization_id: '', region: '', city: '', address: '',
-    contact_email: '', contact_phone: '', latitude: '', longitude: '', capacity: ''
+    contact_email: '', contact_phone: '', latitude: '', longitude: '', capacity: '',
+    geolocation: null // { type: 'point'|'polyline'|'polygon', coordinates: [...] }
   });
 
   const [docForm, setDocForm] = useState({
@@ -11391,6 +12018,95 @@ const OHWRMappingPage = ({ isDark, token }) => {
     setLoadingDomains(false);
   };
 
+  const fetchConfigTypes = async () => {
+    setLoadingConfig(true);
+    try {
+      const res = await api.get('/mapping/config/all', token);
+      if (res.success) {
+        setConfigTypes(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching config types:', err);
+    }
+    setLoadingConfig(false);
+  };
+
+  const fetchSingleConfigType = async (type) => {
+    try {
+      const res = await api.get(`/mapping/config/${type}?include_inactive=1`, token);
+      if (res.success) {
+        setConfigTypes(prev => ({
+          ...prev,
+          [type.replace('-', '') === 'materialtypes' ? 'materialTypes' :
+           type.replace('-', '') === 'organizationtypes' ? 'organizationTypes' :
+           type.replace('-', '') === 'documenttypes' ? 'documentTypes' :
+           type.replace('-', '') === 'expertcategories' ? 'expertCategories' : type]: res.data
+        }));
+      }
+    } catch (err) {
+      console.error(`Error fetching ${type}:`, err);
+    }
+  };
+
+  const handleSaveConfigItem = async () => {
+    if (!configForm.name?.trim()) {
+      setToast({ message: 'Le nom est requis', type: 'error' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = editingConfigItem
+        ? await api.put(`/mapping/config/${configModalType}/${editingConfigItem.id}`, configForm, token)
+        : await api.post(`/mapping/config/${configModalType}`, configForm, token);
+
+      if (res.success) {
+        setToast({ message: editingConfigItem ? 'Modifié avec succès' : 'Créé avec succès', type: 'success' });
+        setShowConfigModal(false);
+        fetchConfigTypes();
+      } else {
+        setToast({ message: res.message || 'Erreur', type: 'error' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erreur serveur', type: 'error' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteConfigItem = async (type, id) => {
+    if (!confirm('Supprimer cet élément ?')) return;
+    try {
+      const res = await api.delete(`/mapping/config/${type}/${id}`, token);
+      if (res.success) {
+        setToast({ message: 'Supprimé avec succès', type: 'success' });
+        fetchConfigTypes();
+      } else {
+        setToast({ message: res.message || 'Erreur', type: 'error' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erreur serveur', type: 'error' });
+    }
+  };
+
+  const openConfigModal = (type, item = null) => {
+    setConfigModalType(type);
+    setEditingConfigItem(item);
+    if (item) {
+      setConfigForm({
+        name: item.name || '',
+        name_en: item.name_en || '',
+        description: item.description || '',
+        icon: item.icon || 'box',
+        color: item.color || '#64748b',
+        is_active: item.is_active !== false
+      });
+    } else {
+      setConfigForm({
+        name: '', name_en: '', description: '', icon: 'box', color: '#64748b', is_active: true
+      });
+    }
+    setShowConfigModal(true);
+  };
+
   const fetchAllOrganizations = async () => {
     if (allOrganizations.length > 0) return; // Already loaded
     setLoadingOrgs(true);
@@ -11443,10 +12159,55 @@ const OHWRMappingPage = ({ isDark, token }) => {
     setLoading(false);
   };
 
+  // Fetch pending submissions for validation
+  const fetchPendingSubmissions = async () => {
+    setPendingLoading(true);
+    const res = await api.get('/mapping/admin/pending-submissions', token);
+    if (res.success && res.data) {
+      // Convertir l'objet en tableau avec resource_type ajouté
+      const allSubmissions = [
+        ...(res.data.materials || []).map(item => ({ ...item, resource_type: 'material' })),
+        ...(res.data.organizations || []).map(item => ({ ...item, resource_type: 'organization' })),
+        ...(res.data.documents || []).map(item => ({ ...item, resource_type: 'document' })),
+        ...(res.data.experts || []).map(item => ({ ...item, resource_type: 'expert' }))
+      ].sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+      setPendingSubmissions(allSubmissions);
+    }
+    setPendingLoading(false);
+  };
+
+  // Approve a submission
+  const approveSubmission = async (resourceType, id) => {
+    const res = await api.put(`/mapping/admin/approve/${resourceType}/${id}`, {}, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Ressource approuvée avec succès !' });
+      fetchPendingSubmissions();
+      fetchStats();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors de l\'approbation' });
+    }
+    setValidationModal(null);
+  };
+
+  // Reject a submission
+  const rejectSubmission = async (resourceType, id, reason) => {
+    const res = await api.put(`/mapping/admin/reject/${resourceType}/${id}`, { reason }, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Ressource rejetée' });
+      fetchPendingSubmissions();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors du rejet' });
+    }
+    setValidationModal(null);
+    setRejectionReason('');
+  };
+
   useEffect(() => {
     fetchStats();
     fetchRegions();
     fetchExpertiseDomains();
+    fetchConfigTypes();
+    fetchPendingSubmissions();
   }, []);
 
   useEffect(() => {
@@ -11620,11 +12381,21 @@ const OHWRMappingPage = ({ isDark, token }) => {
   const openOrgForm = (org = null) => {
     setCurrentOrg(org);
     setFormErrors({});
-    setOrgForm(org || {
-      name: '', acronym: '', type: 'government', description: '', mission: '',
-      website: '', region: '', city: '', address: '',
-      contact_email: '', contact_phone: '', latitude: '', longitude: '', logo: ''
-    });
+    if (org) {
+      // Reconstruire geolocation à partir des données existantes
+      let geolocation = org.geolocation || null;
+      if (!geolocation && org.latitude && org.longitude) {
+        geolocation = { type: 'point', coordinates: [parseFloat(org.latitude), parseFloat(org.longitude)] };
+      }
+      setOrgForm({ ...org, geolocation });
+    } else {
+      setOrgForm({
+        name: '', acronym: '', type: 'government', description: '', mission: '',
+        website: '', region: '', city: '', address: '',
+        contact_email: '', contact_phone: '', latitude: '', longitude: '', logo: '',
+        geolocation: null
+      });
+    }
     fetchAllOrganizations();
     setViewMode('form');
   };
@@ -11632,11 +12403,21 @@ const OHWRMappingPage = ({ isDark, token }) => {
   const openMaterialForm = (material = null) => {
     setCurrentMaterial(material);
     setFormErrors({});
-    setMaterialForm(material ? { ...material, image: material.image || '' } : {
-      name: '', type: 'laboratory', description: '', status: 'available',
-      organization_id: '', region: '', city: '', address: '',
-      contact_email: '', contact_phone: '', latitude: '', longitude: '', capacity: '', image: ''
-    });
+    if (material) {
+      // Reconstruire geolocation à partir des données existantes
+      let geolocation = material.geolocation || null;
+      if (!geolocation && material.latitude && material.longitude) {
+        geolocation = { type: 'point', coordinates: [parseFloat(material.latitude), parseFloat(material.longitude)] };
+      }
+      setMaterialForm({ ...material, image: material.image || '', geolocation });
+    } else {
+      setMaterialForm({
+        name: '', type: 'laboratory', description: '', status: 'available',
+        organization_id: '', region: '', city: '', address: '',
+        contact_email: '', contact_phone: '', latitude: '', longitude: '', capacity: '', image: '',
+        geolocation: null
+      });
+    }
     fetchAllOrganizations();
     setViewMode('form');
   };
@@ -11755,9 +12536,9 @@ const OHWRMappingPage = ({ isDark, token }) => {
 
   // Render filter bar
   const renderFilterBar = (filters, setFilters, options = {}) => (
-    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
       <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-        <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+        <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8', zIndex: 1 }} />
         <input
           type="text"
           placeholder="Rechercher..."
@@ -11767,35 +12548,67 @@ const OHWRMappingPage = ({ isDark, token }) => {
         />
       </div>
       {options.categories && (
-        <select value={filters.category || ''} onChange={e => setFilters({ ...filters, category: e.target.value })} style={{ ...styles.select, minWidth: '150px' }}>
-          <option value="">Toutes catégories</option>
-          {options.categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
+        <div style={{ minWidth: '180px' }}>
+          <SearchableSelect
+            options={options.categories}
+            value={filters.category || ''}
+            onChange={e => setFilters({ ...filters, category: e.target.value })}
+            emptyLabel="Toutes catégories"
+            searchPlaceholder="Rechercher..."
+            isDark={isDark}
+          />
+        </div>
       )}
       {options.types && (
-        <select value={filters.type || ''} onChange={e => setFilters({ ...filters, type: e.target.value })} style={{ ...styles.select, minWidth: '150px' }}>
-          <option value="">Tous types</option>
-          {options.types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
+        <div style={{ minWidth: '180px' }}>
+          <SearchableSelect
+            options={options.types}
+            value={filters.type || ''}
+            onChange={e => setFilters({ ...filters, type: e.target.value })}
+            emptyLabel="Tous types"
+            searchPlaceholder="Rechercher..."
+            isDark={isDark}
+          />
+        </div>
       )}
       {options.statuses && (
-        <select value={filters.status || ''} onChange={e => setFilters({ ...filters, status: e.target.value })} style={{ ...styles.select, minWidth: '150px' }}>
-          <option value="">Tous statuts</option>
-          {options.statuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
+        <div style={{ minWidth: '150px' }}>
+          <SearchableSelect
+            options={options.statuses}
+            value={filters.status || ''}
+            onChange={e => setFilters({ ...filters, status: e.target.value })}
+            emptyLabel="Tous statuts"
+            searchPlaceholder="Rechercher..."
+            isDark={isDark}
+          />
+        </div>
       )}
       {options.showRegion && (
-        <select value={filters.region || ''} onChange={e => setFilters({ ...filters, region: e.target.value })} style={{ ...styles.select, minWidth: '150px' }}>
-          <option value="">Toutes régions</option>
-          {regions.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-        </select>
+        <div style={{ minWidth: '180px' }}>
+          <SearchableSelect
+            options={regions.map(r => ({ value: r.name, label: r.name }))}
+            value={filters.region || ''}
+            onChange={e => setFilters({ ...filters, region: e.target.value })}
+            emptyLabel="Toutes régions"
+            searchPlaceholder="Rechercher..."
+            isDark={isDark}
+          />
+        </div>
       )}
       {options.languages && (
-        <select value={filters.language || ''} onChange={e => setFilters({ ...filters, language: e.target.value })} style={{ ...styles.select, minWidth: '120px' }}>
-          <option value="">Toutes langues</option>
-          <option value="fr">Français</option>
-          <option value="en">English</option>
-        </select>
+        <div style={{ minWidth: '140px' }}>
+          <SearchableSelect
+            options={[
+              { value: 'fr', label: 'Français' },
+              { value: 'en', label: 'English' }
+            ]}
+            value={filters.language || ''}
+            onChange={e => setFilters({ ...filters, language: e.target.value })}
+            emptyLabel="Toutes langues"
+            searchPlaceholder="Rechercher..."
+            isDark={isDark}
+          />
+        </div>
       )}
     </div>
   );
@@ -11876,6 +12689,33 @@ const OHWRMappingPage = ({ isDark, token }) => {
         </button>
         <button style={styles.tab(activeTab === 'settings')} onClick={() => setActiveTab('settings')}>
           <Settings size={16} style={{ marginRight: '8px', color: '#64748b' }} /> Paramètres
+        </button>
+        <button style={{
+          ...styles.tab(activeTab === 'validations'),
+          position: 'relative'
+        }} onClick={() => { setActiveTab('validations'); fetchPendingSubmissions(); }}>
+          <CheckCircle size={16} style={{ marginRight: '8px', color: '#10b981' }} /> Validations
+          {pendingSubmissions.length > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              right: '-8px',
+              minWidth: '20px',
+              height: '20px',
+              background: '#ef4444',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: '700',
+              color: 'white',
+              padding: '0 6px'
+            }}>
+              {pendingSubmissions.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -11988,9 +12828,17 @@ const OHWRMappingPage = ({ isDark, token }) => {
                   </div>
                   <div>
                     <label style={styles.label}>Catégorie</label>
-                    <select style={styles.select} value={expertForm.category} onChange={e => setExpertForm({ ...expertForm, category: e.target.value })}>
-                      {expertCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
+                    <SearchableSelect
+                      options={configTypes.expertCategories.length > 0
+                        ? configTypes.expertCategories.map(c => ({ value: c.slug, label: c.name }))
+                        : expertCategories}
+                      value={expertForm.category}
+                      onChange={e => setExpertForm({ ...expertForm, category: e.target.value })}
+                      placeholder="Sélectionner une catégorie"
+                      searchPlaceholder="Rechercher une catégorie..."
+                      allowEmpty={false}
+                      isDark={isDark}
+                    />
                   </div>
                 </div>
               </div>
@@ -12169,14 +13017,6 @@ const OHWRMappingPage = ({ isDark, token }) => {
                   <label style={styles.label}>Ville</label>
                   <input style={styles.input} value={expertForm.city} onChange={e => setExpertForm({ ...expertForm, city: e.target.value })} placeholder="Ville" />
                 </div>
-                <div>
-                  <label style={styles.label}>Latitude <span style={{ fontSize: '11px', color: '#64748b' }}>(auto)</span></label>
-                  <input style={styles.input} type="number" step="any" value={expertForm.latitude} onChange={e => setExpertForm({ ...expertForm, latitude: e.target.value })} placeholder="Ex: 3.848" />
-                </div>
-                <div>
-                  <label style={styles.label}>Longitude <span style={{ fontSize: '11px', color: '#64748b' }}>(auto)</span></label>
-                  <input style={styles.input} type="number" step="any" value={expertForm.longitude} onChange={e => setExpertForm({ ...expertForm, longitude: e.target.value })} placeholder="Ex: 11.502" />
-                </div>
               </div>
             </div>
 
@@ -12264,7 +13104,12 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </button>
             </div>
 
-            {renderFilterBar(expertFilters, setExpertFilters, { categories: expertCategories, showRegion: true })}
+            {renderFilterBar(expertFilters, setExpertFilters, {
+              categories: configTypes.expertCategories.length > 0
+                ? configTypes.expertCategories.map(c => ({ value: c.slug, label: c.name }))
+                : expertCategories,
+              showRegion: true
+            })}
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
@@ -12296,7 +13141,7 @@ const OHWRMappingPage = ({ isDark, token }) => {
                           {expert.first_name} {expert.last_name}
                         </h4>
                         <p style={{ margin: 0, fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                          {expert.title || expertCategories.find(c => c.value === expert.category)?.label}
+                          {expert.title || (configTypes.expertCategories.find(c => c.slug === expert.category)?.name || expertCategories.find(c => c.value === expert.category)?.label || expert.category)}
                         </p>
                       </div>
                     </div>
@@ -12347,9 +13192,17 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </div>
               <div>
                 <label style={styles.label}>Type</label>
-                <select style={styles.select} value={orgForm.type} onChange={e => setOrgForm({ ...orgForm, type: e.target.value })}>
-                  {orgTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                <SearchableSelect
+                  options={configTypes.organizationTypes.length > 0
+                    ? configTypes.organizationTypes.map(t => ({ value: t.slug, label: t.name }))
+                    : orgTypes}
+                  value={orgForm.type}
+                  onChange={e => setOrgForm({ ...orgForm, type: e.target.value })}
+                  placeholder="Sélectionner un type"
+                  searchPlaceholder="Rechercher un type..."
+                  allowEmpty={false}
+                  isDark={isDark}
+                />
               </div>
               <div>
                 <label style={styles.label}>Email de contact</label>
@@ -12390,13 +13243,51 @@ const OHWRMappingPage = ({ isDark, token }) => {
                 <label style={styles.label}>Adresse</label>
                 <input style={styles.input} value={orgForm.address} onChange={e => setOrgForm({ ...orgForm, address: e.target.value })} placeholder="Adresse complète" />
               </div>
-              <div>
-                <label style={styles.label}>Latitude <span style={{ fontSize: '11px', color: '#64748b' }}>(auto)</span></label>
-                <input style={styles.input} type="number" step="any" value={orgForm.latitude} onChange={e => setOrgForm({ ...orgForm, latitude: e.target.value })} placeholder="Ex: 3.848" />
-              </div>
-              <div>
-                <label style={styles.label}>Longitude <span style={{ fontSize: '11px', color: '#64748b' }}>(auto)</span></label>
-                <input style={styles.input} type="number" step="any" value={orgForm.longitude} onChange={e => setOrgForm({ ...orgForm, longitude: e.target.value })} placeholder="Ex: 11.502" />
+              <div style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
+                <label style={styles.label}><MapPin size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />Localisation GPS</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    style={{ ...styles.input, flex: 1 }}
+                    value={orgForm.geolocation ?
+                      (orgForm.geolocation.type === 'point' ?
+                        `Point: ${orgForm.geolocation.coordinates[0]?.toFixed(6)}, ${orgForm.geolocation.coordinates[1]?.toFixed(6)}` :
+                        orgForm.geolocation.type === 'polyline' ?
+                          `Tracé: ${orgForm.geolocation.coordinates?.length || 0} points` :
+                          `Polygone: ${orgForm.geolocation.coordinates?.length || 0} points`
+                      ) : ''
+                    }
+                    readOnly
+                    placeholder="Aucune position définie"
+                  />
+                  <button
+                    type="button"
+                    style={{ ...styles.btnSecondary, padding: '10px 16px', whiteSpace: 'nowrap' }}
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            const geo = { type: 'point', coordinates: [position.coords.latitude, position.coords.longitude] };
+                            setOrgForm({ ...orgForm, geolocation: geo, latitude: position.coords.latitude, longitude: position.coords.longitude });
+                          },
+                          (error) => setToast({ message: 'Impossible d\'obtenir la position', type: 'error' })
+                        );
+                      }
+                    }}
+                  >
+                    <Navigation size={16} /> Position
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...styles.btnPrimary, padding: '10px 16px', whiteSpace: 'nowrap', background: '#27AE60' }}
+                    onClick={() => {
+                      setMapModalTarget('organization');
+                      setTempGeolocation(orgForm.geolocation);
+                      setShowMapModal(true);
+                    }}
+                  >
+                    <Map size={16} /> Carte
+                  </button>
+                </div>
               </div>
             </div>
             <div style={{ marginTop: '16px' }}>
@@ -12426,7 +13317,12 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </button>
             </div>
 
-            {renderFilterBar(orgFilters, setOrgFilters, { types: orgTypes, showRegion: true })}
+            {renderFilterBar(orgFilters, setOrgFilters, {
+              types: configTypes.organizationTypes.length > 0
+                ? configTypes.organizationTypes.map(t => ({ value: t.slug, label: t.name }))
+                : orgTypes,
+              showRegion: true
+            })}
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
@@ -12462,7 +13358,7 @@ const OHWRMappingPage = ({ isDark, token }) => {
                           fontSize: '11px', fontWeight: '600',
                           background: '#E67E2220', color: '#E67E22'
                         }}>
-                          {orgTypes.find(t => t.value === org.type)?.label || org.type}
+                          {configTypes.organizationTypes.find(t => t.slug === org.type)?.name || orgTypes.find(t => t.value === org.type)?.label || org.type}
                         </span>
                       </div>
                     </div>
@@ -12510,9 +13406,17 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </div>
               <div>
                 <label style={styles.label}>Type</label>
-                <select style={styles.select} value={materialForm.type} onChange={e => setMaterialForm({ ...materialForm, type: e.target.value })}>
-                  {materialTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                <SearchableSelect
+                  options={configTypes.materialTypes.length > 0
+                    ? configTypes.materialTypes.map(t => ({ value: t.slug, label: t.name }))
+                    : materialTypes}
+                  value={materialForm.type}
+                  onChange={e => setMaterialForm({ ...materialForm, type: e.target.value })}
+                  placeholder="Sélectionner un type"
+                  searchPlaceholder="Rechercher un type..."
+                  allowEmpty={false}
+                  isDark={isDark}
+                />
               </div>
               <div>
                 <label style={styles.label}>Statut</label>
@@ -12565,13 +13469,51 @@ const OHWRMappingPage = ({ isDark, token }) => {
                 type="materials"
                 disabled={uploading}
               />
-              <div>
-                <label style={styles.label}>Latitude <span style={{ fontSize: '11px', color: '#64748b' }}>(auto)</span></label>
-                <input style={styles.input} type="number" step="any" value={materialForm.latitude} onChange={e => setMaterialForm({ ...materialForm, latitude: e.target.value })} placeholder="Ex: 3.848" />
-              </div>
-              <div>
-                <label style={styles.label}>Longitude <span style={{ fontSize: '11px', color: '#64748b' }}>(auto)</span></label>
-                <input style={styles.input} type="number" step="any" value={materialForm.longitude} onChange={e => setMaterialForm({ ...materialForm, longitude: e.target.value })} placeholder="Ex: 11.502" />
+              <div style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
+                <label style={styles.label}><MapPin size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />Localisation GPS</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    style={{ ...styles.input, flex: 1 }}
+                    value={materialForm.geolocation ?
+                      (materialForm.geolocation.type === 'point' ?
+                        `Point: ${materialForm.geolocation.coordinates[0]?.toFixed(6)}, ${materialForm.geolocation.coordinates[1]?.toFixed(6)}` :
+                        materialForm.geolocation.type === 'polyline' ?
+                          `Tracé: ${materialForm.geolocation.coordinates?.length || 0} points` :
+                          `Polygone: ${materialForm.geolocation.coordinates?.length || 0} points`
+                      ) : ''
+                    }
+                    readOnly
+                    placeholder="Aucune position définie"
+                  />
+                  <button
+                    type="button"
+                    style={{ ...styles.btnSecondary, padding: '10px 16px', whiteSpace: 'nowrap' }}
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            const geo = { type: 'point', coordinates: [position.coords.latitude, position.coords.longitude] };
+                            setMaterialForm({ ...materialForm, geolocation: geo, latitude: position.coords.latitude, longitude: position.coords.longitude });
+                          },
+                          (error) => setToast({ message: 'Impossible d\'obtenir la position', type: 'error' })
+                        );
+                      }
+                    }}
+                  >
+                    <Navigation size={16} /> Position
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...styles.btnPrimary, padding: '10px 16px', whiteSpace: 'nowrap', background: '#27AE60' }}
+                    onClick={() => {
+                      setMapModalTarget('material');
+                      setTempGeolocation(materialForm.geolocation);
+                      setShowMapModal(true);
+                    }}
+                  >
+                    <Map size={16} /> Carte
+                  </button>
+                </div>
               </div>
             </div>
             <div style={{ marginTop: '16px' }}>
@@ -12597,7 +13539,13 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </button>
             </div>
 
-            {renderFilterBar(materialFilters, setMaterialFilters, { types: materialTypes, statuses: materialStatuses, showRegion: true })}
+            {renderFilterBar(materialFilters, setMaterialFilters, {
+              types: configTypes.materialTypes.length > 0
+                ? configTypes.materialTypes.map(t => ({ value: t.slug, label: t.name }))
+                : materialTypes,
+              statuses: materialStatuses,
+              showRegion: true
+            })}
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
@@ -12631,7 +13579,7 @@ const OHWRMappingPage = ({ isDark, token }) => {
                             fontSize: '11px', fontWeight: '600',
                             background: '#3498DB20', color: '#3498DB'
                           }}>
-                            {materialTypes.find(t => t.value === mat.type)?.label || mat.type}
+                            {configTypes.materialTypes.find(t => t.slug === mat.type)?.name || materialTypes.find(t => t.value === mat.type)?.label || mat.type}
                           </span>
                         </div>
                       </div>
@@ -12686,9 +13634,17 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </div>
               <div>
                 <label style={styles.label}>Type</label>
-                <select style={styles.select} value={docForm.type} onChange={e => setDocForm({ ...docForm, type: e.target.value })}>
-                  {docTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                <SearchableSelect
+                  options={configTypes.documentTypes.length > 0
+                    ? configTypes.documentTypes.map(t => ({ value: t.slug, label: t.name }))
+                    : docTypes}
+                  value={docForm.type}
+                  onChange={e => setDocForm({ ...docForm, type: e.target.value })}
+                  placeholder="Sélectionner un type"
+                  searchPlaceholder="Rechercher un type..."
+                  allowEmpty={false}
+                  isDark={isDark}
+                />
               </div>
               <div>
                 <label style={styles.label}>Langue</label>
@@ -12697,24 +13653,26 @@ const OHWRMappingPage = ({ isDark, token }) => {
                   <option value="en">English</option>
                 </select>
               </div>
-              <div>
-                <label style={styles.label}>Organisation {loadingOrgs && <Loader size={12} className="spin" style={{ marginLeft: 4 }} />}</label>
-                <select style={styles.select} value={docForm.organization_id} onChange={e => setDocForm({ ...docForm, organization_id: e.target.value })}>
-                  <option value="">Sélectionner...</option>
-                  {allOrganizations.map(o => <option key={o.id} value={o.id}>{o.acronym ? `${o.name} (${o.acronym})` : o.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={styles.label}>Date de publication</label>
-                <input style={styles.input} type="date" value={docForm.publication_date ? docForm.publication_date.split('T')[0] : ''} onChange={e => setDocForm({ ...docForm, publication_date: e.target.value })} />
-              </div>
-              <div>
-                <label style={styles.label}>Niveau d'accès</label>
-                <select style={styles.select} value={docForm.access_level} onChange={e => setDocForm({ ...docForm, access_level: e.target.value })}>
-                  <option value="public">Public</option>
-                  <option value="registered">Utilisateurs enregistrés</option>
-                  <option value="private">Privé</option>
-                </select>
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={styles.label}>Organisation {loadingOrgs && <Loader size={12} className="spin" style={{ marginLeft: 4 }} />}</label>
+                  <select style={styles.select} value={docForm.organization_id} onChange={e => setDocForm({ ...docForm, organization_id: e.target.value })}>
+                    <option value="">Sélectionner...</option>
+                    {allOrganizations.map(o => <option key={o.id} value={o.id}>{o.acronym ? `${o.name} (${o.acronym})` : o.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Date de publication</label>
+                  <input style={styles.input} type="date" value={docForm.publication_date ? docForm.publication_date.split('T')[0] : ''} onChange={e => setDocForm({ ...docForm, publication_date: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Niveau d'accès</label>
+                  <select style={styles.select} value={docForm.access_level} onChange={e => setDocForm({ ...docForm, access_level: e.target.value })}>
+                    <option value="public">Public</option>
+                    <option value="registered">Utilisateurs enregistrés</option>
+                    <option value="private">Privé</option>
+                  </select>
+                </div>
               </div>
               <FileUploadInput
                 label="Fichier (PDF, Vidéo...)"
@@ -12734,12 +13692,6 @@ const OHWRMappingPage = ({ isDark, token }) => {
                 type="materials"
                 disabled={uploading}
               />
-              <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <label style={{ ...styles.label, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={docForm.is_featured} onChange={e => setDocForm({ ...docForm, is_featured: e.target.checked })} />
-                  <Star size={16} color="#F39C12" /> Mettre en avant ce document
-                </label>
-              </div>
             </div>
             <div style={{ marginTop: '16px' }}>
               <label style={styles.label}>Description</label>
@@ -12748,6 +13700,12 @@ const OHWRMappingPage = ({ isDark, token }) => {
             <div style={{ marginTop: '16px' }}>
               <label style={styles.label}>Contenu / Notes</label>
               <textarea style={{ ...styles.input, minHeight: '100px' }} value={docForm.content} onChange={e => setDocForm({ ...docForm, content: e.target.value })} placeholder="Contenu détaillé ou notes..." />
+            </div>
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ ...styles.label, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={docForm.is_featured} onChange={e => setDocForm({ ...docForm, is_featured: e.target.checked })} />
+                <Star size={16} color="#F39C12" /> Mettre en avant ce document
+              </label>
             </div>
             <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button style={styles.btnSecondary} onClick={goBackToList}>Annuler</button>
@@ -12768,7 +13726,12 @@ const OHWRMappingPage = ({ isDark, token }) => {
               </button>
             </div>
 
-            {renderFilterBar(docFilters, setDocFilters, { types: docTypes, languages: true })}
+            {renderFilterBar(docFilters, setDocFilters, {
+              types: configTypes.documentTypes.length > 0
+                ? configTypes.documentTypes.map(t => ({ value: t.slug, label: t.name }))
+                : docTypes,
+              languages: true
+            })}
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
@@ -12792,7 +13755,7 @@ const OHWRMappingPage = ({ isDark, token }) => {
                           padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600',
                           background: '#9B59B620', color: '#9B59B6'
                         }}>
-                          {docTypes.find(t => t.value === doc.type)?.label || doc.type}
+                          {configTypes.documentTypes.find(t => t.slug === doc.type)?.name || docTypes.find(t => t.value === doc.type)?.label || doc.type}
                         </span>
                         <span style={{
                           padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600',
@@ -12837,86 +13800,667 @@ const OHWRMappingPage = ({ isDark, token }) => {
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <div>
-          <div style={styles.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          {/* Settings Sub-tabs */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'domains', label: 'Domaines d\'expertise', icon: Award, color: '#27AE60' },
+              { id: 'material-types', label: 'Types de matériel', icon: Box, color: '#3498DB' },
+              { id: 'organization-types', label: 'Types d\'organisation', icon: Home, color: '#E67E22' },
+              { id: 'document-types', label: 'Types de document', icon: FileText, color: '#9B59B6' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setSettingsTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 16px', borderRadius: '10px', border: 'none',
+                  background: settingsTab === tab.id ? `${tab.color}20` : isDark ? '#1e293b' : '#f1f5f9',
+                  color: settingsTab === tab.id ? tab.color : isDark ? '#94a3b8' : '#64748b',
+                  fontWeight: settingsTab === tab.id ? '600' : '500',
+                  cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                <tab.icon size={18} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Domains Sub-tab */}
+          {settingsTab === 'domains' && (
+            <div style={styles.card}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#27AE6020', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Award size={24} color="#27AE60" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Domaines d'expertise</h3>
+                    <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Gérez les domaines qui apparaissent dans le formulaire des experts
+                    </p>
+                  </div>
+                </div>
+                <button
+                  style={styles.btnPrimary}
+                  onClick={() => {
+                    setEditingDomain(null);
+                    setDomainForm({ name: '', category: 'health', description: '', icon: 'award', is_active: true });
+                    setShowDomainModal(true);
+                  }}
+                >
+                  <Plus size={18} /> Ajouter un domaine
+                </button>
+              </div>
+
+              {loadingDomains ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
+              ) : Object.keys(expertiseDomainsGrouped).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  <Award size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                  <p>Aucun domaine d'expertise configuré</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {Object.entries(expertiseDomainsGrouped).map(([category, domains]) => (
+                    <div key={category} style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '16px', padding: '20px', border: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}` }}>
+                      <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: category === 'health' ? '#27AE60' : category === 'animal' ? '#3498DB' : category === 'environment' ? '#2ECC71' : category === 'laboratory' ? '#9B59B6' : '#E67E22' }}></span>
+                        {expertiseCategoryLabels[category] || category}
+                        <span style={{ fontSize: '13px', fontWeight: '400', color: isDark ? '#64748b' : '#94a3b8' }}>({domains.length})</span>
+                      </h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {domains.map(domain => (
+                          <div
+                            key={domain.id}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px',
+                              padding: '10px 14px', background: isDark ? '#1e293b' : '#ffffff',
+                              borderRadius: '10px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                              cursor: 'pointer', transition: 'all 0.2s'
+                            }}
+                            onClick={() => {
+                              setEditingDomain(domain);
+                              setDomainForm({ name: domain.name, category: domain.category, description: domain.description || '', icon: domain.icon || 'award', is_active: domain.is_active });
+                              setShowDomainModal(true);
+                            }}
+                          >
+                            <span style={{ fontSize: '14px', fontWeight: '500' }}>{domain.name}</span>
+                            {!domain.is_active && <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', background: '#ef444420', color: '#ef4444' }}>Inactif</span>}
+                            <Edit2 size={14} style={{ color: isDark ? '#64748b' : '#94a3b8', marginLeft: '4px' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Material Types Sub-tab */}
+          {settingsTab === 'material-types' && (
+            <div style={styles.card}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#3498DB20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Box size={24} color="#3498DB" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Types de matériel</h3>
+                    <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Gérez les types de ressources matérielles (laboratoires, équipements, etc.)
+                    </p>
+                  </div>
+                </div>
+                <button style={styles.btnPrimary} onClick={() => openConfigModal('material-types')}>
+                  <Plus size={18} /> Ajouter un type
+                </button>
+              </div>
+
+              {loadingConfig ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
+              ) : configTypes.materialTypes.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  <Box size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                  <p>Aucun type de matériel configuré</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {configTypes.materialTypes.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '14px 18px', background: isDark ? '#1e293b' : '#ffffff',
+                        borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                        cursor: 'pointer', transition: 'all 0.2s', minWidth: '200px'
+                      }}
+                      onClick={() => openConfigModal('material-types', item)}
+                    >
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: `${item.color || '#3498DB'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box size={18} color={item.color || '#3498DB'} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{item.name}</div>
+                        {item.name_en && <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>{item.name_en}</div>}
+                      </div>
+                      {!item.is_active && <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', background: '#ef444420', color: '#ef4444' }}>Inactif</span>}
+                      <Edit2 size={14} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Organization Types Sub-tab */}
+          {settingsTab === 'organization-types' && (
+            <div style={styles.card}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#E67E2220', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Home size={24} color="#E67E22" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Types d'organisation</h3>
+                    <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Gérez les types d'organisations (gouvernement, ONG, universités, etc.)
+                    </p>
+                  </div>
+                </div>
+                <button style={styles.btnPrimary} onClick={() => openConfigModal('organization-types')}>
+                  <Plus size={18} /> Ajouter un type
+                </button>
+              </div>
+
+              {loadingConfig ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
+              ) : configTypes.organizationTypes.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  <Home size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                  <p>Aucun type d'organisation configuré</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {configTypes.organizationTypes.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '14px 18px', background: isDark ? '#1e293b' : '#ffffff',
+                        borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                        cursor: 'pointer', transition: 'all 0.2s', minWidth: '200px'
+                      }}
+                      onClick={() => openConfigModal('organization-types', item)}
+                    >
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: `${item.color || '#E67E22'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Home size={18} color={item.color || '#E67E22'} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{item.name}</div>
+                        {item.name_en && <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>{item.name_en}</div>}
+                      </div>
+                      {!item.is_active && <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', background: '#ef444420', color: '#ef4444' }}>Inactif</span>}
+                      <Edit2 size={14} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Document Types Sub-tab */}
+          {settingsTab === 'document-types' && (
+            <div style={styles.card}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#9B59B620', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FileText size={24} color="#9B59B6" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Types de document</h3>
+                    <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Gérez les types de documents (guides, articles, thèses, etc.)
+                    </p>
+                  </div>
+                </div>
+                <button style={styles.btnPrimary} onClick={() => openConfigModal('document-types')}>
+                  <Plus size={18} /> Ajouter un type
+                </button>
+              </div>
+
+              {loadingConfig ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
+              ) : configTypes.documentTypes.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                  <p>Aucun type de document configuré</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {configTypes.documentTypes.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '14px 18px', background: isDark ? '#1e293b' : '#ffffff',
+                        borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                        cursor: 'pointer', transition: 'all 0.2s', minWidth: '200px'
+                      }}
+                      onClick={() => openConfigModal('document-types', item)}
+                    >
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: `${item.color || '#9B59B6'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={18} color={item.color || '#9B59B6'} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{item.name}</div>
+                        {item.name_en && <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>{item.name_en}</div>}
+                      </div>
+                      {!item.is_active && <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', background: '#ef444420', color: '#ef4444' }}>Inactif</span>}
+                      <Edit2 size={14} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Validations Tab */}
+      {activeTab === 'validations' && (
+        <div>
+          <div style={{ ...styles.card, marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#64748b20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Award size={24} color="#64748b" />
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <CheckCircle size={24} color="white" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Domaines d'expertise</h3>
-                  <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Gérez les domaines qui apparaissent dans le formulaire des experts
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    Soumissions en attente de validation
+                  </h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Validez ou rejetez les ressources soumises par les utilisateurs
                   </p>
                 </div>
               </div>
               <button
-                style={styles.btnPrimary}
-                onClick={() => {
-                  setEditingDomain(null);
-                  setDomainForm({ name: '', category: 'health', description: '', icon: 'award', is_active: true });
-                  setShowDomainModal(true);
-                }}
+                style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={fetchPendingSubmissions}
               >
-                <Plus size={18} /> Ajouter un domaine
+                <RefreshCw size={16} /> Actualiser
               </button>
             </div>
 
-            {loadingDomains ? (
-              <div style={{ textAlign: 'center', padding: '60px' }}><Loader size={32} className="spin" /></div>
-            ) : Object.keys(expertiseDomainsGrouped).length === 0 ? (
+            {pendingLoading ? (
+              <div style={{ textAlign: 'center', padding: '60px' }}>
+                <Loader size={32} style={{ animation: 'spin 1s linear infinite' }} color={isDark ? '#64748b' : '#94a3b8'} />
+                <p style={{ marginTop: '16px', color: isDark ? '#64748b' : '#94a3b8' }}>Chargement...</p>
+              </div>
+            ) : pendingSubmissions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                <Award size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-                <p>Aucun domaine d'expertise configuré</p>
+                <CheckCircle size={48} style={{ opacity: 0.4, marginBottom: '16px' }} />
+                <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Aucune soumission en attente</p>
+                <p style={{ margin: '8px 0 0', fontSize: '13px' }}>Toutes les ressources ont été validées</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {Object.entries(expertiseDomainsGrouped).map(([category, domains]) => (
-                  <div key={category} style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '16px', padding: '20px', border: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}` }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: category === 'health' ? '#27AE60' : category === 'animal' ? '#3498DB' : category === 'environment' ? '#2ECC71' : category === 'laboratory' ? '#9B59B6' : '#E67E22' }}></span>
-                      {expertiseCategoryLabels[category] || category}
-                      <span style={{ fontSize: '13px', fontWeight: '400', color: isDark ? '#64748b' : '#94a3b8' }}>({domains.length})</span>
-                    </h4>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {domains.map(domain => (
-                        <div
-                          key={domain.id}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {pendingSubmissions.map((item) => {
+                  const getTypeInfo = () => {
+                    switch (item.resource_type) {
+                      case 'material': return { label: 'Matériel', color: '#3498DB', icon: Box };
+                      case 'organization': return { label: 'Organisation', color: '#E67E22', icon: Home };
+                      case 'document': return { label: 'Document', color: '#9B59B6', icon: FileText };
+                      case 'expert': return { label: 'Expert', color: '#27AE60', icon: User };
+                      default: return { label: item.resource_type, color: '#64748b', icon: Box };
+                    }
+                  };
+                  const typeInfo = getTypeInfo();
+                  const TypeIcon = typeInfo.icon;
+
+                  return (
+                    <div
+                      key={`${item.resource_type}-${item.id}`}
+                      style={{
+                        padding: '16px 20px',
+                        background: isDark ? '#1e293b' : '#f8fafc',
+                        borderRadius: '12px',
+                        border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '16px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
+                        <div style={{
+                          width: '44px', height: '44px', borderRadius: '10px',
+                          background: `${typeInfo.color}15`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          <TypeIcon size={22} color={typeInfo.color} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                              {item.name || item.title_fr || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sans nom'}
+                            </p>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              background: `${typeInfo.color}20`,
+                              color: typeInfo.color
+                            }}>
+                              {typeInfo.label}
+                            </span>
+                          </div>
+                          <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                            Soumis par {item.submitter_name || 'Utilisateur'} le {new Date(item.submitted_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          {item.description && (
+                            <p style={{ margin: '6px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', maxWidth: '500px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
                           style={{
+                            padding: '8px 16px',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            padding: '10px 14px',
-                            background: isDark ? '#1e293b' : '#ffffff',
-                            borderRadius: '10px',
-                            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            gap: '6px'
                           }}
-                          onClick={() => {
-                            setEditingDomain(domain);
-                            setDomainForm({
-                              name: domain.name,
-                              category: domain.category,
-                              description: domain.description || '',
-                              icon: domain.icon || 'award',
-                              is_active: domain.is_active
-                            });
-                            setShowDomainModal(true);
-                          }}
+                          onClick={() => setValidationModal({ type: item.resource_type, item, action: 'reject' })}
                         >
-                          <span style={{ fontSize: '14px', fontWeight: '500' }}>{domain.name}</span>
-                          {!domain.is_active && (
-                            <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', background: '#ef444420', color: '#ef4444' }}>Inactif</span>
-                          )}
-                          <Edit2 size={14} style={{ color: isDark ? '#64748b' : '#94a3b8', marginLeft: '4px' }} />
-                        </div>
-                      ))}
+                          <X size={16} /> Rejeter
+                        </button>
+                        <button
+                          style={{
+                            padding: '8px 16px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          onClick={() => setValidationModal({ type: item.resource_type, item, action: 'approve' })}
+                        >
+                          <Check size={16} /> Approuver
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Validation Confirmation Modal */}
+      {validationModal && (
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modal, maxWidth: '450px' }}>
+            <div style={styles.modalHeader}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+                {validationModal.action === 'approve' ? 'Confirmer l\'approbation' : 'Rejeter la soumission'}
+              </h3>
+              <button style={styles.closeBtn} onClick={() => { setValidationModal(null); setRejectionReason(''); }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={styles.modalBody}>
+              {validationModal.action === 'approve' ? (
+                <div>
+                  <p style={{ margin: '0 0 20px', color: isDark ? '#94a3b8' : '#64748b', fontSize: '14px' }}>
+                    Êtes-vous sûr de vouloir approuver cette ressource ?
+                  </p>
+                  <div style={{
+                    padding: '16px',
+                    background: isDark ? '#1e293b' : '#f8fafc',
+                    borderRadius: '10px',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                  }}>
+                    <p style={{ margin: 0, fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                      {validationModal.item.name || validationModal.item.title_fr || `${validationModal.item.first_name || ''} ${validationModal.item.last_name || ''}`.trim()}
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      {validationModal.type === 'material' ? 'Matériel' :
+                       validationModal.type === 'organization' ? 'Organisation' :
+                       validationModal.type === 'document' ? 'Document' : 'Expert'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                    <button
+                      style={{ ...styles.btnSecondary, flex: 1 }}
+                      onClick={() => { setValidationModal(null); setRejectionReason(''); }}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      style={{ ...styles.btn, flex: 1, background: '#10b981' }}
+                      onClick={() => approveSubmission(validationModal.type, validationModal.item.id)}
+                    >
+                      <Check size={18} style={{ marginRight: '6px' }} /> Approuver
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p style={{ margin: '0 0 16px', color: isDark ? '#94a3b8' : '#64748b', fontSize: '14px' }}>
+                    Veuillez indiquer la raison du rejet. L'utilisateur recevra cette information.
+                  </p>
+                  <textarea
+                    style={{ ...styles.textarea, minHeight: '100px' }}
+                    placeholder="Raison du rejet..."
+                    value={rejectionReason}
+                    onChange={e => setRejectionReason(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                    <button
+                      style={{ ...styles.btnSecondary, flex: 1 }}
+                      onClick={() => { setValidationModal(null); setRejectionReason(''); }}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      style={{ ...styles.btn, flex: 1, background: '#ef4444' }}
+                      onClick={() => rejectSubmission(validationModal.type, validationModal.item.id, rejectionReason)}
+                      disabled={!rejectionReason.trim()}
+                    >
+                      <X size={18} style={{ marginRight: '6px' }} /> Rejeter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Config Type Modal */}
+      {showConfigModal && (
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modal, maxWidth: '500px' }}>
+            <div style={styles.modalHeader}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+                {editingConfigItem ? 'Modifier' : 'Ajouter'} - {
+                  configModalType === 'material-types' ? 'Type de matériel' :
+                  configModalType === 'organization-types' ? 'Type d\'organisation' :
+                  configModalType === 'document-types' ? 'Type de document' : 'Catégorie'
+                }
+              </h3>
+              <button style={styles.closeBtn} onClick={() => setShowConfigModal(false)}><X size={20} /></button>
+            </div>
+            <div style={styles.modalBody}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={styles.label}>Nom (Français) *</label>
+                <input
+                  style={styles.input}
+                  value={configForm.name}
+                  onChange={e => setConfigForm({ ...configForm, name: e.target.value })}
+                  placeholder="Ex: Laboratoire"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={styles.label}>Nom (Anglais)</label>
+                <input
+                  style={styles.input}
+                  value={configForm.name_en}
+                  onChange={e => setConfigForm({ ...configForm, name_en: e.target.value })}
+                  placeholder="Ex: Laboratory"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={styles.label}>Description</label>
+                <textarea
+                  style={{ ...styles.textarea, minHeight: '80px' }}
+                  value={configForm.description}
+                  onChange={e => setConfigForm({ ...configForm, description: e.target.value })}
+                  placeholder="Description courte..."
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={styles.label}>Couleur</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="color"
+                      value={configForm.color}
+                      onChange={e => setConfigForm({ ...configForm, color: e.target.value })}
+                      style={{ width: '50px', height: '38px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                    />
+                    <input
+                      style={{ ...styles.input, flex: 1 }}
+                      value={configForm.color}
+                      onChange={e => setConfigForm({ ...configForm, color: e.target.value })}
+                      placeholder="#3498DB"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={styles.label}>Icône</label>
+                  <select
+                    style={styles.select}
+                    value={configForm.icon}
+                    onChange={e => setConfigForm({ ...configForm, icon: e.target.value })}
+                  >
+                    <option value="box">Box</option>
+                    <option value="building">Building</option>
+                    <option value="file-text">File Text</option>
+                    <option value="flask-conical">Flask</option>
+                    <option value="cog">Cog</option>
+                    <option value="car">Car</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="landmark">Landmark</option>
+                    <option value="graduation-cap">Graduation Cap</option>
+                    <option value="globe">Globe</option>
+                    <option value="heart-handshake">Heart Handshake</option>
+                    <option value="network">Network</option>
+                    <option value="briefcase">Briefcase</option>
+                    <option value="book-open">Book Open</option>
+                    <option value="clipboard-list">Clipboard List</option>
+                    <option value="megaphone">Megaphone</option>
+                    <option value="presentation">Presentation</option>
+                    <option value="file-bar-chart">File Bar Chart</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  type="checkbox"
+                  id="config_active"
+                  checked={configForm.is_active}
+                  onChange={e => setConfigForm({ ...configForm, is_active: e.target.checked })}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                <label htmlFor="config_active" style={{ ...styles.label, margin: 0 }}>Actif (visible dans les formulaires)</label>
+              </div>
+            </div>
+            <div style={styles.modalFooter}>
+              {editingConfigItem && (
+                <button
+                  style={{ ...styles.btnSecondary, color: '#ef4444', marginRight: 'auto' }}
+                  onClick={() => {
+                    handleDeleteConfigItem(configModalType, editingConfigItem.id);
+                    setShowConfigModal(false);
+                  }}
+                >
+                  <Trash2 size={16} /> Supprimer
+                </button>
+              )}
+              <button style={styles.btnSecondary} onClick={() => setShowConfigModal(false)}>Annuler</button>
+              <button style={styles.btnPrimary} onClick={handleSaveConfigItem} disabled={loading}>
+                {loading ? <><Loader size={16} className="spin" /> Enregistrement...</> : (editingConfigItem ? 'Enregistrer' : 'Créer')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Map Location Modal */}
+      {showMapModal && (
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modal, maxWidth: '900px', width: '95%', maxHeight: '90vh' }}>
+            <div style={styles.modalHeader}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+                <MapPin size={20} style={{ marginRight: '8px', verticalAlign: 'middle', color: '#27AE60' }} />
+                Sélectionner la localisation
+              </h3>
+              <button style={styles.closeBtn} onClick={() => setShowMapModal(false)}><X size={20} /></button>
+            </div>
+            <div style={{ ...styles.modalBody, padding: '20px', maxHeight: 'calc(90vh - 140px)', overflow: 'auto' }}>
+              <MapLocationPicker
+                value={tempGeolocation}
+                onChange={(geo) => setTempGeolocation(geo)}
+                isDark={isDark}
+                height="500px"
+              />
+            </div>
+            <div style={styles.modalFooter}>
+              <button style={styles.btnSecondary} onClick={() => setShowMapModal(false)}>Annuler</button>
+              <button
+                style={{ ...styles.btnPrimary, background: '#27AE60' }}
+                onClick={() => {
+                  // Appliquer les coordonnées au formulaire cible
+                  let lat = '', lng = '';
+                  if (tempGeolocation?.type === 'point' && tempGeolocation.coordinates) {
+                    lat = tempGeolocation.coordinates[0];
+                    lng = tempGeolocation.coordinates[1];
+                  }
+                  if (mapModalTarget === 'organization') {
+                    setOrgForm({ ...orgForm, geolocation: tempGeolocation, latitude: lat, longitude: lng });
+                  } else if (mapModalTarget === 'material') {
+                    setMaterialForm({ ...materialForm, geolocation: tempGeolocation, latitude: lat, longitude: lng });
+                  }
+                  setShowMapModal(false);
+                }}
+              >
+                <Check size={16} /> Valider
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -13783,7 +15327,7 @@ const OHELearningPage = ({ isDark, token }) => {
                   <div style={{ flex: 1 }}>
                     <p style={{ margin: 0, fontWeight: '600', fontSize: '13px' }}>{course.title_fr}</p>
                     <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                      {course.enrolled_count} inscrits • {course.average_rating?.toFixed(1) || '0.0'} ⭐
+                      {course.enrolled_count || 0} inscrits • {parseFloat(course.average_rating || 0).toFixed(1)} ⭐
                     </p>
                   </div>
                 </div>
@@ -14737,7 +16281,8 @@ const OHELearningPage = ({ isDark, token }) => {
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         });
-        const res = await response.json();
+        const text = await response.text();
+        const res = text ? JSON.parse(text) : { success: false };
         if (res.success) {
           setForm(prev => ({ ...prev, thumbnail: res.data.url }));
         }
@@ -14937,7 +16482,8 @@ const OHELearningPage = ({ isDark, token }) => {
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         });
-        const res = await response.json();
+        const text = await response.text();
+        const res = text ? JSON.parse(text) : { success: false };
         if (res.success) {
           setForm(prev => ({ ...prev, video_url: res.data.url }));
         }
@@ -14959,7 +16505,8 @@ const OHELearningPage = ({ isDark, token }) => {
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         });
-        const res = await response.json();
+        const text = await response.text();
+        const res = text ? JSON.parse(text) : { success: false };
         if (res.success) {
           setForm(prev => ({ ...prev, pdf_url: res.data.url }));
         }
@@ -15165,19 +16712,25 @@ const OHELearningPage = ({ isDark, token }) => {
 
   // ============ QUESTION MODAL ============
   const QuestionModal = () => {
+    // Parser les options si c'est une chaîne JSON
+    const parseOptions = (opts) => {
+      if (!opts) return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+      if (Array.isArray(opts)) return opts;
+      try { return JSON.parse(opts); } catch { return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }]; }
+    };
+    const parseCorrectAnswer = (ans) => {
+      if (ans === null || ans === undefined) return 0;
+      if (typeof ans === 'number' || Array.isArray(ans)) return ans;
+      try { return JSON.parse(ans); } catch { return 0; }
+    };
     const [form, setForm] = useState({
       question_text_fr: editingQuestion?.question_text_fr || '',
       question_text_en: editingQuestion?.question_text_en || '',
       question_type: editingQuestion?.question_type || 'mcq',
       explanation_fr: editingQuestion?.explanation_fr || '',
       explanation_en: editingQuestion?.explanation_en || '',
-      options: editingQuestion?.options || [
-        { text_fr: '', text_en: '' },
-        { text_fr: '', text_en: '' },
-        { text_fr: '', text_en: '' },
-        { text_fr: '', text_en: '' }
-      ],
-      correct_answer: editingQuestion?.correct_answer ?? 0,
+      options: parseOptions(editingQuestion?.options),
+      correct_answer: parseCorrectAnswer(editingQuestion?.correct_answer),
       points: editingQuestion?.points || 1,
       difficulty: editingQuestion?.difficulty || 'medium',
       is_active: editingQuestion?.is_active !== false
@@ -16479,11 +18032,23 @@ const UsersPage = ({ isDark, token, hasPermission = () => true }) => {
   };
 
   const handleToggleStatus = async (user) => {
-    const newStatus = user.status === 'active' ? 'inactive' : 'active';
-    const res = await api.put(`/users/${user.id}`, { status: newStatus }, token);
+    const endpoint = user.status === 'active' || user.is_active ? 'deactivate' : 'activate';
+    const res = await api.put(`/users/${user.id}/${endpoint}`, {}, token);
     if (res.success) {
-      setToast({ message: `Utilisateur ${newStatus === 'active' ? 'activé' : 'désactivé'}`, type: 'success' });
+      setToast({ message: `Utilisateur ${endpoint === 'activate' ? 'activé' : 'désactivé'}`, type: 'success' });
       fetchData();
+    } else {
+      setToast({ message: res.message || 'Erreur', type: 'error' });
+    }
+  };
+
+  const handleVerifyEmail = async (user) => {
+    const res = await api.put(`/users/${user.id}/verify-email`, {}, token);
+    if (res.success) {
+      setToast({ message: 'Email vérifié avec succès', type: 'success' });
+      fetchData();
+    } else {
+      setToast({ message: res.message || 'Erreur', type: 'error' });
     }
   };
 
@@ -16603,6 +18168,7 @@ const UsersPage = ({ isDark, token, hasPermission = () => true }) => {
                 <th style={styles.th}>Email</th>
                 <th style={styles.th}>Rôle</th>
                 <th style={styles.th}>Statut</th>
+                <th style={styles.th}>Email vérifié</th>
                 <th style={styles.th}>Dernière connexion</th>
                 <th style={{ ...styles.th, textAlign: 'right' }}>Actions</th>
               </tr>
@@ -16651,17 +18217,42 @@ const UsersPage = ({ isDark, token, hasPermission = () => true }) => {
                       style={{
                         display: 'flex', alignItems: 'center', gap: '6px',
                         padding: '6px 12px', borderRadius: '20px', border: 'none',
-                        background: user.status === 'active' ? `${colors.success}20` : `${colors.error}20`,
-                        color: user.status === 'active' ? colors.success : colors.error,
+                        background: (user.status === 'active' && user.is_active !== false && user.is_active !== 0) ? `${colors.success}20` : `${colors.error}20`,
+                        color: (user.status === 'active' && user.is_active !== false && user.is_active !== 0) ? colors.success : colors.error,
                         fontSize: '12px', fontWeight: '600', cursor: 'pointer'
                       }}
                     >
                       <span style={{
                         width: '8px', height: '8px', borderRadius: '50%',
-                        background: user.status === 'active' ? colors.success : colors.error
+                        background: (user.status === 'active' && user.is_active !== false && user.is_active !== 0) ? colors.success : colors.error
                       }} />
-                      {user.status === 'active' ? 'Actif' : 'Inactif'}
+                      {(user.status === 'active' && user.is_active !== false && user.is_active !== 0) ? 'Actif' : 'Inactif'}
                     </button>
+                  </td>
+                  <td style={styles.td}>
+                    {user.email_verified ? (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        padding: '4px 10px', borderRadius: '12px',
+                        background: `${colors.success}15`, color: colors.success,
+                        fontSize: '12px', fontWeight: '500'
+                      }}>
+                        <CheckCircle size={14} /> Vérifié
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleVerifyEmail(user)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '4px 10px', borderRadius: '12px', border: 'none',
+                          background: `${colors.warning}15`, color: colors.warning,
+                          fontSize: '12px', fontWeight: '500', cursor: 'pointer'
+                        }}
+                        title="Cliquer pour vérifier manuellement"
+                      >
+                        <AlertCircle size={14} /> Non vérifié
+                      </button>
+                    )}
                   </td>
                   <td style={styles.td}>
                     <span style={{ fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
@@ -17632,26 +19223,43 @@ export default function AdminApp() {
   const [isDark, setIsDark] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
     const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
     if (savedToken && savedUser) {
       setToken(savedToken);
-      const parsedUser = JSON.parse(savedUser);
+      let parsedUser;
+      try {
+        parsedUser = JSON.parse(savedUser);
+      } catch (e) {
+        console.error('Error parsing saved user:', e);
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
+        return;
+      }
       setUser(parsedUser);
 
       // Refresh permissions from server
       fetch(`${API_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${savedToken}` }
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            const updatedUser = { ...parsedUser, permissions: data.data.permissions || [] };
-            setUser(updatedUser);
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        .then(res => res.text())
+        .then(text => {
+          try {
+            const data = JSON.parse(text);
+            if (data.success && data.data) {
+              const updatedUser = { ...parsedUser, permissions: data.data.permissions || [] };
+              setUser(updatedUser);
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              sessionStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+          } catch (e) {
+            console.error('Error parsing auth response:', e);
           }
         })
         .catch(err => console.error('Error refreshing permissions:', err));
@@ -17671,6 +19279,75 @@ export default function AdminApp() {
     setUser(null);
     setToken(null);
   };
+
+  // Fetch notification count
+  const fetchNotificationCount = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await api.get('/mapping/admin/notifications/count', token);
+      if (res.success) {
+        setNotificationCount(res.data?.unread || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching notification count:', error);
+    }
+  }, [token]);
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    if (!token) return;
+    setNotificationsLoading(true);
+    try {
+      const res = await api.get('/mapping/admin/notifications?limit=10', token);
+      if (res.success && res.data) {
+        setNotifications(res.data);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [token]);
+
+  // Mark notification as read
+  const markNotificationRead = useCallback(async (notificationId) => {
+    if (!token) return;
+    try {
+      await api.put(`/mapping/admin/notifications/${notificationId}/read`, {}, token);
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
+      setNotificationCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  }, [token]);
+
+  // Mark all notifications as read
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!token) return;
+    try {
+      await api.put('/mapping/admin/notifications/read-all', {}, token);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setNotificationCount(0);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  }, [token]);
+
+  // Fetch notification count on load and periodically
+  useEffect(() => {
+    if (token && user?.role === 'admin') {
+      fetchNotificationCount();
+      const interval = setInterval(fetchNotificationCount, 60000); // Every minute
+      return () => clearInterval(interval);
+    }
+  }, [token, user, fetchNotificationCount]);
+
+  // Fetch notifications when panel opens
+  useEffect(() => {
+    if (showNotifications && token) {
+      fetchNotifications();
+    }
+  }, [showNotifications, token, fetchNotifications]);
 
   // Permission check helper - admin role has all permissions
   const hasPermission = useCallback((permissionKey) => {
@@ -17789,6 +19466,7 @@ export default function AdminApp() {
       case 'profile': return <ProfilePage isDark={isDark} token={token} user={user} setUser={setUser} />;
       case 'ohwr-mapping': return <OHWRMappingPage isDark={isDark} token={token} />;
       case 'oh-elearning': return <OHELearningPage isDark={isDark} token={token} />;
+      case 'cohrm-system': return <COHRMSystemPage isDark={isDark} token={token} />;
       default: return <Dashboard isDark={isDark} token={token} />;
     }
   };
@@ -17799,6 +19477,8 @@ export default function AdminApp() {
     ? { id: 'ohwr-mapping', label: 'OHWR-Mapping', icon: MapPin }
     : activePage === 'oh-elearning'
     ? { id: 'oh-elearning', label: 'OH E-Learning', icon: GraduationCap }
+    : activePage === 'cohrm-system'
+    ? { id: 'cohrm-system', label: 'COHRM-SYSTEM', icon: Radar }
     : filteredNavGroups.flatMap(g => g.items).find(i => i.id === activePage);
 
   return (
@@ -17931,14 +19611,278 @@ export default function AdminApp() {
             >
               <GraduationCap size={20} />
             </button>
+            {/* COHRM-SYSTEM Button */}
+            <button
+              style={{
+                ...styles.btnIcon,
+                background: activePage === 'cohrm-system' ? '#E74C3C' : (isDark ? 'rgba(231,76,60,0.2)' : 'rgba(231,76,60,0.15)'),
+                borderRadius: '12px',
+                color: activePage === 'cohrm-system' ? 'white' : '#E74C3C',
+                position: 'relative'
+              }}
+              onClick={() => setActivePage('cohrm-system')}
+              title="COHRM-SYSTEM - Gestion des Rumeurs"
+            >
+              <Radar size={20} />
+            </button>
             <div style={{ width: '1px', height: '32px', background: isDark ? '#334155' : 'rgba(0,122,51,0.2)' }} />
             <button style={{ ...styles.btnIcon, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,122,51,0.1)', borderRadius: '12px' }} onClick={() => setIsDark(!isDark)}>
               {isDark ? <Sun size={20} color="#fbbf24" /> : <Moon size={20} color={colors.cameroonGreen} />}
             </button>
-            <button style={{ ...styles.btnIcon, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,122,51,0.1)', borderRadius: '12px', position: 'relative' }}>
-              <Bell size={20} color={isDark ? '#94a3b8' : colors.cameroonGreen} />
-              <span style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', background: colors.error, borderRadius: '50%' }} />
-            </button>
+            {/* Notifications Button with Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                style={{ ...styles.btnIcon, background: showNotifications ? (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,122,51,0.2)') : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,122,51,0.1)'), borderRadius: '12px', position: 'relative' }}
+                onClick={() => setShowNotifications(!showNotifications)}
+                title="Notifications"
+              >
+                <Bell size={20} color={isDark ? '#94a3b8' : colors.cameroonGreen} />
+                {notificationCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '4px',
+                    right: '4px',
+                    minWidth: '18px',
+                    height: '18px',
+                    background: colors.error,
+                    borderRadius: '9px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    color: 'white',
+                    padding: '0 4px',
+                    boxShadow: '0 2px 4px rgba(239,68,68,0.4)'
+                  }}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications Dropdown */}
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  width: '380px',
+                  maxHeight: '500px',
+                  background: isDark ? '#1e293b' : '#ffffff',
+                  borderRadius: '16px',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+                  border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                  overflow: 'hidden',
+                  zIndex: 1000
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    padding: '16px 20px',
+                    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Bell size={18} color={colors.cameroonGreen} />
+                      <span style={{ fontWeight: '600', fontSize: '15px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                        Notifications
+                      </span>
+                      {notificationCount > 0 && (
+                        <span style={{
+                          background: colors.error,
+                          color: 'white',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          padding: '2px 8px',
+                          borderRadius: '10px'
+                        }}>
+                          {notificationCount} nouveau{notificationCount > 1 ? 'x' : ''}
+                        </span>
+                      )}
+                    </div>
+                    {notifications.some(n => !n.is_read) && (
+                      <button
+                        onClick={markAllNotificationsRead}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: colors.primary,
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={e => e.target.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(33,150,243,0.1)'}
+                        onMouseLeave={e => e.target.style.background = 'none'}
+                      >
+                        Tout marquer lu
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notifications List */}
+                  <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                    {notificationsLoading ? (
+                      <div style={{ padding: '40px', textAlign: 'center' }}>
+                        <Loader size={24} style={{ animation: 'spin 1s linear infinite' }} color={isDark ? '#64748b' : '#94a3b8'} />
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        <Bell size={40} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                        <p style={{ margin: 0, fontSize: '14px' }}>Aucune notification</p>
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          onClick={() => {
+                            if (!notification.is_read) {
+                              markNotificationRead(notification.id);
+                            }
+                            // Navigate to validation page if it's a resource submission
+                            if (notification.type === 'resource_submission') {
+                              setActivePage('ohwr-mapping');
+                              setShowNotifications(false);
+                            }
+                          }}
+                          style={{
+                            padding: '14px 20px',
+                            borderBottom: `1px solid ${isDark ? '#334155' : '#f1f5f9'}`,
+                            cursor: 'pointer',
+                            background: notification.is_read ? 'transparent' : (isDark ? 'rgba(33,150,243,0.1)' : 'rgba(33,150,243,0.05)'),
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = notification.is_read ? 'transparent' : (isDark ? 'rgba(33,150,243,0.1)' : 'rgba(33,150,243,0.05)')}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '10px',
+                              background: notification.type === 'resource_submission' ? 'rgba(139,154,45,0.15)' : 'rgba(33,150,243,0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {notification.type === 'resource_submission' ? (
+                                <MapPin size={18} color="#8B9A2D" />
+                              ) : notification.type === 'expert_registration' ? (
+                                <User size={18} color={colors.primary} />
+                              ) : (
+                                <Bell size={18} color={colors.primary} />
+                              )}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{
+                                margin: 0,
+                                fontSize: '13px',
+                                fontWeight: notification.is_read ? '400' : '600',
+                                color: isDark ? '#e2e8f0' : '#1e293b',
+                                marginBottom: '4px'
+                              }}>
+                                {notification.title}
+                              </p>
+                              {notification.message && (
+                                <p style={{
+                                  margin: 0,
+                                  fontSize: '12px',
+                                  color: isDark ? '#94a3b8' : '#64748b',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {notification.message}
+                                </p>
+                              )}
+                              <p style={{
+                                margin: '6px 0 0 0',
+                                fontSize: '11px',
+                                color: isDark ? '#64748b' : '#94a3b8'
+                              }}>
+                                {new Date(notification.created_at).toLocaleString('fr-FR', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                            {!notification.is_read && (
+                              <div style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: colors.primary,
+                                flexShrink: 0,
+                                marginTop: '6px'
+                              }} />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  {notifications.length > 0 && (
+                    <div style={{
+                      padding: '12px 20px',
+                      borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                      textAlign: 'center'
+                    }}>
+                      <button
+                        onClick={() => {
+                          setActivePage('ohwr-mapping');
+                          setShowNotifications(false);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: colors.primary,
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '8px',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={e => e.target.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(33,150,243,0.1)'}
+                        onMouseLeave={e => e.target.style.background = 'none'}
+                      >
+                        Voir les soumissions en attente
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Overlay to close notifications */}
+              {showNotifications && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 999
+                  }}
+                  onClick={() => setShowNotifications(false)}
+                />
+              )}
+            </div>
             <div style={{ width: '1px', height: '32px', background: isDark ? '#334155' : 'rgba(0,122,51,0.2)' }} />
             <div
               style={{ ...styles.flex, cursor: 'pointer', padding: '6px 12px', borderRadius: '12px', transition: 'all 0.2s ease', background: activePage === 'profile' ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,122,51,0.1)') : 'transparent' }}

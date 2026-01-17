@@ -30,7 +30,7 @@ router.get('/', auth, authorize('admin'), async (req, res) => {
 
     const [countResult] = await db.query(`SELECT COUNT(*) as total FROM users ${whereClause}`, params);
     const [users] = await db.query(
-      `SELECT id, username, email, first_name, last_name, avatar, role, status, last_login, created_at 
+      `SELECT id, username, email, first_name, last_name, avatar, role, status, is_active, email_verified, last_login, created_at
        FROM users ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), parseInt(offset)]
     );
@@ -49,7 +49,7 @@ router.get('/', auth, authorize('admin'), async (req, res) => {
 router.get('/:id', auth, authorize('admin'), async (req, res) => {
   try {
     const [users] = await db.query(
-      'SELECT id, username, email, first_name, last_name, avatar, role, status, bio, last_login, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, first_name, last_name, avatar, role, status, is_active, email_verified, bio, last_login, created_at FROM users WHERE id = ?',
       [req.params.id]
     );
     if (users.length === 0) {
@@ -125,6 +125,92 @@ router.put('/:id', auth, authorize('admin'), async (req, res) => {
 
     res.json({ success: true, data: updated[0] });
   } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT activate user
+router.put('/:id/activate', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if user exists
+    const [users] = await db.query('SELECT id, email, first_name, username FROM users WHERE id = ?', [id]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Activate the user
+    await db.query('UPDATE users SET is_active = TRUE, status = ? WHERE id = ?', ['active', id]);
+
+    const [updated] = await db.query(
+      'SELECT id, username, email, first_name, last_name, role, status, is_active, email_verified FROM users WHERE id = ?',
+      [id]
+    );
+
+    res.json({ success: true, message: 'User activated', data: updated[0] });
+  } catch (error) {
+    console.error('Activate user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT deactivate user
+router.put('/:id/deactivate', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Cannot deactivate yourself
+    if (id === req.user.id.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot deactivate yourself' });
+    }
+
+    // Check if user exists
+    const [users] = await db.query('SELECT id FROM users WHERE id = ?', [id]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Deactivate the user
+    await db.query('UPDATE users SET is_active = FALSE, status = ? WHERE id = ?', ['inactive', id]);
+
+    const [updated] = await db.query(
+      'SELECT id, username, email, first_name, last_name, role, status, is_active, email_verified FROM users WHERE id = ?',
+      [id]
+    );
+
+    res.json({ success: true, message: 'User deactivated', data: updated[0] });
+  } catch (error) {
+    console.error('Deactivate user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT verify user email (admin override)
+router.put('/:id/verify-email', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if user exists
+    const [users] = await db.query('SELECT id, email_verified FROM users WHERE id = ?', [id]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Verify the email
+    await db.query(
+      'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = ?',
+      [id]
+    );
+
+    const [updated] = await db.query(
+      'SELECT id, username, email, first_name, last_name, role, status, is_active, email_verified FROM users WHERE id = ?',
+      [id]
+    );
+
+    res.json({ success: true, message: 'Email verified', data: updated[0] });
+  } catch (error) {
+    console.error('Verify email error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

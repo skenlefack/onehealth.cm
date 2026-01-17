@@ -2,6 +2,223 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { auth, authorize, requirePermission } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
+
+// =====================================================
+// MULTER CONFIGURATION FOR FILE UPLOADS
+// =====================================================
+
+// Ensure upload directories exist
+const uploadDirs = [
+  'uploads/experts',
+  'uploads/organizations',
+  'uploads/materials',
+  'uploads/documents',
+  'uploads/documents/files',
+  'uploads/thumbnails'
+];
+
+uploadDirs.forEach(dir => {
+  const fullPath = path.join(__dirname, '..', dir);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+  }
+});
+
+// File filter for images
+const imageFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files (JPEG, PNG, GIF, WebP) are allowed'), false);
+  }
+};
+
+// File filter for documents (PDF, video, office files)
+const documentFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime'
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('File type not allowed'), false);
+  }
+};
+
+// Storage for expert photos
+const expertPhotoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'uploads', 'experts'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${uniqueId}${ext}`);
+  }
+});
+
+// Storage for expert CVs
+const expertCvStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'uploads', 'documents'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `cv-${uniqueId}-${safeName}`);
+  }
+});
+
+// Storage for material images
+const materialImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'uploads', 'materials'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${uniqueId}${ext}`);
+  }
+});
+
+// Storage for organization logos
+const organizationLogoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'uploads', 'organizations'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${uniqueId}${ext}`);
+  }
+});
+
+// Storage for document files
+const documentFileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'uploads', 'documents', 'files'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `${uniqueId}-${safeName}`);
+  }
+});
+
+// Storage for document thumbnails
+const thumbnailStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'uploads', 'thumbnails'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${uniqueId}${ext}`);
+  }
+});
+
+// Multer instances
+const uploadExpertFiles = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      if (file.fieldname === 'photo') {
+        cb(null, path.join(__dirname, '..', 'uploads', 'experts'));
+      } else if (file.fieldname === 'cv') {
+        cb(null, path.join(__dirname, '..', 'uploads', 'documents'));
+      } else {
+        cb(null, path.join(__dirname, '..', 'uploads'));
+      }
+    },
+    filename: (req, file, cb) => {
+      const uniqueId = uuidv4();
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (file.fieldname === 'cv') {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        cb(null, `cv-${uniqueId}-${safeName}`);
+      } else {
+        cb(null, `${uniqueId}${ext}`);
+      }
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'photo') {
+      imageFilter(req, file, cb);
+    } else if (file.fieldname === 'cv') {
+      documentFilter(req, file, cb);
+    } else {
+      cb(null, true);
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
+}).fields([
+  { name: 'photo', maxCount: 1 },
+  { name: 'cv', maxCount: 1 }
+]);
+
+const uploadMaterialImage = multer({
+  storage: materialImageStorage,
+  fileFilter: imageFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+}).single('image');
+
+const uploadOrganizationLogo = multer({
+  storage: organizationLogoStorage,
+  fileFilter: imageFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+}).single('logo');
+
+const uploadDocumentFiles = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      if (file.fieldname === 'file') {
+        cb(null, path.join(__dirname, '..', 'uploads', 'documents', 'files'));
+      } else if (file.fieldname === 'thumbnail') {
+        cb(null, path.join(__dirname, '..', 'uploads', 'thumbnails'));
+      } else {
+        cb(null, path.join(__dirname, '..', 'uploads'));
+      }
+    },
+    filename: (req, file, cb) => {
+      const uniqueId = uuidv4();
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (file.fieldname === 'file') {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        cb(null, `${uniqueId}-${safeName}`);
+      } else {
+        cb(null, `${uniqueId}${ext}`);
+      }
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'thumbnail') {
+      imageFilter(req, file, cb);
+    } else if (file.fieldname === 'file') {
+      documentFilter(req, file, cb);
+    } else {
+      cb(null, true);
+    }
+  },
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max for documents/videos
+}).fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]);
 
 // =====================================================
 // OHWR-MAPPING API ROUTES
@@ -679,20 +896,21 @@ router.post('/organizations', auth, async (req, res) => {
     const {
       name, acronym, type, description, mission, logo, website,
       parent_organization_id, latitude, longitude, region, city, address,
-      contact_email, contact_phone, social_links, domains
+      contact_email, contact_phone, social_links, domains, geolocation
     } = req.body;
 
     const [result] = await db.query(`
       INSERT INTO organizations
       (name, acronym, type, description, mission, logo, website, parent_organization_id,
-       latitude, longitude, region, city, address, contact_email, contact_phone, social_links, domains)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       latitude, longitude, region, city, address, contact_email, contact_phone, social_links, domains, geolocation)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name, acronym, type, description, mission, logo, website,
       parent_organization_id, latitude, longitude, region, city, address,
       contact_email, contact_phone,
       JSON.stringify(social_links || {}),
-      JSON.stringify(domains || [])
+      JSON.stringify(domains || []),
+      geolocation ? JSON.stringify(geolocation) : null
     ]);
 
     const [newOrg] = await db.query('SELECT * FROM organizations WHERE id = ?', [result.insertId]);
@@ -712,7 +930,7 @@ router.put('/organizations/:id', auth, async (req, res) => {
     const allowedFields = [
       'name', 'acronym', 'type', 'description', 'mission', 'logo', 'website',
       'parent_organization_id', 'latitude', 'longitude', 'region', 'city', 'address',
-      'contact_email', 'contact_phone', 'social_links', 'domains', 'is_active'
+      'contact_email', 'contact_phone', 'social_links', 'domains', 'is_active', 'geolocation'
     ];
 
     const updates = [];
@@ -721,7 +939,7 @@ router.put('/organizations/:id', auth, async (req, res) => {
     for (const [key, value] of Object.entries(fields)) {
       if (allowedFields.includes(key)) {
         updates.push(`${key} = ?`);
-        params.push(key === 'social_links' || key === 'domains' ? JSON.stringify(value) : value);
+        params.push(['social_links', 'domains', 'geolocation'].includes(key) ? JSON.stringify(value) : value);
       }
     }
 
@@ -845,15 +1063,15 @@ router.post('/materials', auth, async (req, res) => {
     const {
       name, type, description, specifications, capacity, organization_id, manager_id,
       latitude, longitude, region, city, address, status, certifications, photos,
-      contact_email, contact_phone
+      contact_email, contact_phone, geolocation, image
     } = req.body;
 
     const [result] = await db.query(`
       INSERT INTO material_resources
       (name, type, description, specifications, capacity, organization_id, manager_id,
        latitude, longitude, region, city, address, status, certifications, photos,
-       contact_email, contact_phone)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       contact_email, contact_phone, geolocation, image)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name, type, description,
       JSON.stringify(specifications || {}),
@@ -862,7 +1080,9 @@ router.post('/materials', auth, async (req, res) => {
       status || 'available',
       JSON.stringify(certifications || []),
       JSON.stringify(photos || []),
-      contact_email, contact_phone
+      contact_email, contact_phone,
+      geolocation ? JSON.stringify(geolocation) : null,
+      image || null
     ]);
 
     const [newMaterial] = await db.query('SELECT * FROM material_resources WHERE id = ?', [result.insertId]);
@@ -882,7 +1102,7 @@ router.put('/materials/:id', auth, async (req, res) => {
     const allowedFields = [
       'name', 'type', 'description', 'specifications', 'capacity', 'organization_id', 'manager_id',
       'latitude', 'longitude', 'region', 'city', 'address', 'status', 'certifications', 'photos',
-      'contact_email', 'contact_phone', 'is_active'
+      'contact_email', 'contact_phone', 'is_active', 'geolocation', 'image'
     ];
 
     const updates = [];
@@ -891,7 +1111,7 @@ router.put('/materials/:id', auth, async (req, res) => {
     for (const [key, value] of Object.entries(fields)) {
       if (allowedFields.includes(key)) {
         updates.push(`${key} = ?`);
-        params.push(['specifications', 'certifications', 'photos'].includes(key) ? JSON.stringify(value) : value);
+        params.push(['specifications', 'certifications', 'photos', 'geolocation'].includes(key) ? JSON.stringify(value) : value);
       }
     }
 
@@ -1180,6 +1400,769 @@ router.post('/documents/:id/download', async (req, res) => {
     res.json({ success: true, data: doc[0] });
   } catch (error) {
     console.error('Download document error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== CONFIGURATION / SETTINGS ====================
+
+// Helper function for CRUD operations on config tables
+const createConfigRoutes = (tableName, entityName) => {
+  // GET all
+  router.get(`/config/${entityName}`, async (req, res) => {
+    try {
+      const { include_inactive } = req.query;
+      let query = `SELECT * FROM ${tableName}`;
+      if (!include_inactive) {
+        query += ' WHERE is_active = 1';
+      }
+      query += ' ORDER BY display_order, name';
+      const [rows] = await db.query(query);
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      console.error(`Get ${entityName} error:`, error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // GET single
+  router.get(`/config/${entityName}/:id`, async (req, res) => {
+    try {
+      const [rows] = await db.query(`SELECT * FROM ${tableName} WHERE id = ?`, [req.params.id]);
+      if (rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Not found' });
+      }
+      res.json({ success: true, data: rows[0] });
+    } catch (error) {
+      console.error(`Get ${entityName} error:`, error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // CREATE
+  router.post(`/config/${entityName}`, auth, async (req, res) => {
+    try {
+      const { name, name_en, description, icon, color, display_order, is_active } = req.body;
+
+      if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Name is required' });
+      }
+
+      const slug = name.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+      const [result] = await db.query(
+        `INSERT INTO ${tableName} (name, name_en, slug, description, icon, color, display_order, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, name_en || null, slug, description || null, icon || 'box', color || '#64748b', display_order || 0, is_active !== false]
+      );
+
+      const [created] = await db.query(`SELECT * FROM ${tableName} WHERE id = ?`, [result.insertId]);
+      res.status(201).json({ success: true, data: created[0] });
+    } catch (error) {
+      console.error(`Create ${entityName} error:`, error);
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({ success: false, message: 'Un élément avec ce nom existe déjà' });
+      }
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // UPDATE
+  router.put(`/config/${entityName}/:id`, auth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, name_en, description, icon, color, display_order, is_active } = req.body;
+
+      const updates = [];
+      const params = [];
+
+      if (name !== undefined) {
+        updates.push('name = ?');
+        params.push(name);
+        // Update slug too
+        const slug = name.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        updates.push('slug = ?');
+        params.push(slug);
+      }
+      if (name_en !== undefined) { updates.push('name_en = ?'); params.push(name_en); }
+      if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+      if (icon !== undefined) { updates.push('icon = ?'); params.push(icon); }
+      if (color !== undefined) { updates.push('color = ?'); params.push(color); }
+      if (display_order !== undefined) { updates.push('display_order = ?'); params.push(display_order); }
+      if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active); }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ success: false, message: 'No fields to update' });
+      }
+
+      params.push(id);
+      await db.query(`UPDATE ${tableName} SET ${updates.join(', ')} WHERE id = ?`, params);
+
+      const [updated] = await db.query(`SELECT * FROM ${tableName} WHERE id = ?`, [id]);
+      res.json({ success: true, data: updated[0] });
+    } catch (error) {
+      console.error(`Update ${entityName} error:`, error);
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({ success: false, message: 'Un élément avec ce nom existe déjà' });
+      }
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // DELETE (soft delete)
+  router.delete(`/config/${entityName}/:id`, auth, authorize('admin'), async (req, res) => {
+    try {
+      await db.query(`UPDATE ${tableName} SET is_active = 0 WHERE id = ?`, [req.params.id]);
+      res.json({ success: true, message: 'Deleted successfully' });
+    } catch (error) {
+      console.error(`Delete ${entityName} error:`, error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // REORDER
+  router.put(`/config/${entityName}/reorder`, auth, async (req, res) => {
+    try {
+      const { items } = req.body; // Array of { id, display_order }
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ success: false, message: 'Items array required' });
+      }
+
+      for (const item of items) {
+        await db.query(`UPDATE ${tableName} SET display_order = ? WHERE id = ?`, [item.display_order, item.id]);
+      }
+
+      res.json({ success: true, message: 'Reordered successfully' });
+    } catch (error) {
+      console.error(`Reorder ${entityName} error:`, error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+};
+
+// Create routes for each config type
+createConfigRoutes('ohwr_material_types', 'material-types');
+createConfigRoutes('ohwr_organization_types', 'organization-types');
+createConfigRoutes('ohwr_document_types', 'document-types');
+createConfigRoutes('ohwr_expert_categories', 'expert-categories');
+
+// GET all config types at once (for forms)
+router.get('/config/all', async (req, res) => {
+  try {
+    const [materialTypes] = await db.query('SELECT * FROM ohwr_material_types WHERE is_active = 1 ORDER BY display_order, name');
+    const [organizationTypes] = await db.query('SELECT * FROM ohwr_organization_types WHERE is_active = 1 ORDER BY display_order, name');
+    const [documentTypes] = await db.query('SELECT * FROM ohwr_document_types WHERE is_active = 1 ORDER BY display_order, name');
+    const [expertCategories] = await db.query('SELECT * FROM ohwr_expert_categories WHERE is_active = 1 ORDER BY display_order, name');
+
+    res.json({
+      success: true,
+      data: {
+        materialTypes,
+        organizationTypes,
+        documentTypes,
+        expertCategories
+      }
+    });
+  } catch (error) {
+    console.error('Get all config error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== USER RESOURCE SUBMISSIONS ====================
+
+// Helper function to create notification
+const createNotification = async (type, title, message, resourceType, resourceId, userId) => {
+  try {
+    await db.query(
+      `INSERT INTO admin_notifications (type, title, message, resource_type, resource_id, user_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [type, title, message, resourceType, resourceId, userId]
+    );
+  } catch (error) {
+    console.error('Create notification error:', error);
+  }
+};
+
+// GET user's submissions (all types)
+router.get('/my-submissions', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, type } = req.query;
+
+    let results = { materials: [], organizations: [], documents: [], experts: [] };
+
+    // Build status filter
+    const statusFilter = status ? 'AND submission_status = ?' : '';
+    const statusParams = status ? [status] : [];
+
+    if (!type || type === 'material') {
+      const [materials] = await db.query(
+        `SELECT *, 'material' as resource_type FROM material_resources
+         WHERE submitted_by = ? ${statusFilter} ORDER BY submitted_at DESC`,
+        [userId, ...statusParams]
+      );
+      results.materials = materials;
+    }
+
+    if (!type || type === 'organization') {
+      const [organizations] = await db.query(
+        `SELECT *, 'organization' as resource_type FROM organizations
+         WHERE submitted_by = ? ${statusFilter} ORDER BY submitted_at DESC`,
+        [userId, ...statusParams]
+      );
+      results.organizations = organizations;
+    }
+
+    if (!type || type === 'document') {
+      const [documents] = await db.query(
+        `SELECT *, 'document' as resource_type FROM document_resources
+         WHERE submitted_by = ? ${statusFilter} ORDER BY submitted_at DESC`,
+        [userId, ...statusParams]
+      );
+      results.documents = documents;
+    }
+
+    if (!type || type === 'expert') {
+      const [experts] = await db.query(
+        `SELECT *, 'expert' as resource_type FROM human_resources
+         WHERE submitted_by = ? ${statusFilter} ORDER BY submitted_at DESC`,
+        [userId, ...statusParams]
+      );
+      results.experts = experts;
+    }
+
+    // Calculate counts
+    const counts = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      total: 0
+    };
+
+    ['materials', 'organizations', 'documents', 'experts'].forEach(key => {
+      results[key].forEach(item => {
+        counts.total++;
+        if (item.submission_status === 'pending') counts.pending++;
+        else if (item.submission_status === 'approved') counts.approved++;
+        else if (item.submission_status === 'rejected') counts.rejected++;
+      });
+    });
+
+    res.json({ success: true, data: results, counts });
+  } catch (error) {
+    console.error('Get user submissions error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// SUBMIT material (user) - with image upload
+router.post('/submit/material', auth, (req, res) => {
+  uploadMaterialImage(req, res, async (err) => {
+    if (err) {
+      console.error('Material image upload error:', err);
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    try {
+      const userId = req.user.id;
+      const {
+        name, type, description, specifications, capacity, organization_id, status,
+        latitude, longitude, region, city, address, contact_email, contact_phone
+      } = req.body;
+
+      if (!name || !type) {
+        return res.status(400).json({ success: false, message: 'Name and type are required' });
+      }
+
+      // Handle uploaded image
+      let imagePath = null;
+      if (req.file) {
+        imagePath = `/uploads/materials/${req.file.filename}`;
+      }
+
+      const [result] = await db.query(`
+        INSERT INTO material_resources
+        (name, type, description, specifications, capacity, organization_id, status,
+         latitude, longitude, region, city, address, contact_email, contact_phone, image,
+         submitted_by, submission_status, submitted_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), 0)
+      `, [
+        name, type, description,
+        JSON.stringify(specifications || {}),
+        capacity, organization_id || null, status || 'operational',
+        latitude || null, longitude || null, region || null, city || null, address || null,
+        contact_email || null, contact_phone || null, imagePath,
+        userId
+      ]);
+
+      // Create notification for admin
+      await createNotification(
+        'resource_submission',
+        'Nouvelle soumission de matériel',
+        `${req.user.email} a soumis un nouveau matériel: ${name}`,
+        'material',
+        result.insertId,
+        userId
+      );
+
+      const [newMaterial] = await db.query('SELECT * FROM material_resources WHERE id = ?', [result.insertId]);
+      res.status(201).json({ success: true, data: newMaterial[0], message: 'Material submitted for validation' });
+    } catch (error) {
+      console.error('Submit material error:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+});
+
+// SUBMIT organization (user) - with logo upload
+router.post('/submit/organization', auth, (req, res) => {
+  uploadOrganizationLogo(req, res, async (err) => {
+    if (err) {
+      console.error('Organization logo upload error:', err);
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    try {
+      const userId = req.user.id;
+      const {
+        name, acronym, type, description, mission, website,
+        latitude, longitude, region, city, address, contact_email, contact_phone
+      } = req.body;
+
+      if (!name || !type) {
+        return res.status(400).json({ success: false, message: 'Name and type are required' });
+      }
+
+      // Handle uploaded logo
+      let logoPath = null;
+      if (req.file) {
+        logoPath = `/uploads/organizations/${req.file.filename}`;
+      }
+
+      const [result] = await db.query(`
+        INSERT INTO organizations
+        (name, acronym, type, description, mission, logo, website,
+         latitude, longitude, region, city, address, contact_email, contact_phone,
+         submitted_by, submission_status, submitted_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), 0)
+      `, [
+        name, acronym || null, type, description || null, mission || null, logoPath, website || null,
+        latitude || null, longitude || null, region || null, city || null, address || null,
+        contact_email || null, contact_phone || null,
+        userId
+      ]);
+
+      await createNotification(
+        'resource_submission',
+        'Nouvelle soumission d\'organisme',
+        `${req.user.email} a soumis un nouvel organisme: ${name}`,
+        'organization',
+        result.insertId,
+        userId
+      );
+
+      const [newOrg] = await db.query('SELECT * FROM organizations WHERE id = ?', [result.insertId]);
+      res.status(201).json({ success: true, data: newOrg[0], message: 'Organization submitted for validation' });
+    } catch (error) {
+      console.error('Submit organization error:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+});
+
+// SUBMIT document (user) - with file and thumbnail uploads
+router.post('/submit/document', auth, (req, res) => {
+  uploadDocumentFiles(req, res, async (err) => {
+    if (err) {
+      console.error('Document upload error:', err);
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    try {
+      const userId = req.user.id;
+      const {
+        title, type, description, external_url,
+        publication_date, language, themes, organization_id, access_level
+      } = req.body;
+
+      if (!title || !type) {
+        return res.status(400).json({ success: false, message: 'Title and type are required' });
+      }
+
+      // Handle uploaded files
+      let filePath = null;
+      let fileType = null;
+      let fileSize = null;
+      let thumbnailPath = null;
+
+      if (req.files) {
+        if (req.files['file'] && req.files['file'][0]) {
+          const uploadedFile = req.files['file'][0];
+          filePath = `/uploads/documents/files/${uploadedFile.filename}`;
+          fileType = uploadedFile.mimetype;
+          fileSize = uploadedFile.size;
+        }
+        if (req.files['thumbnail'] && req.files['thumbnail'][0]) {
+          thumbnailPath = `/uploads/thumbnails/${req.files['thumbnail'][0].filename}`;
+        }
+      }
+
+      // If no file uploaded, use external URL if provided
+      if (!filePath && external_url) {
+        filePath = external_url;
+      }
+
+      // Generate slug
+      const slug = title.toLowerCase()
+        .replace(/[àáâãäå]/g, 'a')
+        .replace(/[èéêë]/g, 'e')
+        .replace(/[ìíîï]/g, 'i')
+        .replace(/[òóôõö]/g, 'o')
+        .replace(/[ùúûü]/g, 'u')
+        .replace(/[ç]/g, 'c')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .substring(0, 200) + '-' + Date.now();
+
+      const [result] = await db.query(`
+        INSERT INTO document_resources
+        (title, slug, type, description, file_path, file_type, file_size, thumbnail,
+         publication_date, language, themes, organization_id,
+         submitted_by, submission_status, submitted_at, is_active, access_level)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), 0, ?)
+      `, [
+        title, slug, type, description || null, filePath, fileType, fileSize, thumbnailPath,
+        publication_date || null, language || 'fr', JSON.stringify(themes || []), organization_id || null,
+        userId, access_level || 'public'
+      ]);
+
+      await createNotification(
+        'resource_submission',
+        'Nouvelle soumission de document',
+        `${req.user.email} a soumis un nouveau document: ${title}`,
+        'document',
+        result.insertId,
+        userId
+      );
+
+      const [newDoc] = await db.query('SELECT * FROM document_resources WHERE id = ?', [result.insertId]);
+      res.status(201).json({ success: true, data: newDoc[0], message: 'Document submitted for validation' });
+    } catch (error) {
+      console.error('Submit document error:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+});
+
+// SUBMIT expert registration (user registers themselves) - with photo and CV uploads
+router.post('/submit/expert', auth, (req, res) => {
+  uploadExpertFiles(req, res, async (err) => {
+    if (err) {
+      console.error('Expert file upload error:', err);
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    try {
+      const userId = req.user.id;
+      const {
+        first_name, last_name, title, category, organization_id,
+        email, phone, biography, expertise_domains, qualifications, expertise_summary,
+        latitude, longitude, region, city, address,
+        years_experience, linkedin_url, twitter_url, orcid_id, google_scholar_url, researchgate_url, website,
+        publications_count, projects_count, consultation_rate, awards, research_interests,
+        available_for_collaboration
+      } = req.body;
+
+      // Parse selected_expertise_ids if it's a string (from FormData)
+      let selected_expertise_ids = req.body.selected_expertise_ids;
+      if (typeof selected_expertise_ids === 'string') {
+        try {
+          selected_expertise_ids = JSON.parse(selected_expertise_ids);
+        } catch (e) {
+          selected_expertise_ids = [];
+        }
+      }
+
+      if (!first_name || !last_name || !category) {
+        return res.status(400).json({ success: false, message: 'First name, last name and category are required' });
+      }
+
+      // Handle uploaded files
+      let photoPath = null;
+      let cvPath = null;
+
+      if (req.files) {
+        if (req.files['photo'] && req.files['photo'][0]) {
+          photoPath = `/uploads/experts/${req.files['photo'][0].filename}`;
+        }
+        if (req.files['cv'] && req.files['cv'][0]) {
+          cvPath = `/uploads/documents/${req.files['cv'][0].filename}`;
+        }
+      }
+
+      const [result] = await db.query(`
+        INSERT INTO human_resources
+        (first_name, last_name, title, category, organization_id, email, phone, photo, cv_url, biography,
+         expertise_domains, qualifications, expertise_summary, latitude, longitude, region, city, address,
+         years_experience, linkedin_url, twitter_url, orcid_id, google_scholar_url, researchgate_url, website,
+         publications_count, projects_count, consultation_rate, awards, research_interests,
+         available_for_collaboration, submitted_by, submission_status, submitted_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), 0)
+      `, [
+        first_name, last_name, title || null, category, organization_id || null,
+        email || req.user.email, phone || null, photoPath, cvPath, biography || null,
+        JSON.stringify(expertise_domains || []),
+        JSON.stringify(qualifications || []),
+        expertise_summary || null,
+        latitude || null, longitude || null, region || null, city || null, address || null,
+        years_experience || 0, linkedin_url || null, twitter_url || null, orcid_id || null, google_scholar_url || null,
+        researchgate_url || null, website || null,
+        publications_count || 0, projects_count || 0, consultation_rate || null, awards || null, research_interests || null,
+        available_for_collaboration === 'true' || available_for_collaboration === true ? 1 : 0,
+        userId
+      ]);
+
+      const expertId = result.insertId;
+
+      // Save expertise domains relationship
+      if (selected_expertise_ids && Array.isArray(selected_expertise_ids) && selected_expertise_ids.length > 0) {
+        const expertiseValues = selected_expertise_ids.map(e => [
+          expertId,
+          typeof e === 'object' ? e.domain_id : e,
+          typeof e === 'object' ? e.level || 'intermediate' : 'intermediate',
+          typeof e === 'object' ? e.years_in_domain : null
+        ]);
+        await db.query(
+          'INSERT INTO expert_expertise (expert_id, expertise_domain_id, level, years_in_domain) VALUES ?',
+          [expertiseValues]
+        );
+      }
+
+      await createNotification(
+        'expert_registration',
+        'Nouvelle inscription expert',
+        `${req.user.email} s'est inscrit comme expert: ${first_name} ${last_name}`,
+        'expert',
+        expertId,
+        userId
+      );
+
+      const [newExpert] = await db.query('SELECT * FROM human_resources WHERE id = ?', [expertId]);
+      res.status(201).json({ success: true, data: newExpert[0], message: 'Expert registration submitted for validation' });
+    } catch (error) {
+      console.error('Submit expert error:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+});
+
+// ==================== ADMIN VALIDATION ====================
+
+// GET pending submissions (admin)
+router.get('/admin/pending-submissions', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { type } = req.query;
+
+    let results = { materials: [], organizations: [], documents: [], experts: [] };
+
+    if (!type || type === 'material') {
+      const [materials] = await db.query(`
+        SELECT m.*, u.username as submitter_username, u.email as submitter_email
+        FROM material_resources m
+        LEFT JOIN users u ON m.submitted_by = u.id
+        WHERE m.submission_status = 'pending'
+        ORDER BY m.submitted_at ASC
+      `);
+      results.materials = materials;
+    }
+
+    if (!type || type === 'organization') {
+      const [organizations] = await db.query(`
+        SELECT o.*, u.username as submitter_username, u.email as submitter_email
+        FROM organizations o
+        LEFT JOIN users u ON o.submitted_by = u.id
+        WHERE o.submission_status = 'pending'
+        ORDER BY o.submitted_at ASC
+      `);
+      results.organizations = organizations;
+    }
+
+    if (!type || type === 'document') {
+      const [documents] = await db.query(`
+        SELECT d.*, u.username as submitter_username, u.email as submitter_email
+        FROM document_resources d
+        LEFT JOIN users u ON d.submitted_by = u.id
+        WHERE d.submission_status = 'pending'
+        ORDER BY d.submitted_at ASC
+      `);
+      results.documents = documents;
+    }
+
+    if (!type || type === 'expert') {
+      const [experts] = await db.query(`
+        SELECT h.*, u.username as submitter_username, u.email as submitter_email
+        FROM human_resources h
+        LEFT JOIN users u ON h.submitted_by = u.id
+        WHERE h.submission_status = 'pending'
+        ORDER BY h.submitted_at ASC
+      `);
+      results.experts = experts;
+    }
+
+    const totalPending = results.materials.length + results.organizations.length +
+                         results.documents.length + results.experts.length;
+
+    res.json({ success: true, data: results, totalPending });
+  } catch (error) {
+    console.error('Get pending submissions error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// APPROVE submission (admin)
+router.put('/admin/approve/:resourceType/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { resourceType, id } = req.params;
+    const adminId = req.user.id;
+
+    const tableMap = {
+      material: 'material_resources',
+      organization: 'organizations',
+      document: 'document_resources',
+      expert: 'human_resources'
+    };
+
+    const table = tableMap[resourceType];
+    if (!table) {
+      return res.status(400).json({ success: false, message: 'Invalid resource type' });
+    }
+
+    await db.query(
+      `UPDATE ${table} SET submission_status = 'approved', validated_by = ?, validated_at = NOW(), is_active = 1 WHERE id = ?`,
+      [adminId, id]
+    );
+
+    // Mark related notification as read
+    await db.query(
+      `UPDATE admin_notifications SET is_read = 1, read_by = ?, read_at = NOW()
+       WHERE resource_type = ? AND resource_id = ? AND is_read = 0`,
+      [adminId, resourceType, id]
+    );
+
+    res.json({ success: true, message: 'Submission approved' });
+  } catch (error) {
+    console.error('Approve submission error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// REJECT submission (admin)
+router.put('/admin/reject/:resourceType/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { resourceType, id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.id;
+
+    const tableMap = {
+      material: 'material_resources',
+      organization: 'organizations',
+      document: 'document_resources',
+      expert: 'human_resources'
+    };
+
+    const table = tableMap[resourceType];
+    if (!table) {
+      return res.status(400).json({ success: false, message: 'Invalid resource type' });
+    }
+
+    await db.query(
+      `UPDATE ${table} SET submission_status = 'rejected', validated_by = ?, validated_at = NOW(), rejection_reason = ? WHERE id = ?`,
+      [adminId, reason || null, id]
+    );
+
+    // Mark related notification as read
+    await db.query(
+      `UPDATE admin_notifications SET is_read = 1, read_by = ?, read_at = NOW()
+       WHERE resource_type = ? AND resource_id = ? AND is_read = 0`,
+      [adminId, resourceType, id]
+    );
+
+    res.json({ success: true, message: 'Submission rejected' });
+  } catch (error) {
+    console.error('Reject submission error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== ADMIN NOTIFICATIONS ====================
+
+// GET notifications (admin)
+router.get('/admin/notifications', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { limit = 20, unread_only } = req.query;
+
+    let query = 'SELECT * FROM admin_notifications';
+    const params = [];
+
+    if (unread_only === 'true') {
+      query += ' WHERE is_read = 0';
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ?';
+    params.push(parseInt(limit));
+
+    const [notifications] = await db.query(query, params);
+
+    // Get unread count
+    const [[{ unreadCount }]] = await db.query('SELECT COUNT(*) as unreadCount FROM admin_notifications WHERE is_read = 0');
+
+    res.json({ success: true, data: notifications, unreadCount });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET notification count (for badge)
+router.get('/admin/notifications/count', auth, async (req, res) => {
+  try {
+    const [[{ count }]] = await db.query('SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0');
+    res.json({ success: true, count });
+  } catch (error) {
+    console.error('Get notification count error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Mark notification as read
+router.put('/admin/notifications/:id/read', auth, authorize('admin'), async (req, res) => {
+  try {
+    await db.query(
+      'UPDATE admin_notifications SET is_read = 1, read_by = ?, read_at = NOW() WHERE id = ?',
+      [req.user.id, req.params.id]
+    );
+    res.json({ success: true, message: 'Notification marked as read' });
+  } catch (error) {
+    console.error('Mark notification read error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Mark all notifications as read
+router.put('/admin/notifications/read-all', auth, authorize('admin'), async (req, res) => {
+  try {
+    await db.query(
+      'UPDATE admin_notifications SET is_read = 1, read_by = ?, read_at = NOW() WHERE is_read = 0',
+      [req.user.id]
+    );
+    res.json({ success: true, message: 'All notifications marked as read' });
+  } catch (error) {
+    console.error('Mark all notifications read error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

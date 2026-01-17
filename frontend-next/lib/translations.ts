@@ -38,6 +38,11 @@ export interface Translation {
       description: string;
       features: string[];
     };
+    plant: {
+      title: string;
+      description: string;
+      features: string[];
+    };
   };
   zoonoses: {
     badge: string;
@@ -230,7 +235,7 @@ export const translations: Record<Language, Translation> = {
     },
     pillars: {
       badge: 'Notre Approche',
-      title: 'Les Trois Piliers One Health',
+      title: 'Les Quatre Piliers One Health',
       subtitle: 'Une approche intégrée reconnaissant que la santé humaine, animale et environnementale sont interconnectées',
       human: {
         title: 'Santé Humaine',
@@ -246,6 +251,11 @@ export const translations: Record<Language, Translation> = {
         title: 'Environnement',
         description: "Protection des écosystèmes, qualité de l'eau et biodiversité.",
         features: ['Protection écosystèmes', "Qualité de l'eau", 'Biodiversité'],
+      },
+      plant: {
+        title: 'Santé des Végétaux',
+        description: 'Protection phytosanitaire, surveillance des cultures et sécurité alimentaire végétale.',
+        features: ['Surveillance phytosanitaire', 'Protection des cultures', 'Sécurité alimentaire'],
       },
     },
     zoonoses: {
@@ -460,7 +470,7 @@ export const translations: Record<Language, Translation> = {
     },
     pillars: {
       badge: 'Our Approach',
-      title: 'The Three One Health Pillars',
+      title: 'The Four One Health Pillars',
       subtitle: 'An integrated approach recognizing that human, animal and environmental health are interconnected',
       human: {
         title: 'Human Health',
@@ -476,6 +486,11 @@ export const translations: Record<Language, Translation> = {
         title: 'Environment',
         description: 'Ecosystem protection, water quality and biodiversity.',
         features: ['Ecosystem protection', 'Water quality', 'Biodiversity'],
+      },
+      plant: {
+        title: 'Plant Health',
+        description: 'Phytosanitary protection, crop surveillance and plant-based food safety.',
+        features: ['Phytosanitary surveillance', 'Crop protection', 'Food safety'],
       },
     },
     zoonoses: {

@@ -18,20 +18,23 @@ export function PageSectionRenderer({ section, lang, index = 0 }: PageSectionRen
     return lang === 'en' ? (section.title.en || section.title.fr || '') : (section.title.fr || '');
   };
 
+  type ContentBlock = { type: string; text?: string; style?: string; items?: string[] };
+
   // Handle different content formats
-  const getContent = () => {
+  const getContent = (): ContentBlock[] => {
     if (!section.content) return [];
     // Direct format: section.content = { fr: [...], en: [...] }
     if (section.content.fr || section.content.en) {
       return lang === 'en' ? (section.content.en || section.content.fr || []) : (section.content.fr || []);
     }
     // Nested format: section.content.content = { fr: [...], en: [...] }
-    if (section.content.content) {
-      const nested = section.content.content;
+    const contentAny = section.content as Record<string, unknown>;
+    if (contentAny.content && typeof contentAny.content === 'object') {
+      const nested = contentAny.content as { fr?: ContentBlock[]; en?: ContentBlock[] };
       return lang === 'en' ? (nested.en || nested.fr || []) : (nested.fr || []);
     }
     // Array format
-    if (Array.isArray(section.content)) return section.content;
+    if (Array.isArray(section.content)) return section.content as ContentBlock[];
     return [];
   };
 

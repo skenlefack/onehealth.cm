@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+
+# Next.js build output
+.next
+out
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Tests
+test
+tests
+coverage
+__tests__
+
+# Documentation
+*.md
+docs
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# TypeScript build info
+*.tsbuildinfo

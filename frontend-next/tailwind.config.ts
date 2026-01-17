@@ -38,6 +38,7 @@ const config: Config = {
         'spin-slow': 'spin 20s linear infinite',
         'shine': 'shine 4s ease-in-out infinite',
         'banner-shine': 'bannerShine 5s ease-in-out infinite',
+        'gradient-x': 'gradient-x 3s ease infinite',
       },
       keyframes: {
         float: {
@@ -51,6 +52,10 @@ const config: Config = {
         bannerShine: {
           '0%': { left: '-50%' },
           '100%': { left: '150%' },
+        },
+        'gradient-x': {
+          '0%, 100%': { 'background-position': '0% 50%' },
+          '50%': { 'background-position': '100% 50%' },
         },
       },
       backgroundImage: {
