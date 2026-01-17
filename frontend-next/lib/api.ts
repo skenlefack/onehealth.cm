@@ -8,8 +8,14 @@ import {
   QuizAttemptResult, QuizQuestionForStudent, UserLearningStats
 } from './types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+// Use internal Docker URL for server-side, public URL for client-side
+const isServer = typeof window === 'undefined';
+const API_URL = isServer
+  ? (process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000') + '/api'
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api');
+const API_BASE_URL = isServer
+  ? (process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000')
+  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000');
 
 // Client API générique
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
@@ -146,8 +152,9 @@ export async function subscribeNewsletter(email: string): Promise<ApiResponse<{ 
 export function getImageUrl(path?: string): string {
   if (!path) return '/images/placeholder.jpg';
   if (path.startsWith('http')) return path;
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
-  return `${BACKEND_URL}${path}`;
+  // Use relative URLs for uploads - they'll be proxied by Next.js rewrites
+  // This works in both Docker (via internal network) and local dev
+  return path.startsWith('/') ? path : `/${path}`;
 }
 
 // === MENUS ===

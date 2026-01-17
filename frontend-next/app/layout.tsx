@@ -1,13 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
+// Using system font stack for better Docker build compatibility
+// Font family is defined in tailwind.config.ts
 
 export const metadata: Metadata = {
   title: {
@@ -77,7 +73,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={inter.variable}>
+    <html lang="fr">
       <body className="min-h-screen bg-oh-background font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

@@ -22,7 +22,11 @@ export function truncate(str: string, length: number): string {
 export function getImageUrl(path: string | null | undefined): string {
   if (!path) return '/images/placeholder.jpg';
   if (path.startsWith('http')) return path;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-  const baseUrl = apiUrl.replace('/api', '');
-  return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+  // Use relative URLs for uploads - they'll be proxied by Next.js rewrites
+  // This works in both Docker (via internal network) and local dev
+  if (path.startsWith('/uploads/') || path.startsWith('uploads/')) {
+    return path.startsWith('/') ? path : `/${path}`;
+  }
+  // For other paths, assume they're static assets
+  return path.startsWith('/') ? path : `/${path}`;
 }

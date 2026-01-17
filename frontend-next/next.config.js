@@ -12,14 +12,31 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: process.env.NEXT_PUBLIC_BACKEND_PROTOCOL || 'http',
-        hostname: process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost',
-        port: process.env.NEXT_PUBLIC_BACKEND_PORT || '5000',
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '5000',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '5001',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'backend',
+        port: '5000',
         pathname: '/uploads/**',
       },
       {
         protocol: 'https',
         hostname: '*.onehealth.cm',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'onehealth.cm',
         pathname: '/uploads/**',
       },
     ],
@@ -40,6 +57,10 @@ const nextConfig = {
       {
         source: '/api/:path*',
         destination: `${backendUrl}/api/:path*`,
+      },
+      {
+        source: '/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
       },
     ];
   },

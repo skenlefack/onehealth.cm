@@ -57,8 +57,8 @@ services:
       context: ./frontend-next
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:5000/api
-        NEXT_PUBLIC_BACKEND_URL: http://localhost:5000
+        NEXT_PUBLIC_API_URL: http://localhost:5001/api
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:5001
         BACKEND_INTERNAL_URL: http://backend:5000
     container_name: onehealth-frontend
     restart: unless-stopped
