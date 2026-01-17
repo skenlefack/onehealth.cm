@@ -10,7 +10,7 @@ import { Language } from '@/lib/types';
 import { isValidLanguage, getTranslation } from '@/lib/translations';
 import { getELearningCourse, getELearningCourseCurriculum, getImageUrl } from '@/lib/api';
 import { Button } from '@/components/ui';
-import { LevelBadge, ProgressBar } from '@/components/elearning';
+import { LevelBadge, ProgressBar, EnrollButton } from '@/components/elearning';
 
 interface PageProps {
   params: Promise<{ lang: string; slug: string }>;
@@ -220,13 +220,14 @@ export default async function CourseDetailPage({ params }: PageProps) {
                 </div>
 
                 {/* Enroll button */}
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full bg-blue-600 hover:bg-blue-700 mb-4"
-                >
-                  {course.is_free ? t.elearning.enrollFree : t.elearning.enroll}
-                </Button>
+                <div className="mb-4">
+                  <EnrollButton
+                    courseId={course.id}
+                    courseSlug={slug}
+                    isFree={course.is_free}
+                    lang={language}
+                  />
+                </div>
 
                 {/* Course includes */}
                 <div className="border-t border-slate-200 pt-4">

@@ -22,6 +22,8 @@ export interface Post {
   featured: boolean;
   author_id: number;
   author_username?: string;
+  author_first_name?: string;
+  author_last_name?: string;
   category_id?: number;
   category_name?: string;
   category_name_fr?: string;
@@ -226,20 +228,27 @@ export interface OHWRMaterial {
 export interface OHWRDocument {
   id: number;
   title: string;
+  title_fr?: string;
+  title_en?: string;
   slug: string;
   type: string;
+  document_type?: string;
   description?: string;
+  description_fr?: string;
+  description_en?: string;
   content?: string;
   file_path?: string;
+  file_url?: string;
+  external_url?: string;
   thumbnail?: string;
   organization_id?: number;
   organization_name?: string;
-  language: string;
+  language?: string;
   publication_date?: string;
-  access_level: string;
-  is_featured: boolean;
-  view_count: number;
-  download_count: number;
+  access_level?: string;
+  is_featured?: boolean;
+  view_count?: number;
+  download_count?: number;
 }
 
 export interface OHWRMapMarker {
@@ -424,8 +433,11 @@ export interface ELearningEnrollment {
   email?: string;
   enrollable_type: 'course' | 'learning_path';
   enrollable_id: number;
+  slug?: string;
   course_title?: string;
   path_title?: string;
+  title_fr?: string;
+  title_en?: string;
   thumbnail?: string;
   status: 'enrolled' | 'in_progress' | 'completed' | 'expired' | 'cancelled';
   progress_percent: number;
@@ -434,8 +446,16 @@ export interface ELearningEnrollment {
   completed_at?: string;
   last_accessed_at?: string;
   final_score?: number;
-  total_time_spent_minutes: number;
+  total_time_spent_minutes?: number;
+  total_time_spent_seconds?: number;
   certificate_id?: number;
+  course?: {
+    id: number;
+    slug: string;
+    title_fr?: string;
+    title_en?: string;
+    thumbnail?: string;
+  };
 }
 
 export interface ELearningCertificate {
@@ -466,6 +486,15 @@ export interface ELearningStats {
   paths: { total: number; published: number };
   enrollments: { total: number; completed: number };
   certificates: { total: number };
+}
+
+export interface UserLearningStats {
+  enrolledCourses: number;
+  completedCourses: number;
+  inProgressCourses: number;
+  certificates: number;
+  totalTimeSpent: number;
+  lessonsCompleted: number;
 }
 
 // ============== QUIZ TYPES ==============
@@ -506,6 +535,7 @@ export interface ELearningQuiz {
   title_fr: string;
   title_en?: string;
   description_fr?: string;
+  description_en?: string;
   quiz_type: QuizType;
   time_limit_minutes?: number;
   passing_score: number;
@@ -534,6 +564,7 @@ export interface QuizAttempt {
   completed_at?: string;
   time_spent_seconds: number;
   score?: number;
+  score_percent?: number;
   max_score: number;
   correct_count: number;
   total_questions: number;

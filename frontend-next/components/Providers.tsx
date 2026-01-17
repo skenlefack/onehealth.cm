@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { LoadingProvider, useLoading } from '@/lib/LoadingContext';
+import { AuthProvider } from '@/lib/AuthContext';
 import { PageLoader } from '@/components/ui/PageLoader';
 
 function LoadingHandlerInner({ children }: { children: ReactNode }) {
@@ -33,8 +34,10 @@ function LoadingHandler({ children }: { children: ReactNode }) {
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <LoadingProvider>
-      <LoadingHandler>{children}</LoadingHandler>
-    </LoadingProvider>
+    <AuthProvider>
+      <LoadingProvider>
+        <LoadingHandler>{children}</LoadingHandler>
+      </LoadingProvider>
+    </AuthProvider>
   );
 }

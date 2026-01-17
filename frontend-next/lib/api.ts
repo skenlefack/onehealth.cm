@@ -5,10 +5,11 @@ import {
   ELearningCategory, ELearningCourse, ELearningLearningPath,
   ELearningCourseCurriculum, ELearningEnrollment, ELearningCertificate,
   ELearningStats, ELearningLesson, ELearningQuiz, QuizAttempt,
-  QuizAttemptResult, QuizQuestionForStudent
+  QuizAttemptResult, QuizQuestionForStudent, UserLearningStats
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 // Client API générique
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
@@ -145,7 +146,8 @@ export async function subscribeNewsletter(email: string): Promise<ApiResponse<{ 
 export function getImageUrl(path?: string): string {
   if (!path) return '/images/placeholder.jpg';
   if (path.startsWith('http')) return path;
-  return `http://localhost:5000${path}`;
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+  return `${BACKEND_URL}${path}`;
 }
 
 // === MENUS ===
@@ -410,16 +412,30 @@ export async function enrollInPath(pathId: number, token: string): Promise<ApiRe
   });
 }
 
+// User learning stats
+export async function getUserLearningStats(token: string): Promise<ApiResponse<UserLearningStats>> {
+  return fetchApi<UserLearningStats>('/elearning/user/stats', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 // Progress (requires auth)
 export async function updateLessonProgress(
   lessonId: number,
   data: { progress_percent?: number; video_position?: number; time_spent?: number },
   token: string
 ): Promise<ApiResponse<{ message: string }>> {
+  // Mapper les noms de paramètres vers ceux attendus par le backend
+  const backendData = {
+    progress_percent: data.progress_percent,
+    video_last_position_seconds: data.video_position,
+    video_watch_time_seconds: data.time_spent,
+    time_spent_seconds: data.time_spent
+  };
   return fetchApi<{ message: string }>(`/elearning/lessons/${lessonId}/progress`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(data)
+    body: JSON.stringify(backendData)
   });
 }
 
@@ -455,13 +471,26 @@ export async function getQuiz(quizId: number, token?: string): Promise<ApiRespon
   return fetchApi<ELearningQuiz>(`/elearning/quizzes/${quizId}`, { headers });
 }
 
-// Start a quiz attempt
+// Start a quiz attempt (or resume in-progress)
 export async function startQuizAttempt(quizId: number, token: string, enrollmentId?: number): Promise<ApiResponse<{
-  attempt_id: number;
-  attempt_number: number;
+  attempt: {
+    id: number;
+    user_id: number;
+    quiz_id: number;
+    attempt_number: number;
+    status: string;
+    started_at: string;
+    time_spent_seconds: number;
+    responses?: string; // JSON string of saved responses
+  };
+  quiz: {
+    id: number;
+    title_fr: string;
+    title_en?: string;
+    time_limit_minutes: number | null;
+    shuffle_options: boolean;
+  };
   questions: QuizQuestionForStudent[];
-  time_limit_minutes: number | null;
-  started_at: string;
 }>> {
   return fetchApi(`/elearning/quizzes/${quizId}/start`, {
     method: 'POST',
@@ -507,7 +536,7 @@ export async function abandonQuizAttempt(attemptId: number, token: string): Prom
 
 // Get user's quiz history for a specific quiz
 export async function getQuizHistory(quizId: number, token: string): Promise<ApiResponse<QuizAttempt[]>> {
-  return fetchApi<QuizAttempt[]>(`/elearning/quizzes/${quizId}/history`, {
+  return fetchApi<QuizAttempt[]>(`/elearning/quizzes/${quizId}/attempts`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
@@ -577,4 +606,323 @@ export async function generateCertificate(enrollmentId: number, token: string): 
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ enrollment_id: enrollmentId })
   });
+}
+
+// Download certificate PDF
+export async function downloadCertificatePDF(certificateId: number, token: string, lang: string = 'fr'): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/elearning/certificates/${certificateId}/download?lang=${lang}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to download certificate');
+  }
+
+  // Get the blob data
+  const blob = await response.blob();
+
+  // Get filename from Content-Disposition header or use default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `certificat_${certificateId}.pdf`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (match) filename = match[1];
+  }
+
+  // Create download link
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
+// ============== PRIVATE RESOURCES API ==============
+
+// Get private documents (requires auth)
+export async function getPrivateDocuments(token: string, options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  language?: string;
+}): Promise<ApiResponse<OHWRDocument[]>> {
+  const params = new URLSearchParams();
+  params.append('access_level', 'private');
+  if (options?.page) params.append('page', options.page.toString());
+  if (options?.limit) params.append('limit', options.limit.toString());
+  if (options?.search) params.append('search', options.search);
+  if (options?.type) params.append('type', options.type);
+  if (options?.language) params.append('language', options.language);
+
+  return fetchApi<OHWRDocument[]>(`/mapping/documents?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// ============== USER SUBMISSIONS API ==============
+
+export interface UserSubmission {
+  id: number;
+  type: 'material' | 'organization' | 'document' | 'expert';
+  name: string;
+  submission_status: 'draft' | 'pending' | 'approved' | 'rejected';
+  submitted_at: string;
+  validated_at?: string;
+  rejection_reason?: string;
+  // Material specific
+  material_type?: string;
+  // Organization specific
+  org_type?: string;
+  acronym?: string;
+  // Document specific
+  doc_type?: string;
+  title_fr?: string;
+  title_en?: string;
+  // Expert specific
+  category?: string;
+  title?: string;
+}
+
+// Get user's submissions
+export async function getUserSubmissions(token: string): Promise<ApiResponse<{
+  materials: UserSubmission[];
+  organizations: UserSubmission[];
+  documents: UserSubmission[];
+  experts: UserSubmission[];
+}>> {
+  return fetchApi('/mapping/my-submissions', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Submit material
+export async function submitMaterial(token: string, data: {
+  name: string;
+  type: string;
+  description?: string;
+  status?: string;
+  organization_id?: number;
+  region_id?: number;
+  city?: string;
+  address?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  latitude?: string;
+  longitude?: string;
+  capacity?: string;
+}, imageFile?: File): Promise<ApiResponse<{ id: number; message: string }>> {
+  // Use FormData if file is provided
+  if (imageFile) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    formData.append('image', imageFile);
+
+    try {
+      const res = await fetch(`${API_URL}/mapping/submit/material`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      return res.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      return { success: false, data: { id: 0, message: '' }, message: 'Connection error' };
+    }
+  }
+
+  return fetchApi('/mapping/submit/material', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+}
+
+// Submit organization
+export async function submitOrganization(token: string, data: {
+  name: string;
+  type: string;
+  acronym?: string;
+  description?: string;
+  mission?: string;
+  website?: string;
+  region_id?: number;
+  city?: string;
+  address?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  latitude?: string;
+  longitude?: string;
+}, logoFile?: File): Promise<ApiResponse<{ id: number; message: string }>> {
+  // Use FormData if file is provided
+  if (logoFile) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    formData.append('logo', logoFile);
+
+    try {
+      const res = await fetch(`${API_URL}/mapping/submit/organization`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      return res.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      return { success: false, data: { id: 0, message: '' }, message: 'Connection error' };
+    }
+  }
+
+  return fetchApi('/mapping/submit/organization', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+}
+
+// Submit document
+export async function submitDocument(token: string, data: {
+  title: string;
+  type: string;
+  description?: string;
+  external_url?: string;
+  language?: string;
+  publication_date?: string;
+  access_level?: string;
+}, documentFile?: File, thumbnailFile?: File): Promise<ApiResponse<{ id: number; message: string }>> {
+  // Use FormData if files are provided
+  if (documentFile || thumbnailFile) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    if (documentFile) {
+      formData.append('file', documentFile);
+    }
+    if (thumbnailFile) {
+      formData.append('thumbnail', thumbnailFile);
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/mapping/submit/document`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      return res.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      return { success: false, data: { id: 0, message: '' }, message: 'Connection error' };
+    }
+  }
+
+  return fetchApi('/mapping/submit/document', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+}
+
+// Submit expert registration
+export async function submitExpertRegistration(token: string, data: {
+  first_name?: string;
+  last_name?: string;
+  title?: string;
+  category: string;
+  email?: string;
+  phone?: string;
+  organization_id?: number;
+  organization_name?: string;
+  region_id?: number;
+  city?: string;
+  biography?: string;
+  years_experience?: number;
+  linkedin_url?: string;
+  twitter_url?: string;
+  orcid_id?: string;
+  google_scholar_url?: string;
+  researchgate_url?: string;
+  website?: string;
+  expertise_domain_ids?: number[];
+  qualifications?: string;
+  expertise_summary?: string;
+  publications_count?: number;
+  projects_count?: number;
+  consultation_rate?: string;
+  awards?: string;
+  research_interests?: string;
+  available_for_collaboration?: boolean;
+  latitude?: string;
+  longitude?: string;
+}, photoFile?: File, cvFile?: File): Promise<ApiResponse<{ id: number; message: string }>> {
+  // Use FormData if files are provided, otherwise use JSON
+  if (photoFile || cvFile) {
+    const formData = new FormData();
+
+    // Add all data fields
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (Array.isArray(value)) {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+
+    // Add files
+    if (photoFile) {
+      formData.append('photo', photoFile);
+    }
+    if (cvFile) {
+      formData.append('cv', cvFile);
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/mapping/submit/expert`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData
+      });
+
+      if (!res.ok) {
+        throw new Error(`API Error: ${res.status}`);
+      }
+
+      return res.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      return { success: false, data: { id: 0, message: '' }, message: 'Connection error' };
+    }
+  }
+
+  // No files, use JSON
+  return fetchApi('/mapping/submit/expert', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+}
+
+// Get OHWR regions (for forms)
+export async function getRegions(): Promise<ApiResponse<OHWRRegion[]>> {
+  return fetchApi<OHWRRegion[]>('/mapping/regions');
 }

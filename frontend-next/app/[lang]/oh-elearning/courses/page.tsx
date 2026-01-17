@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import { BookOpen, ArrowLeft, Map, GraduationCap } from 'lucide-react';
 import { Language, ELearningCourse, ELearningCategory } from '@/lib/types';
 import { getTranslation, isValidLanguage } from '@/lib/translations';
 import { getELearningCourses, getELearningCategories } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { CourseCard, CourseFilters } from '@/components/elearning';
 
-export default function CoursesPage() {
+function CoursesContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const lang = (params.lang as string) || 'fr';
@@ -73,36 +73,47 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <section className="pt-32 pb-8 px-[5%]">
-        <div className="max-w-6xl mx-auto">
-          {/* Back link */}
-          <Link
-            href={`/${lang}/oh-elearning`}
-            className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 mb-6 transition-colors"
-          >
-            <ArrowLeft size={18} />
-            {t.common.back}
-          </Link>
-
-          {/* Title */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <BookOpen size={28} className="text-blue-600" />
-            </div>
+      {/* Gradient Header Banner */}
+      <div className="bg-gradient-to-r from-oh-blue to-oh-green">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
-                {t.elearning.allCourses}
-              </h1>
-              <p className="text-slate-500">
+              <Link
+                href={`/${lang}/oh-elearning`}
+                className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors mb-2"
+              >
+                <ArrowLeft size={16} />
+                {t.common.back}
+              </Link>
+              <h1 className="text-2xl font-bold text-white">{t.elearning.allCourses}</h1>
+              <p className="text-sm text-white/80 mt-0.5">
                 {language === 'fr'
                   ? 'Explorez notre catalogue de formations'
                   : 'Explore our training catalog'}
               </p>
             </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/${lang}/ohwr-mapping`}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl font-semibold transition-all border border-white/30 hover:border-white/50"
+              >
+                <Map size={18} />
+                OHWR-Map
+              </Link>
+              <Link
+                href={`/${lang}/oh-elearning`}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-oh-blue rounded-xl font-semibold hover:bg-white/90 transition-all shadow-lg"
+              >
+                <GraduationCap size={18} />
+                OH E-learning
+              </Link>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
+
+      {/* Spacer for fixed header */}
+      <div className="pt-8" />
 
       {/* Filters */}
       <section className="px-[5%] mb-8">
@@ -166,5 +177,21 @@ export default function CoursesPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
+      <Spinner />
+    </div>
+  );
+}
+
+export default function CoursesPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CoursesContent />
+    </Suspense>
   );
 }

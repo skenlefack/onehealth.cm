@@ -1,25 +1,26 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Play, FileText, File,
-  CheckCircle, Lock, Menu, X, Download
+  CheckCircle, Lock, Menu, X, Download, LogIn
 } from 'lucide-react';
 import { Language, ELearningCourse, ELearningModule, ELearningLesson } from '@/lib/types';
 import { isValidLanguage, getTranslation } from '@/lib/translations';
 import {
   getELearningCourse, getELearningCourseCurriculum, getELearningLesson,
-  getImageUrl, completeLesson
+  getImageUrl, completeLesson, updateLessonProgress
 } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
-import { ProgressBar } from '@/components/elearning';
+import { ProgressBar, VideoPlayer, VideoProgressData } from '@/components/elearning';
+import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
 export default function LessonViewerPage() {
   const params = useParams();
-  const router = useRouter();
+  const { token, isAuthenticated, user } = useAuth();
   const lang = (params.lang as string) || 'fr';
   const courseSlug = params.courseSlug as string;
   const lessonId = parseInt(params.lessonId as string);
@@ -38,7 +39,12 @@ export default function LessonViewerPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
   const [isCompleting, setIsCompleting] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  // Ref pour éviter les sauvegardes multiples
+  const lastSavedProgressRef = useRef<number>(0);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,8 +69,8 @@ export default function LessonViewerPage() {
             }
           }
 
-          // Fetch lesson details
-          const lessonRes = await getELearningLesson(lessonId);
+          // Fetch lesson details with auth token if available
+          const lessonRes = await getELearningLesson(lessonId, token || undefined);
           if (lessonRes.success) {
             setCurrentLesson(lessonRes.data);
           }
@@ -77,7 +83,16 @@ export default function LessonViewerPage() {
     };
 
     fetchData();
-  }, [courseSlug, lessonId]);
+  }, [courseSlug, lessonId, token]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const toggleModule = (moduleId: number) => {
     setExpandedModules((prev) => {
@@ -118,13 +133,66 @@ export default function LessonViewerPage() {
     return idx < lessons.length - 1 ? lessons[idx + 1] : null;
   };
 
+  // Sauvegarder la progression vidéo
+  const saveVideoProgress = useCallback(async (data: VideoProgressData) => {
+    if (!token || !currentLesson) return;
+
+    // Éviter les sauvegardes trop fréquentes (min 5% de différence)
+    const progressDiff = Math.abs(data.progressPercent - lastSavedProgressRef.current);
+    if (progressDiff < 5 && !data.isComplete) return;
+
+    try {
+      await updateLessonProgress(
+        lessonId,
+        {
+          progress_percent: Math.round(data.progressPercent),
+          video_position: Math.floor(data.currentTime),
+          time_spent: Math.floor(data.watchedTime)
+        },
+        token
+      );
+      lastSavedProgressRef.current = data.progressPercent;
+    } catch (error) {
+      console.error('Error saving progress:', error);
+    }
+  }, [token, lessonId, currentLesson]);
+
+  // Handler pour la progression vidéo
+  const handleVideoProgress = useCallback((data: VideoProgressData) => {
+    setVideoProgress(data.progressPercent);
+
+    // Sauvegarder avec debounce
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveVideoProgress(data);
+    }, 2000);
+  }, [saveVideoProgress]);
+
+  // Handler pour la complétion de la vidéo
+  const handleVideoComplete = useCallback(async () => {
+    if (!token || !currentLesson || currentLesson.is_completed) return;
+
+    try {
+      await completeLesson(lessonId, token);
+      setCurrentLesson({ ...currentLesson, is_completed: true });
+    } catch (error) {
+      console.error('Error completing lesson:', error);
+    }
+  }, [token, lessonId, currentLesson]);
+
   const handleMarkComplete = async () => {
     if (!currentLesson || currentLesson.is_completed) return;
 
+    if (!token) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
     setIsCompleting(true);
     try {
-      // In real implementation, get token from auth context
-      // await completeLesson(lessonId, token);
+      await completeLesson(lessonId, token);
       setCurrentLesson({ ...currentLesson, is_completed: true });
     } catch (error) {
       console.error('Error completing lesson:', error);
@@ -178,10 +246,44 @@ export default function LessonViewerPage() {
 
   const prevLesson = getPrevLesson();
   const nextLesson = getNextLesson();
-  const progress = course.progress_percent || 0;
+  const courseProgress = course.progress_percent || 0;
+
+  // Position initiale pour la reprise de lecture
+  const initialVideoPosition = currentLesson.video_last_position || 0;
 
   return (
     <div className="min-h-screen bg-slate-900">
+      {/* Login Prompt Modal */}
+      {showLoginPrompt && (
+        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold text-white mb-3">
+              {language === 'fr' ? 'Connexion requise' : 'Login Required'}
+            </h3>
+            <p className="text-slate-300 mb-6">
+              {language === 'fr'
+                ? 'Connectez-vous pour sauvegarder votre progression et obtenir un certificat.'
+                : 'Log in to save your progress and earn a certificate.'}
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setShowLoginPrompt(false)}
+                className="flex-1"
+              >
+                {language === 'fr' ? 'Plus tard' : 'Later'}
+              </Button>
+              <Link href={`/${lang}/oh-elearning/login?redirect=${encodeURIComponent(window.location.pathname)}`} className="flex-1">
+                <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700">
+                  <LogIn size={18} className="mr-2" />
+                  {language === 'fr' ? 'Se connecter' : 'Log in'}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar */}
       <header className="fixed top-0 left-0 right-0 h-14 bg-slate-800 border-b border-slate-700 z-50 flex items-center px-4">
         <div className="flex items-center gap-4 flex-1">
@@ -195,7 +297,7 @@ export default function LessonViewerPage() {
 
           {/* Back to course */}
           <Link
-            href={`/${lang}/oh-elearning/learn/${courseSlug}`}
+            href={`/${lang}/oh-elearning/courses/${courseSlug}`}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
           >
             <ArrowLeft size={18} />
@@ -208,13 +310,18 @@ export default function LessonViewerPage() {
           </h1>
         </div>
 
-        {/* Progress */}
+        {/* Progress & User */}
         <div className="flex items-center gap-4">
+          {isAuthenticated && (
+            <span className="text-xs text-slate-400 hidden md:block">
+              {user?.username}
+            </span>
+          )}
           <div className="hidden sm:block w-24">
-            <ProgressBar progress={progress} lang={language} size="sm" />
+            <ProgressBar progress={courseProgress} lang={language} size="sm" />
           </div>
           <span className="text-sm font-medium text-slate-400">
-            {Math.round(progress)}%
+            {Math.round(courseProgress)}%
           </span>
         </div>
       </header>
@@ -275,7 +382,9 @@ export default function LessonViewerPage() {
                             getLessonIcon(lesson.content_type)
                           )}
                         </span>
-                        <span className="flex-1 truncate">{lesson.title_fr}</span>
+                        <span className="flex-1 truncate">
+                          {language === 'en' && lesson.title_en ? lesson.title_en : lesson.title_fr}
+                        </span>
                       </Link>
                     ))}
                   </div>
@@ -292,18 +401,21 @@ export default function LessonViewerPage() {
             sidebarOpen ? 'ml-72' : 'ml-0'
           )}
         >
-          {/* Video content */}
+          {/* Video content with new VideoPlayer */}
           {currentLesson.content_type === 'video' && currentLesson.video_url && (
-            <div className="bg-black aspect-video max-h-[70vh] flex items-center justify-center">
-              <video
-                ref={videoRef}
+            <div className="max-h-[70vh]">
+              <VideoPlayer
                 src={getImageUrl(currentLesson.video_url)}
-                controls
-                className="w-full h-full"
+                provider={currentLesson.video_provider as any}
                 poster={course.thumbnail ? getImageUrl(course.thumbnail) : undefined}
-              >
-                Your browser does not support the video tag.
-              </video>
+                title={lessonTitle}
+                lang={language}
+                initialPosition={initialVideoPosition}
+                minWatchPercent={currentLesson.min_video_watch_percent || 80}
+                onProgress={handleVideoProgress}
+                onComplete={handleVideoComplete}
+                autoSaveInterval={10000}
+              />
             </div>
           )}
 
@@ -339,6 +451,11 @@ export default function LessonViewerPage() {
               <h2 className="text-2xl font-bold text-white mb-2">{lessonTitle}</h2>
               <div className="flex items-center gap-4 text-sm text-slate-400">
                 <span>{currentLesson.duration_minutes} min</span>
+                {currentLesson.content_type === 'video' && videoProgress > 0 && (
+                  <span className="text-blue-400">
+                    {language === 'fr' ? 'Vu' : 'Watched'}: {Math.round(videoProgress)}%
+                  </span>
+                )}
                 {currentLesson.is_completed && (
                   <span className="flex items-center gap-1 text-emerald-400">
                     <CheckCircle size={16} />
@@ -347,6 +464,17 @@ export default function LessonViewerPage() {
                 )}
               </div>
             </div>
+
+            {/* Auth reminder for non-logged users */}
+            {!isAuthenticated && (
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <p className="text-blue-200 text-sm">
+                  {language === 'fr'
+                    ? 'Connectez-vous pour sauvegarder votre progression automatiquement.'
+                    : 'Log in to save your progress automatically.'}
+                </p>
+              </div>
+            )}
 
             {/* Text content */}
             {(currentLesson.content_type === 'text' || currentLesson.content_type === 'mixed') && lessonContent && (

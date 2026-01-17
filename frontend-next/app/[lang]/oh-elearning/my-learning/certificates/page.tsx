@@ -6,25 +6,41 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   Award, ArrowLeft, Download, ExternalLink,
   Calendar, BookOpen, GraduationCap, CheckCircle,
-  AlertTriangle, XCircle
+  AlertTriangle, XCircle, Loader2
 } from 'lucide-react';
 import { Language, ELearningCertificate } from '@/lib/types';
 import { isValidLanguage, getTranslation } from '@/lib/translations';
-import { getMyCertificates } from '@/lib/api';
+import { getMyCertificates, downloadCertificatePDF } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function MyCertificatesPage() {
   const router = useRouter();
   const params = useParams();
   const lang = (params.lang as string) || 'fr';
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
 
   const language = (isValidLanguage(lang) ? lang : 'fr') as Language;
   const t = getTranslation(language);
 
   const [certificates, setCertificates] = useState<ELearningCertificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  // Handle PDF download
+  const handleDownload = async (cert: ELearningCertificate) => {
+    if (!token) return;
+
+    setDownloadingId(cert.id);
+    try {
+      await downloadCertificatePDF(cert.id, token, language);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(language === 'fr' ? 'Erreur lors du telechargement' : 'Download error');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const fetchCertificates = useCallback(async () => {
     if (!token) return;
@@ -188,18 +204,21 @@ export default function MyCertificatesPage() {
 
                     {/* Actions */}
                     <div className="flex gap-3">
-                      {cert.pdf_url && cert.status === 'active' && (
-                        <a
-                          href={cert.pdf_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1"
+                      {cert.status === 'active' && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                          onClick={() => handleDownload(cert)}
+                          disabled={downloadingId === cert.id}
                         >
-                          <Button variant="primary" size="sm" className="w-full bg-indigo-600 hover:bg-indigo-700">
+                          {downloadingId === cert.id ? (
+                            <Loader2 size={16} className="mr-1 animate-spin" />
+                          ) : (
                             <Download size={16} className="mr-1" />
-                            {language === 'fr' ? 'Télécharger' : 'Download'}
-                          </Button>
-                        </a>
+                          )}
+                          {language === 'fr' ? 'Telecharger' : 'Download'}
+                        </Button>
                       )}
                       <Link
                         href={`/${lang}/oh-elearning/certificate/verify/${cert.verification_code}`}
@@ -207,7 +226,7 @@ export default function MyCertificatesPage() {
                       >
                         <Button variant="outline" size="sm" className="w-full">
                           <ExternalLink size={16} className="mr-1" />
-                          {language === 'fr' ? 'Vérifier' : 'Verify'}
+                          {language === 'fr' ? 'Verifier' : 'Verify'}
                         </Button>
                       </Link>
                     </div>

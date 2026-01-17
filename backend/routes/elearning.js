@@ -18,6 +18,7 @@ const db = require('../config/db');
 const { auth, authorize, optionalAuth } = require('../middleware/auth');
 const slugify = require('slugify');
 const { v4: uuidv4 } = require('uuid');
+const { generateCertificatePDF } = require('../services/certificateService');
 
 // ============================================
 // HELPERS
@@ -3284,18 +3285,25 @@ router.get('/certificates/:id/download', auth, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Accès non autorisé' });
     }
 
-    // Si un PDF existe déjà, rediriger vers celui-ci
-    if (cert.pdf_url) {
-      return res.redirect(cert.pdf_url);
-    }
+    // Déterminer la langue depuis le query param ou header
+    const lang = req.query.lang || req.headers['accept-language']?.split(',')[0]?.split('-')[0] || 'fr';
 
-    // Sinon, générer le PDF à la volée (version simplifiée)
-    // En production, utiliser une bibliothèque comme PDFKit ou Puppeteer
-    res.json({
-      success: true,
-      message: 'PDF generation not implemented yet',
-      data: cert
-    });
+    // Générer le PDF à la volée
+    try {
+      const pdfBuffer = await generateCertificatePDF(cert, lang === 'en' ? 'en' : 'fr');
+
+      // Définir les headers pour le téléchargement
+      const filename = `certificat_${cert.certificate_number}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      // Envoyer le PDF
+      res.send(pdfBuffer);
+    } catch (pdfError) {
+      console.error('PDF generation error:', pdfError);
+      res.status(500).json({ success: false, message: 'Erreur lors de la génération du PDF' });
+    }
   } catch (error) {
     console.error('Download certificate error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
