@@ -65,9 +65,9 @@ INSERT INTO homepage_sections (section_key, section_name, content_fr, content_en
   2
 ),
 
-('pillars', 'Les 3 Piliers',
+('pillars', 'Les 4 Piliers',
   JSON_OBJECT(
-    'title', 'Les 3 Piliers',
+    'title', 'Les 4 Piliers',
     'subtitle', 'Une approche intégrée de la santé',
     'human_title', 'Santé Humaine',
     'human_description', 'Protection et amélioration de la santé des populations camerounaises.',
@@ -77,7 +77,7 @@ INSERT INTO homepage_sections (section_key, section_name, content_fr, content_en
     'environment_description', 'Préservation des écosystèmes et gestion durable des ressources naturelles.'
   ),
   JSON_OBJECT(
-    'title', 'The 3 Pillars',
+    'title', 'The 4 Pillars',
     'subtitle', 'An integrated approach to health',
     'human_title', 'Human Health',
     'human_description', 'Protection and improvement of Cameroonian population health.',

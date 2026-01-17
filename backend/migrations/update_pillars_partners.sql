@@ -3,7 +3,7 @@ SET NAMES utf8mb4;
 
 UPDATE homepage_sections SET
   content_fr = JSON_OBJECT(
-    'title', 'Les 3 Piliers',
+    'title', 'Les 4 Piliers',
     'subtitle', 'Une approche integree de la sante',
     'show_features', true,
     'human_title', 'Sante Humaine',
@@ -17,7 +17,7 @@ UPDATE homepage_sections SET
     'environment_features', JSON_ARRAY('Qualite de l''eau', 'Ecosystemes', 'Changement climatique')
   ),
   content_en = JSON_OBJECT(
-    'title', 'The 3 Pillars',
+    'title', 'The 4 Pillars',
     'subtitle', 'An integrated approach to health',
     'show_features', true,
     'human_title', 'Human Health',

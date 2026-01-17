@@ -123,8 +123,8 @@ async function runTests() {
         layout: 'full',
         spacing: { top: '40', bottom: '40' },
         content: {
-          title_fr: 'Nos 3 Piliers',
-          title_en: 'Our 3 Pillars',
+          title_fr: 'Nos 4 Piliers',
+          title_en: 'Our 4 Pillars',
           columns: 3,
           items: [
             { icon: '🏥', title_fr: 'Sante Humaine', title_en: 'Human Health', desc_fr: 'Protection de la sante publique', desc_en: 'Public health protection' },
