@@ -140,10 +140,15 @@ export async function submitContact(data: {
 
 // === NEWSLETTER ===
 
-export async function subscribeNewsletter(email: string): Promise<ApiResponse<{ message: string }>> {
-  return fetchApi<{ message: string }>('/newsletter/subscribe', {
+export async function subscribeNewsletter(data: {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  language?: string;
+}): Promise<ApiResponse<{ message: string; needs_confirmation?: boolean; already_subscribed?: boolean }>> {
+  return fetchApi<{ message: string; needs_confirmation?: boolean; already_subscribed?: boolean }>('/newsletter/subscribe', {
     method: 'POST',
-    body: JSON.stringify({ email }),
+    body: JSON.stringify(data),
   });
 }
 
@@ -357,8 +362,12 @@ export async function getELearningFeaturedCourses(limit: number = 6): Promise<Ap
 }
 
 // Course Curriculum
-export async function getELearningCourseCurriculum(courseId: number): Promise<ApiResponse<ELearningCourseCurriculum>> {
-  return fetchApi<ELearningCourseCurriculum>(`/elearning/courses/${courseId}/curriculum`);
+export async function getELearningCourseCurriculum(courseId: number, token?: string): Promise<ApiResponse<ELearningCourseCurriculum>> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return fetchApi<ELearningCourseCurriculum>(`/elearning/courses/${courseId}/curriculum`, { headers });
 }
 
 // Lesson
@@ -446,8 +455,12 @@ export async function updateLessonProgress(
   });
 }
 
-export async function completeLesson(lessonId: number, token: string): Promise<ApiResponse<{ message: string }>> {
-  return fetchApi<{ message: string }>(`/elearning/lessons/${lessonId}/complete`, {
+export async function completeLesson(lessonId: number, token: string): Promise<ApiResponse<{
+  lesson_completed: boolean;
+  course_progress: number;
+  course_completed: boolean;
+}>> {
+  return fetchApi<{ lesson_completed: boolean; course_progress: number; course_completed: boolean }>(`/elearning/lessons/${lessonId}/complete`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` }
   });

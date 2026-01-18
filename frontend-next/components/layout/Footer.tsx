@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Facebook, Twitter, Linkedin, Youtube, Send, MapPin, Phone, Mail, Globe } from 'lucide-react';
+import { Facebook, Twitter, Linkedin, Youtube, Send, MapPin, Phone, Mail, Globe, User } from 'lucide-react';
 import { Language } from '@/lib/types';
 import { Translation } from '@/lib/translations';
-import { getSettings, SiteSettings } from '@/lib/api';
+import { getSettings, subscribeNewsletter, SiteSettings } from '@/lib/api';
 
 interface FooterProps {
   lang: Language;
@@ -15,7 +15,12 @@ interface FooterProps {
 
 export function Footer({ lang, t }: FooterProps) {
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
+  const [subscribeMessage, setSubscribeMessage] = useState('');
   const [settings, setSettings] = useState<SiteSettings>({});
 
   useEffect(() => {
@@ -28,11 +33,40 @@ export function Footer({ lang, t }: FooterProps) {
     fetchSettings();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubscribed(true);
-    setEmail('');
-    setTimeout(() => setSubscribed(false), 3000);
+    setSubscribing(true);
+    setSubscribeError('');
+    setSubscribeMessage('');
+
+    try {
+      const result = await subscribeNewsletter({
+        email,
+        first_name: firstName || undefined,
+        last_name: lastName || undefined,
+        language: lang,
+      });
+
+      if (result.success) {
+        setSubscribed(true);
+        setEmail('');
+        setFirstName('');
+        setLastName('');
+        setSubscribeMessage(result.data?.message || (lang === 'fr' ? 'Inscription reussie!' : 'Successfully subscribed!'));
+        setTimeout(() => {
+          setSubscribed(false);
+          setSubscribeMessage('');
+        }, 5000);
+      } else {
+        setSubscribeError(result.message || (lang === 'fr' ? 'Erreur lors de l\'inscription' : 'Subscription error'));
+        setTimeout(() => setSubscribeError(''), 4000);
+      }
+    } catch (error) {
+      setSubscribeError(lang === 'fr' ? 'Erreur de connexion' : 'Connection error');
+      setTimeout(() => setSubscribeError(''), 4000);
+    } finally {
+      setSubscribing(false);
+    }
   };
 
   const navLinks = [
@@ -178,25 +212,53 @@ export function Footer({ lang, t }: FooterProps) {
             <p className="text-white/70 text-sm mb-5">{t.footer.newsletterDesc}</p>
             <form onSubmit={handleSubmit} className="space-y-3">
               <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={lang === 'fr' ? 'Nom' : 'Last name'}
+                disabled={subscribing}
+                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white text-sm border border-white/10 outline-none placeholder:text-white/40 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors disabled:opacity-50"
+              />
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={lang === 'fr' ? 'Prenom' : 'First name'}
+                disabled={subscribing}
+                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white text-sm border border-white/10 outline-none placeholder:text-white/40 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors disabled:opacity-50"
+              />
+              <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t.footer.emailPlaceholder}
                 required
-                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white text-sm border border-white/10 outline-none placeholder:text-white/40 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
+                disabled={subscribing}
+                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white text-sm border border-white/10 outline-none placeholder:text-white/40 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors disabled:opacity-50"
               />
               <button
                 type="submit"
-                className="w-full px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                disabled={subscribing}
+                className="w-full px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <Send size={16} />
-                {lang === 'fr' ? "S'abonner" : 'Subscribe'}
+                {subscribing ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Send size={16} />
+                )}
+                {subscribing ? (lang === 'fr' ? 'En cours...' : 'Loading...') : (lang === 'fr' ? "S'abonner" : 'Subscribe')}
               </button>
             </form>
-            {subscribed && (
+            {subscribed && subscribeMessage && (
               <p className="text-emerald-300 text-sm mt-3 flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                {lang === 'fr' ? 'Merci!' : 'Thanks!'}
+                {subscribeMessage}
+              </p>
+            )}
+            {subscribeError && (
+              <p className="text-red-300 text-sm mt-3 flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-400 rounded-full" />
+                {subscribeError}
               </p>
             )}
           </div>

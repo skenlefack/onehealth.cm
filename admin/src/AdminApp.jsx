@@ -1,5 +1,6 @@
 import PageBuilderPage from './PageBuilderPage';
 import COHRMSystemPage from './COHRMSystemPage';
+import NewsletterPage from './NewsletterPage';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline, Polygon, Autocomplete } from '@react-google-maps/api';
 import {
@@ -19467,6 +19468,7 @@ export default function AdminApp() {
       case 'ohwr-mapping': return <OHWRMappingPage isDark={isDark} token={token} />;
       case 'oh-elearning': return <OHELearningPage isDark={isDark} token={token} />;
       case 'cohrm-system': return <COHRMSystemPage isDark={isDark} token={token} />;
+      case 'newsletter': return <NewsletterPage isDark={isDark} token={token} />;
       default: return <Dashboard isDark={isDark} token={token} />;
     }
   };
@@ -19479,6 +19481,8 @@ export default function AdminApp() {
     ? { id: 'oh-elearning', label: 'OH E-Learning', icon: GraduationCap }
     : activePage === 'cohrm-system'
     ? { id: 'cohrm-system', label: 'COHRM-SYSTEM', icon: Radar }
+    : activePage === 'newsletter'
+    ? { id: 'newsletter', label: 'Newsletter', icon: Mail }
     : filteredNavGroups.flatMap(g => g.items).find(i => i.id === activePage);
 
   return (
@@ -19624,6 +19628,20 @@ export default function AdminApp() {
               title="COHRM-SYSTEM - Gestion des Rumeurs"
             >
               <Radar size={20} />
+            </button>
+            {/* Newsletter Button */}
+            <button
+              style={{
+                ...styles.btnIcon,
+                background: activePage === 'newsletter' ? '#27AE60' : (isDark ? 'rgba(39,174,96,0.2)' : 'rgba(39,174,96,0.15)'),
+                borderRadius: '12px',
+                color: activePage === 'newsletter' ? 'white' : '#27AE60',
+                position: 'relative'
+              }}
+              onClick={() => setActivePage('newsletter')}
+              title="Gestion Newsletter"
+            >
+              <Mail size={20} />
             </button>
             <div style={{ width: '1px', height: '32px', background: isDark ? '#334155' : 'rgba(0,122,51,0.2)' }} />
             <button style={{ ...styles.btnIcon, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,122,51,0.1)', borderRadius: '12px' }} onClick={() => setIsDark(!isDark)}>

@@ -101,6 +101,9 @@ app.use('/api/upload', require('./routes/upload'));
 // COHRM - Cameroon One Health Rumor Management
 app.use('/api/cohrm', require('./routes/cohrm'));
 
+// Newsletter
+app.use('/api/newsletter', require('./routes/newsletter'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
@@ -127,6 +130,20 @@ app.listen(PORT, () => {
   console.log(`🚀 One Health CMS Server running on port ${PORT}`);
   console.log(`📚 API: http://localhost:${PORT}/api`);
   console.log(`💾 Health: http://localhost:${PORT}/api/health`);
+
+  // Start newsletter scheduler (check every minute for scheduled campaigns)
+  const newsletterEmailService = require('./services/newsletterEmailService');
+  setInterval(async () => {
+    try {
+      const count = await newsletterEmailService.processScheduledCampaigns();
+      if (count > 0) {
+        console.log(`📧 Started ${count} scheduled newsletter(s)`);
+      }
+    } catch (error) {
+      console.error('Newsletter scheduler error:', error);
+    }
+  }, 60000); // Check every minute
+  console.log(`📧 Newsletter scheduler started`);
 });
 
 module.exports = app;

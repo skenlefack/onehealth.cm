@@ -39,8 +39,15 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-devpassword}
       DB_NAME: ${DB_NAME:-onehealth_cms}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
-      FRONTEND_URL: http://localhost:3002
-      ADMIN_URL: http://localhost:3001
+      FRONTEND_URL: http://localhost:3003
+      ADMIN_URL: http://localhost:3004
+      # SMTP Configuration (Infomaniak)
+      SMTP_HOST: mail.infomaniak.com
+      SMTP_PORT: 587
+      SMTP_SECURE: "false"
+      SMTP_USER: ${SMTP_USER:-contact@onehealth.cm}
+      SMTP_PASS: ${SMTP_PASS:-your-email-password}
+      SMTP_FROM: contact@onehealth.cm
     ports:
       - "5001:5000"  # Use 5001 externally to avoid conflict with local backend
     volumes:
