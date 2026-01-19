@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -14,12 +14,15 @@ import { getELearningCourse, getELearningCourseCurriculum, getImageUrl } from '@
 import { Button, Spinner } from '@/components/ui';
 import { ProgressBar } from '@/components/elearning';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function CoursePlayerPage() {
   const params = useParams();
   const router = useRouter();
+  const { token } = useAuth();
   const lang = (params.lang as string) || 'fr';
   const courseSlug = params.courseSlug as string;
+  const hasRedirected = useRef(false);
 
   if (!isValidLanguage(lang)) {
     return null;
@@ -34,6 +37,27 @@ export default function CoursePlayerPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
 
+  // Find the lesson to continue (first incomplete or first lesson)
+  const findContinueLesson = (mods: ELearningModule[]): ELearningLesson | null => {
+    // First, find the first incomplete lesson
+    for (const module of mods) {
+      if (module.lessons) {
+        for (const lesson of module.lessons) {
+          if (!lesson.is_completed && !lesson.is_locked) {
+            return lesson;
+          }
+        }
+      }
+    }
+    // If all completed, return the first lesson
+    for (const module of mods) {
+      if (module.lessons && module.lessons.length > 0) {
+        return module.lessons[0];
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -42,9 +66,21 @@ export default function CoursePlayerPage() {
         if (courseRes.success && courseRes.data) {
           setCourse(courseRes.data);
 
-          const curriculumRes = await getELearningCourseCurriculum(courseRes.data.id);
+          // Fetch curriculum with auth token to get progress info
+          const curriculumRes = await getELearningCourseCurriculum(courseRes.data.id, token || undefined);
           if (curriculumRes.success) {
             setModules(curriculumRes.data.modules);
+
+            // Auto-redirect to continue lesson if user has progress
+            if (!hasRedirected.current && curriculumRes.data.modules.length > 0) {
+              const continueLesson = findContinueLesson(curriculumRes.data.modules);
+              if (continueLesson) {
+                hasRedirected.current = true;
+                router.replace(`/${lang}/oh-elearning/learn/${courseSlug}/${continueLesson.id}`);
+                return;
+              }
+            }
+
             // Expand first module by default
             if (curriculumRes.data.modules.length > 0) {
               setExpandedModules(new Set([curriculumRes.data.modules[0].id]));
@@ -59,7 +95,7 @@ export default function CoursePlayerPage() {
     };
 
     fetchData();
-  }, [courseSlug]);
+  }, [courseSlug, token, lang, router]);
 
   const toggleModule = (moduleId: number) => {
     setExpandedModules((prev) => {

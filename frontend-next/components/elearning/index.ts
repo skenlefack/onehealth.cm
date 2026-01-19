@@ -6,3 +6,4 @@ export { CourseFilters } from './CourseFilters';
 export { VideoPlayer } from './VideoPlayer';
 export type { VideoProgressData } from './VideoPlayer';
 export { EnrollButton } from './EnrollButton';
+export { ELearningSearchBar } from './ELearningSearchBar';

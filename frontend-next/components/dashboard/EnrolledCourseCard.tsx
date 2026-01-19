@@ -114,7 +114,11 @@ export function EnrolledCourseCard({ lang, enrollment }: EnrolledCourseCardProps
 
         {/* Action button */}
         <Link
-          href={`/${lang}/oh-elearning/courses/${course.slug}`}
+          href={
+            isCompleted
+              ? `/${lang}/oh-elearning/courses/${enrollment.slug || course.slug}`
+              : `/${lang}/oh-elearning/learn/${enrollment.slug || course.slug}`
+          }
           className={cn(
             'flex items-center justify-center gap-2 w-full py-2.5 rounded-lg font-medium transition-colors',
             isCompleted

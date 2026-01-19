@@ -331,11 +331,14 @@ export function VideoPlayer({
     return (
       <div className={cn('relative aspect-video bg-black', className)}>
         <iframe
-          src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(initialPosition)}&rel=0&modestbranding=1`}
+          src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(initialPosition)}&rel=0&modestbranding=1&enablejsapi=1`}
           title={title || 'YouTube video'}
           className="w-full h-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
         />
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-700">
           <div
@@ -364,8 +367,10 @@ export function VideoPlayer({
           src={`https://player.vimeo.com/video/${videoId}?#t=${Math.floor(initialPosition)}s`}
           title={title || 'Vimeo video'}
           className="w-full h-full"
+          frameBorder="0"
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
+          loading="lazy"
         />
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-700">
           <div

@@ -126,37 +126,53 @@ export default function MyLearningPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-emerald-500">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <Link
-                href={`/${lang}/oh-elearning`}
-                className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors mb-2"
-              >
-                <ArrowLeft size={16} />
-                {t.common.back}
-              </Link>
-              <h1 className="text-2xl md:text-3xl font-bold text-white">{t.elearning.myCourses}</h1>
-              <p className="text-sm text-white/80 mt-1">
+      {/* Hero Banner */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-blue-600 to-emerald-500 pt-24 pb-16">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-emerald-400/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+        </div>
+
+        {/* Floating elements */}
+        <div className="absolute top-20 right-[10%] w-16 h-16 bg-white/5 rounded-2xl rotate-12 hidden lg:block" />
+        <div className="absolute bottom-12 left-[15%] w-12 h-12 bg-white/5 rounded-full hidden lg:block" />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-[5%]">
+          {/* Back link */}
+          <Link
+            href={`/${lang}/oh-elearning`}
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+          >
+            <ArrowLeft size={18} />
+            {t.common.back}
+          </Link>
+
+          {/* Title */}
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-2xl ring-1 ring-white/20">
+              <Target size={40} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
+                {t.elearning.myCourses}
+              </h1>
+              <p className="text-lg text-blue-100 max-w-2xl">
                 {language === 'fr'
-                  ? `Bienvenue, ${user?.first_name || user?.username || 'Apprenant'}`
-                  : `Welcome back, ${user?.first_name || user?.username || 'Learner'}`}
+                  ? `Bienvenue ${user?.first_name || user?.username || ''} ! Suivez votre progression et continuez votre apprentissage`
+                  : `Welcome ${user?.first_name || user?.username || ''}! Track your progress and continue learning`}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/${lang}/oh-elearning/my-learning/certificates`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl font-medium transition-all border border-white/30"
-              >
-                <Award size={18} />
-                {language === 'fr' ? 'Mes certificats' : 'My certificates'}
-              </Link>
-            </div>
+            <Link
+              href={`/${lang}/oh-elearning/my-learning/certificates`}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white rounded-xl font-medium transition-all border border-white/30 self-start md:self-center"
+            >
+              <Award size={20} />
+              {language === 'fr' ? 'Mes certificats' : 'My certificates'}
+            </Link>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Stats Cards */}
       <section className="px-4 sm:px-6 lg:px-8 -mt-6">
@@ -215,17 +231,16 @@ export default function MyLearningPage() {
             </h2>
 
             <div className="grid md:grid-cols-3 gap-4">
-              {continueLearning.map((enrollment) => {
+              {continueLearning.filter(e => e.slug).map((enrollment) => {
                 const title = language === 'en' && enrollment.title_en ? enrollment.title_en : enrollment.title_fr;
+                const courseUrl = enrollment.enrollable_type === 'course'
+                  ? `/${lang}/oh-elearning/learn/${enrollment.slug}`
+                  : `/${lang}/oh-elearning/paths/${enrollment.slug}`;
 
                 return (
                   <Link
                     key={enrollment.id}
-                    href={
-                      enrollment.enrollable_type === 'course'
-                        ? `/${lang}/oh-elearning/learn/${enrollment.slug}`
-                        : `/${lang}/oh-elearning/paths/${enrollment.slug}`
-                    }
+                    href={courseUrl}
                     className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all"
                   >
                     {/* Thumbnail */}
@@ -427,19 +442,26 @@ export default function MyLearningPage() {
                               {t.elearning.completed}
                             </Button>
                           )
-                        ) : (
-                          <Link
-                            href={
-                              enrollment.enrollable_type === 'course'
+                        ) : enrollment.slug ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => {
+                              const url = enrollment.enrollable_type === 'course'
                                 ? `/${lang}/oh-elearning/learn/${enrollment.slug}`
-                                : `/${lang}/oh-elearning/paths/${enrollment.slug}`
-                            }
+                                : `/${lang}/oh-elearning/paths/${enrollment.slug}`;
+                              console.log('Navigating to:', url);
+                              window.location.href = url;
+                            }}
                           >
-                            <Button variant="primary" size="sm" className="bg-blue-600 hover:bg-blue-700">
-                              <Play size={16} className="mr-2" />
-                              {enrollment.progress_percent > 0 ? t.elearning.continue : t.elearning.start}
-                            </Button>
-                          </Link>
+                            <Play size={16} className="mr-2" />
+                            {enrollment.progress_percent > 0 ? t.elearning.continue : t.elearning.start}
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled>
+                            {language === 'fr' ? 'Non disponible' : 'Not available'}
+                          </Button>
                         )}
                       </div>
                     </div>

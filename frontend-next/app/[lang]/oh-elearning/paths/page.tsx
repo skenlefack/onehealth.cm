@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { GraduationCap, ArrowLeft, Search } from 'lucide-react';
+import { GraduationCap, ArrowLeft, Search, BookOpen, Award, Users } from 'lucide-react';
 import { Language, ELearningLearningPath, ELearningCategory } from '@/lib/types';
 import { getTranslation, isValidLanguage } from '@/lib/translations';
 import { getELearningPaths, getELearningCategories } from '@/lib/api';
@@ -87,32 +87,73 @@ export default function PathsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <section className="pt-32 pb-8 px-[5%]">
-        <div className="max-w-6xl mx-auto">
+      {/* Hero Banner */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 pt-24 pb-16">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-400/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+        </div>
+
+        {/* Floating elements */}
+        <div className="absolute top-20 right-[10%] w-16 h-16 bg-white/5 rounded-2xl rotate-12 hidden lg:block" />
+        <div className="absolute bottom-12 left-[15%] w-12 h-12 bg-white/5 rounded-full hidden lg:block" />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-[5%]">
           {/* Back link */}
           <Link
             href={`/${lang}/oh-elearning`}
-            className="inline-flex items-center gap-2 text-slate-600 hover:text-indigo-600 mb-6 transition-colors"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
           >
             <ArrowLeft size={18} />
             {t.common.back}
           </Link>
 
           {/* Title */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-              <GraduationCap size={28} className="text-indigo-600" />
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-2xl ring-1 ring-white/20">
+              <GraduationCap size={40} className="text-white" />
             </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
                 {t.elearning.allPaths}
               </h1>
-              <p className="text-slate-500">
+              <p className="text-lg text-indigo-100 max-w-2xl">
                 {language === 'fr'
-                  ? 'Parcours diplômants pour développer vos compétences'
-                  : 'Learning paths to develop your skills'}
+                  ? 'Parcours diplômants pour développer vos compétences en santé publique et approche One Health'
+                  : 'Learning paths to develop your skills in public health and One Health approach'}
               </p>
+            </div>
+          </div>
+
+          {/* Quick stats */}
+          <div className="flex flex-wrap gap-6 mt-8 pt-8 border-t border-white/10">
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <BookOpen size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{paths.length || '—'}</div>
+                <div className="text-sm text-indigo-200">{language === 'fr' ? 'Parcours' : 'Paths'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <Award size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">100%</div>
+                <div className="text-sm text-indigo-200">{language === 'fr' ? 'Certifiants' : 'Certified'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <Users size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">Pro</div>
+                <div className="text-sm text-indigo-200">{language === 'fr' ? 'Niveau' : 'Level'}</div>
+              </div>
             </div>
           </div>
         </div>

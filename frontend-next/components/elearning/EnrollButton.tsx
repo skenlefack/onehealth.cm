@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Play, CheckCircle, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
-import { enrollInCourse } from '@/lib/api';
+import { enrollInCourse, getELearningEnrollments } from '@/lib/api';
 import { Language } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +25,7 @@ const translations = {
     continue: 'Continuer le cours',
     enrolled: 'Inscrit',
     error: "Erreur lors de l'inscription",
+    loading: 'Chargement...',
   },
   en: {
     enrollFree: 'Enroll for free',
@@ -34,6 +35,7 @@ const translations = {
     continue: 'Continue course',
     enrolled: 'Enrolled',
     error: 'Error during enrollment',
+    loading: 'Loading...',
   },
 };
 
@@ -44,7 +46,37 @@ export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: 
 
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState('');
+
+  // Check enrollment status on mount
+  useEffect(() => {
+    const checkEnrollment = async () => {
+      if (!isAuthenticated || !token) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        const result = await getELearningEnrollments(token);
+        if (result.success && result.data) {
+          // Check if enrolled in this course
+          const enrollment = result.data.find(
+            (e) => e.enrollable_type === 'course' && e.enrollable_id === courseId
+          );
+          if (enrollment) {
+            setIsEnrolled(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking enrollment:', err);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    checkEnrollment();
+  }, [isAuthenticated, token, courseId]);
 
   const handleEnroll = async () => {
     // If not authenticated, redirect to login
@@ -85,6 +117,23 @@ export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: 
   const handleContinue = () => {
     router.push(`/${lang}/oh-elearning/learn/${courseSlug}`);
   };
+
+  // Loading state while checking enrollment
+  if (isChecking && isAuthenticated) {
+    return (
+      <button
+        disabled
+        className={cn(
+          'flex items-center justify-center gap-2 w-full py-3 px-6 rounded-lg font-semibold transition-colors',
+          'bg-gray-400 text-white cursor-not-allowed',
+          className
+        )}
+      >
+        <Loader2 size={20} className="animate-spin" />
+        {t.loading}
+      </button>
+    );
+  }
 
   // Already enrolled state
   if (isEnrolled) {

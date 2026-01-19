@@ -170,17 +170,44 @@ export default function LessonViewerPage() {
     }, 2000);
   }, [saveVideoProgress]);
 
+  // Helper to update progress after completing a lesson
+  const updateProgressAfterComplete = useCallback((courseProgressPercent: number) => {
+    // Update course progress
+    if (course) {
+      setCourse({ ...course, progress_percent: courseProgressPercent });
+    }
+
+    // Update current lesson
+    if (currentLesson) {
+      setCurrentLesson({ ...currentLesson, is_completed: true });
+    }
+
+    // Update the lesson in modules list to show checkmark
+    setModules(prevModules =>
+      prevModules.map(module => ({
+        ...module,
+        lessons: module.lessons?.map(lesson =>
+          lesson.id === lessonId
+            ? { ...lesson, is_completed: true }
+            : lesson
+        )
+      }))
+    );
+  }, [course, currentLesson, lessonId]);
+
   // Handler pour la complétion de la vidéo
   const handleVideoComplete = useCallback(async () => {
     if (!token || !currentLesson || currentLesson.is_completed) return;
 
     try {
-      await completeLesson(lessonId, token);
-      setCurrentLesson({ ...currentLesson, is_completed: true });
+      const result = await completeLesson(lessonId, token);
+      if (result.success && result.data) {
+        updateProgressAfterComplete(result.data.course_progress);
+      }
     } catch (error) {
       console.error('Error completing lesson:', error);
     }
-  }, [token, lessonId, currentLesson]);
+  }, [token, lessonId, currentLesson, updateProgressAfterComplete]);
 
   const handleMarkComplete = async () => {
     if (!currentLesson || currentLesson.is_completed) return;
@@ -192,8 +219,10 @@ export default function LessonViewerPage() {
 
     setIsCompleting(true);
     try {
-      await completeLesson(lessonId, token);
-      setCurrentLesson({ ...currentLesson, is_completed: true });
+      const result = await completeLesson(lessonId, token);
+      if (result.success && result.data) {
+        updateProgressAfterComplete(result.data.course_progress);
+      }
     } catch (error) {
       console.error('Error completing lesson:', error);
     } finally {
@@ -252,10 +281,10 @@ export default function LessonViewerPage() {
   const initialVideoPosition = currentLesson.video_last_position || 0;
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col">
       {/* Login Prompt Modal */}
       {showLoginPrompt && (
-        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 z-[110] flex items-center justify-center p-4">
           <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full">
             <h3 className="text-xl font-semibold text-white mb-3">
               {language === 'fr' ? 'Connexion requise' : 'Login Required'}
@@ -285,7 +314,7 @@ export default function LessonViewerPage() {
       )}
 
       {/* Top Bar */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-slate-800 border-b border-slate-700 z-50 flex items-center px-4">
+      <header className="h-14 bg-slate-800 border-b border-slate-700 flex items-center px-4 flex-shrink-0">
         <div className="flex items-center gap-4 flex-1">
           {/* Toggle sidebar */}
           <button
@@ -326,12 +355,12 @@ export default function LessonViewerPage() {
         </div>
       </header>
 
-      <div className="pt-14 flex">
+      <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside
           className={cn(
-            'fixed left-0 top-14 bottom-0 w-72 bg-slate-800 border-r border-slate-700 overflow-y-auto transition-transform duration-300 z-40',
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            'w-72 bg-slate-800 border-r border-slate-700 overflow-y-auto transition-all duration-300 flex-shrink-0',
+            sidebarOpen ? 'ml-0' : '-ml-72'
           )}
         >
           <nav className="p-2">
@@ -395,17 +424,16 @@ export default function LessonViewerPage() {
         </aside>
 
         {/* Main content */}
-        <main
-          className={cn(
-            'flex-1 transition-all duration-300 min-h-[calc(100vh-3.5rem)]',
-            sidebarOpen ? 'ml-72' : 'ml-0'
-          )}
-        >
+        <main className="flex-1 overflow-y-auto">
           {/* Video content with new VideoPlayer */}
           {currentLesson.content_type === 'video' && currentLesson.video_url && (
-            <div className="max-h-[70vh]">
+            <div className="bg-slate-900">
               <VideoPlayer
-                src={getImageUrl(currentLesson.video_url)}
+                src={
+                  currentLesson.video_provider === 'youtube' || currentLesson.video_provider === 'vimeo'
+                    ? currentLesson.video_url
+                    : getImageUrl(currentLesson.video_url)
+                }
                 provider={currentLesson.video_provider as any}
                 poster={course.thumbnail ? getImageUrl(course.thumbnail) : undefined}
                 title={lessonTitle}

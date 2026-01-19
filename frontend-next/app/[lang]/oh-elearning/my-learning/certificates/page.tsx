@@ -107,32 +107,73 @@ export default function MyCertificatesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <section className="pt-32 pb-8 px-[5%]">
-        <div className="max-w-6xl mx-auto">
+      {/* Hero Banner */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 pt-24 pb-16">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-rose-400/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+        </div>
+
+        {/* Floating elements */}
+        <div className="absolute top-20 right-[10%] w-16 h-16 bg-white/5 rounded-2xl rotate-12 hidden lg:block" />
+        <div className="absolute bottom-12 left-[15%] w-12 h-12 bg-white/5 rounded-full hidden lg:block" />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-[5%]">
           {/* Back link */}
           <Link
             href={`/${lang}/oh-elearning/my-learning`}
-            className="inline-flex items-center gap-2 text-slate-600 hover:text-indigo-600 mb-6 transition-colors"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
           >
             <ArrowLeft size={18} />
             {t.common.back}
           </Link>
 
           {/* Title */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center">
-              <Award size={28} className="text-amber-600" />
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-2xl ring-1 ring-white/20">
+              <Award size={40} className="text-white" />
             </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
-                {language === 'fr' ? 'Mes certificats' : 'My certificates'}
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
+                {language === 'fr' ? 'Mes Certificats' : 'My Certificates'}
               </h1>
-              <p className="text-slate-500">
+              <p className="text-lg text-amber-100 max-w-2xl">
                 {language === 'fr'
-                  ? 'Tous vos certificats obtenus sur la plateforme'
-                  : 'All your certificates earned on the platform'}
+                  ? 'Tous vos certificats obtenus sur la plateforme One Health E-Learning'
+                  : 'All your certificates earned on the One Health E-Learning platform'}
               </p>
+            </div>
+          </div>
+
+          {/* Quick stats */}
+          <div className="flex flex-wrap gap-6 mt-8 pt-8 border-t border-white/10">
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <Award size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{certificates.length || '0'}</div>
+                <div className="text-sm text-amber-200">{language === 'fr' ? 'Certificats' : 'Certificates'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <CheckCircle size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{certificates.filter(c => c.status === 'active').length}</div>
+                <div className="text-sm text-amber-200">{language === 'fr' ? 'Actifs' : 'Active'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <GraduationCap size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{certificates.filter(c => c.enrollable_type === 'learning_path').length}</div>
+                <div className="text-sm text-amber-200">{language === 'fr' ? 'Parcours' : 'Paths'}</div>
+              </div>
             </div>
           </div>
         </div>

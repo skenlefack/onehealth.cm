@@ -392,11 +392,14 @@ router.get('/courses/:slug', optionalAuth, async (req, res) => {
 router.get('/courses/:id/curriculum', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user?.id;
 
-    const [course] = await db.query('SELECT id, title_fr FROM courses WHERE id = ?', [id]);
+    const [course] = await db.query('SELECT id, title_fr, sequential_modules FROM courses WHERE id = ?', [id]);
     if (course.length === 0) {
       return res.status(404).json({ success: false, message: 'Cours non trouvé' });
     }
+
+    const sequentialModules = course[0].sequential_modules;
 
     const [modules] = await db.query(`
       SELECT * FROM course_modules
@@ -404,12 +407,60 @@ router.get('/courses/:id/curriculum', optionalAuth, async (req, res) => {
       ORDER BY sort_order ASC
     `, [id]);
 
-    for (let module of modules) {
+    // Track completion status for sequential unlock logic
+    let previousLessonCompleted = true;
+    let previousModuleCompleted = true;
+
+    for (let moduleIdx = 0; moduleIdx < modules.length; moduleIdx++) {
+      const module = modules[moduleIdx];
       const [lessons] = await db.query(`
         SELECT * FROM lessons
         WHERE module_id = ? AND is_active = 1
         ORDER BY sort_order ASC
       `, [module.id]);
+
+      // Get progress for each lesson if user is authenticated
+      if (userId) {
+        for (let lessonIdx = 0; lessonIdx < lessons.length; lessonIdx++) {
+          const lesson = lessons[lessonIdx];
+          const [progress] = await db.query(`
+            SELECT status, progress_percent FROM lesson_progress
+            WHERE user_id = ? AND lesson_id = ?
+          `, [userId, lesson.id]);
+
+          lesson.is_completed = progress.length > 0 && progress[0].status === 'completed';
+          lesson.progress_percent = progress.length > 0 ? progress[0].progress_percent : 0;
+
+          // Determine if lesson is locked (sequential unlock logic)
+          if (sequentialModules) {
+            // First lesson of first module is never locked
+            if (moduleIdx === 0 && lessonIdx === 0) {
+              lesson.is_locked = false;
+            } else if (lessonIdx === 0) {
+              // First lesson of a module: locked if previous module not completed
+              lesson.is_locked = !previousModuleCompleted;
+            } else {
+              // Other lessons: locked if previous lesson not completed
+              lesson.is_locked = !previousLessonCompleted;
+            }
+          } else {
+            lesson.is_locked = false;
+          }
+
+          previousLessonCompleted = lesson.is_completed;
+        }
+
+        // Check if this module is completed (all lessons completed)
+        previousModuleCompleted = lessons.every(l => l.is_completed);
+      } else {
+        // No user - mark all as not completed, not locked
+        lessons.forEach(lesson => {
+          lesson.is_completed = false;
+          lesson.is_locked = false;
+          lesson.progress_percent = 0;
+        });
+      }
+
       module.lessons = lessons;
     }
 

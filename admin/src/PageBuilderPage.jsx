@@ -7,13 +7,23 @@ import {
 
 const API_URL = 'http://localhost:5000/api';
 
+const safeJson = async (res) => {
+  try {
+    const text = await res.text();
+    return text ? JSON.parse(text) : { success: false, message: 'Empty response' };
+  } catch (e) {
+    console.error('JSON parse error:', e);
+    return { success: false, message: 'Invalid JSON response' };
+  }
+};
+
 const api = {
   get: async (endpoint, token) => {
     try {
       const res = await fetch(`${API_URL}${endpoint}`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Connection error' };
     }
@@ -25,7 +35,7 @@ const api = {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Connection error' };
     }
@@ -37,7 +47,7 @@ const api = {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      return res.json();
+      return safeJson(res);
     } catch (error) {
       return { success: false, message: 'Upload error' };
     }
@@ -500,6 +510,139 @@ const SectionEditorModal = ({ section, onClose, onSave, isDark, token }) => {
     }));
   };
 
+  // Handle pillar item change (for pillars array)
+  const handlePillarItemChange = (index, field, newValue) => {
+    // Pillars are shared between languages, so update in both
+    const currentPillarsFr = [...(editData.content_fr.pillars || [])];
+    const currentPillarsEn = [...(editData.content_en.pillars || [])];
+
+    currentPillarsFr[index] = { ...currentPillarsFr[index], [field]: newValue };
+    currentPillarsEn[index] = { ...currentPillarsEn[index], [field]: newValue };
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
+  // Handle pillar feature change
+  const handlePillarFeatureChange = (pillarIndex, featureIndex, field, newValue) => {
+    const currentPillarsFr = [...(editData.content_fr.pillars || [])];
+    const currentPillarsEn = [...(editData.content_en.pillars || [])];
+
+    const featuresFr = [...(currentPillarsFr[pillarIndex]?.features || [])];
+    const featuresEn = [...(currentPillarsEn[pillarIndex]?.features || [])];
+
+    featuresFr[featureIndex] = { ...featuresFr[featureIndex], [field]: newValue };
+    featuresEn[featureIndex] = { ...featuresEn[featureIndex], [field]: newValue };
+
+    currentPillarsFr[pillarIndex] = { ...currentPillarsFr[pillarIndex], features: featuresFr };
+    currentPillarsEn[pillarIndex] = { ...currentPillarsEn[pillarIndex], features: featuresEn };
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
+  // Add new pillar
+  const addPillar = () => {
+    const newPillar = {
+      icon: '🏥',
+      color: '#007A33',
+      title_fr: 'Nouveau Pilier',
+      title_en: 'New Pillar',
+      description_fr: '',
+      description_en: '',
+      features: []
+    };
+
+    const currentPillarsFr = [...(editData.content_fr.pillars || []), newPillar];
+    const currentPillarsEn = [...(editData.content_en.pillars || []), { ...newPillar }];
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
+  // Remove pillar
+  const removePillar = (index) => {
+    if (!window.confirm('Supprimer ce pilier ?')) return;
+
+    const currentPillarsFr = [...(editData.content_fr.pillars || [])];
+    const currentPillarsEn = [...(editData.content_en.pillars || [])];
+
+    currentPillarsFr.splice(index, 1);
+    currentPillarsEn.splice(index, 1);
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
+  // Move pillar up/down
+  const movePillar = (index, direction) => {
+    const newIndex = index + direction;
+    const currentPillarsFr = [...(editData.content_fr.pillars || [])];
+    const currentPillarsEn = [...(editData.content_en.pillars || [])];
+
+    if (newIndex < 0 || newIndex >= currentPillarsFr.length) return;
+
+    [currentPillarsFr[index], currentPillarsFr[newIndex]] = [currentPillarsFr[newIndex], currentPillarsFr[index]];
+    [currentPillarsEn[index], currentPillarsEn[newIndex]] = [currentPillarsEn[newIndex], currentPillarsEn[index]];
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
+  // Add feature to pillar
+  const addPillarFeature = (pillarIndex) => {
+    const currentPillarsFr = [...(editData.content_fr.pillars || [])];
+    const currentPillarsEn = [...(editData.content_en.pillars || [])];
+
+    const featuresFr = [...(currentPillarsFr[pillarIndex]?.features || []), { text_fr: '', text_en: '' }];
+    const featuresEn = [...(currentPillarsEn[pillarIndex]?.features || []), { text_fr: '', text_en: '' }];
+
+    currentPillarsFr[pillarIndex] = { ...currentPillarsFr[pillarIndex], features: featuresFr };
+    currentPillarsEn[pillarIndex] = { ...currentPillarsEn[pillarIndex], features: featuresEn };
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
+  // Remove feature from pillar
+  const removePillarFeature = (pillarIndex, featureIndex) => {
+    const currentPillarsFr = [...(editData.content_fr.pillars || [])];
+    const currentPillarsEn = [...(editData.content_en.pillars || [])];
+
+    const featuresFr = [...(currentPillarsFr[pillarIndex]?.features || [])];
+    const featuresEn = [...(currentPillarsEn[pillarIndex]?.features || [])];
+
+    featuresFr.splice(featureIndex, 1);
+    featuresEn.splice(featureIndex, 1);
+
+    currentPillarsFr[pillarIndex] = { ...currentPillarsFr[pillarIndex], features: featuresFr };
+    currentPillarsEn[pillarIndex] = { ...currentPillarsEn[pillarIndex], features: featuresEn };
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, pillars: currentPillarsFr },
+      content_en: { ...prev.content_en, pillars: currentPillarsEn }
+    }));
+  };
+
   // Render fields based on content structure
   const renderFields = () => {
     if (!currentContent) return null;
@@ -749,6 +892,204 @@ const SectionEditorModal = ({ section, onClose, onSave, isDark, token }) => {
             isDark={isDark}
             token={token}
           />
+        );
+      }
+
+      // Array of objects (pillars)
+      if (key === 'pillars' && Array.isArray(value)) {
+        const pillars = editData.content_fr.pillars || [];
+        return (
+          <div key={key} style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <label style={{ fontWeight: '600', color: isDark ? '#e2e8f0' : '#374151', fontSize: '14px' }}>
+                🏛️ Piliers ({pillars.length})
+              </label>
+              <button
+                type="button"
+                onClick={addPillar}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px',
+                  background: `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`,
+                  color: 'white', border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+              >
+                <Plus size={16} /> Nouveau Pilier
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '500px', overflowY: 'auto' }}>
+              {pillars.map((pillar, index) => (
+                <div key={index} style={{
+                  padding: '16px', borderRadius: '12px',
+                  background: isDark ? '#0f172a' : '#f8fafc',
+                  border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
+                  borderLeft: `4px solid ${pillar.color || '#007A33'}`
+                }}>
+                  {/* Header avec contrôles */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{
+                      fontWeight: '700', fontSize: '13px',
+                      color: pillar.color || colors.cameroonGreen,
+                      background: `${pillar.color || colors.cameroonGreen}20`,
+                      padding: '4px 10px', borderRadius: '8px'
+                    }}>
+                      #{index + 1} {pillar[`title_${activeLang}`] || 'Pilier'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => movePillar(index, -1)}
+                        disabled={index === 0}
+                        style={{
+                          padding: '6px 10px', borderRadius: '6px',
+                          background: index === 0 ? (isDark ? '#1e293b' : '#e2e8f0') : (isDark ? '#334155' : '#e2e8f0'),
+                          border: 'none', cursor: index === 0 ? 'not-allowed' : 'pointer',
+                          opacity: index === 0 ? 0.5 : 1, fontSize: '14px'
+                        }}
+                        title="Monter"
+                      >⬆️</button>
+                      <button
+                        type="button"
+                        onClick={() => movePillar(index, 1)}
+                        disabled={index === pillars.length - 1}
+                        style={{
+                          padding: '6px 10px', borderRadius: '6px',
+                          background: index === pillars.length - 1 ? (isDark ? '#1e293b' : '#e2e8f0') : (isDark ? '#334155' : '#e2e8f0'),
+                          border: 'none', cursor: index === pillars.length - 1 ? 'not-allowed' : 'pointer',
+                          opacity: index === pillars.length - 1 ? 0.5 : 1, fontSize: '14px'
+                        }}
+                        title="Descendre"
+                      >⬇️</button>
+                      <button
+                        type="button"
+                        onClick={() => removePillar(index)}
+                        style={{
+                          padding: '6px 10px', borderRadius: '6px',
+                          background: isDark ? '#7f1d1d' : '#fee2e2',
+                          border: 'none', cursor: 'pointer', fontSize: '14px'
+                        }}
+                        title="Supprimer"
+                      >🗑️</button>
+                    </div>
+                  </div>
+
+                  {/* Titre et couleur/icon */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                        Titre ({activeLang.toUpperCase()})
+                      </label>
+                      <input
+                        type="text"
+                        value={pillar[`title_${activeLang}`] || ''}
+                        onChange={(e) => handlePillarItemChange(index, `title_${activeLang}`, e.target.value)}
+                        style={{
+                          width: '100%', padding: '8px 10px', borderRadius: '6px',
+                          border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                          background: isDark ? '#1e293b' : '#ffffff',
+                          color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Couleur</label>
+                        <input
+                          type="color"
+                          value={pillar.color || '#007A33'}
+                          onChange={(e) => handlePillarItemChange(index, 'color', e.target.value)}
+                          style={{ width: '48px', height: '36px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Icône</label>
+                        <input
+                          type="text"
+                          value={pillar.icon || ''}
+                          onChange={(e) => handlePillarItemChange(index, 'icon', e.target.value)}
+                          style={{
+                            width: '60px', padding: '8px', borderRadius: '6px',
+                            border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                            background: isDark ? '#1e293b' : '#ffffff',
+                            color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '16px', textAlign: 'center'
+                          }}
+                          placeholder="🏥"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      Description ({activeLang.toUpperCase()})
+                    </label>
+                    <textarea
+                      value={pillar[`description_${activeLang}`] || ''}
+                      onChange={(e) => handlePillarItemChange(index, `description_${activeLang}`, e.target.value)}
+                      rows={2}
+                      style={{
+                        width: '100%', padding: '8px 10px', borderRadius: '6px',
+                        border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                        background: isDark ? '#1e293b' : '#ffffff',
+                        color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '13px', resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  {/* Caractéristiques */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>
+                        Caractéristiques ({(pillar.features || []).length})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => addPillarFeature(index)}
+                        style={{
+                          padding: '4px 8px', borderRadius: '6px',
+                          background: `${pillar.color || colors.cameroonGreen}20`,
+                          color: pillar.color || colors.cameroonGreen,
+                          border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer'
+                        }}
+                      >
+                        + Ajouter
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {(pillar.features || []).map((feat, fIdx) => (
+                        <div key={fIdx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={feat[`text_${activeLang}`] || ''}
+                            onChange={(e) => handlePillarFeatureChange(index, fIdx, `text_${activeLang}`, e.target.value)}
+                            style={{
+                              flex: 1, padding: '6px 10px', borderRadius: '6px',
+                              border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                              background: isDark ? '#1e293b' : '#ffffff',
+                              color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '12px'
+                            }}
+                            placeholder="Caractéristique..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removePillarFeature(index, fIdx)}
+                            style={{
+                              padding: '4px 8px', borderRadius: '4px',
+                              background: `${colors.error}20`, color: colors.error,
+                              border: 'none', cursor: 'pointer', fontSize: '12px'
+                            }}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         );
       }
 

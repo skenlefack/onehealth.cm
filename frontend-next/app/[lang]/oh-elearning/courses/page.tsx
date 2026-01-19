@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { BookOpen, ArrowLeft, Map, GraduationCap } from 'lucide-react';
+import { BookOpen, ArrowLeft, Map, GraduationCap, Users, Award, TrendingUp } from 'lucide-react';
 import { Language, ELearningCourse, ELearningCategory } from '@/lib/types';
 import { getTranslation, isValidLanguage } from '@/lib/translations';
 import { getELearningCourses, getELearningCategories } from '@/lib/api';
@@ -73,46 +73,79 @@ function CoursesContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Gradient Header Banner */}
-      <div className="bg-gradient-to-r from-oh-blue to-oh-green">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <Link
-                href={`/${lang}/oh-elearning`}
-                className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors mb-2"
-              >
-                <ArrowLeft size={16} />
-                {t.common.back}
-              </Link>
-              <h1 className="text-2xl font-bold text-white">{t.elearning.allCourses}</h1>
-              <p className="text-sm text-white/80 mt-0.5">
+      {/* Hero Banner */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-emerald-600 pt-24 pb-16">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-emerald-400/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+        </div>
+
+        {/* Floating elements */}
+        <div className="absolute top-20 right-[10%] w-16 h-16 bg-white/5 rounded-2xl rotate-12 hidden lg:block" />
+        <div className="absolute bottom-12 left-[15%] w-12 h-12 bg-white/5 rounded-full hidden lg:block" />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-[5%]">
+          {/* Back link */}
+          <Link
+            href={`/${lang}/oh-elearning`}
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+          >
+            <ArrowLeft size={18} />
+            {t.common.back}
+          </Link>
+
+          {/* Title */}
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-2xl ring-1 ring-white/20">
+              <BookOpen size={40} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
+                {t.elearning.allCourses}
+              </h1>
+              <p className="text-lg text-blue-100 max-w-2xl">
                 {language === 'fr'
-                  ? 'Explorez notre catalogue de formations'
-                  : 'Explore our training catalog'}
+                  ? 'Explorez notre catalogue de formations en santé publique et approche One Health'
+                  : 'Explore our catalog of public health and One Health training courses'}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/${lang}/ohwr-mapping`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl font-semibold transition-all border border-white/30 hover:border-white/50"
-              >
-                <Map size={18} />
-                OHWR-Map
-              </Link>
-              <Link
-                href={`/${lang}/oh-elearning`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-oh-blue rounded-xl font-semibold hover:bg-white/90 transition-all shadow-lg"
-              >
-                <GraduationCap size={18} />
-                OH E-learning
-              </Link>
+          </div>
+
+          {/* Quick stats */}
+          <div className="flex flex-wrap gap-6 mt-8 pt-8 border-t border-white/10">
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <BookOpen size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{courses.length || '—'}</div>
+                <div className="text-sm text-blue-200">{language === 'fr' ? 'Cours' : 'Courses'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{categories.length}</div>
+                <div className="text-sm text-blue-200">{language === 'fr' ? 'Catégories' : 'Categories'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <Award size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">100%</div>
+                <div className="text-sm text-blue-200">{language === 'fr' ? 'Gratuit' : 'Free'}</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Spacer for fixed header */}
+      {/* Spacer */}
       <div className="pt-8" />
 
       {/* Filters */}
