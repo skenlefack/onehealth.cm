@@ -27,8 +27,9 @@ ssh -i "C:\dev\onehealth-cms\server\OneHealthCmServerKey" ubuntu@84.234.19.107
 |---------|-----|
 | Site principal | https://onehealth.cm |
 | Site (www) | https://www.onehealth.cm |
-| Admin | https://admin.onehealth.cm |
+| Admin CMS | https://admin.onehealth.cm |
 | API | https://onehealth.cm/api |
+| Portainer (Docker UI) | https://portainer.onehealth.cm |
 
 ---
 
@@ -56,6 +57,7 @@ ssh -i "C:\dev\onehealth-cms\server\OneHealthCmServerKey" ubuntu@84.234.19.107
 | onehealth-admin | onehealth-cms-admin | 80 |
 | onehealth-nginx | nginx:alpine | 80, 443 |
 | onehealth-certbot | certbot/certbot | - |
+| portainer | portainer/portainer-ce | 9000, 9443 |
 
 ---
 
@@ -183,8 +185,8 @@ ssh -i "server/OneHealthCmServerKey" ubuntu@84.234.19.107 "sudo docker run --rm 
 ## SSL / Certificats
 
 **Certificat:** Let's Encrypt (auto-renouvellement)
-**Expiration:** 18 avril 2026
-**Domaines couverts:** onehealth.cm, www.onehealth.cm, admin.onehealth.cm
+**Expiration:** 18-19 avril 2026
+**Domaines couverts:** onehealth.cm, www.onehealth.cm, admin.onehealth.cm, portainer.onehealth.cm
 
 ### Renouveler manuellement (si necessaire)
 ```bash
@@ -199,6 +201,38 @@ ssh -i "server/OneHealthCmServerKey" ubuntu@84.234.19.107 "cd /var/www/onehealth
 **Port:** 587
 **User:** contact@onehealth.cm
 **Securite:** STARTTLS
+
+---
+
+## Portainer - Interface Web Docker
+
+**URL:** https://portainer.onehealth.cm
+
+### Fonctionnalites
+
+| Fonctionnalite | Description |
+|----------------|-------------|
+| **Containers** | Voir etat, logs, restart, stop, supprimer |
+| **Images** | Gerer les images Docker |
+| **Volumes** | Voir les donnees persistantes |
+| **Networks** | Voir les reseaux Docker |
+| **Stacks** | Deployer des docker-compose |
+| **Logs** | Voir les logs en temps reel |
+| **Stats** | CPU, RAM, reseau de chaque container |
+| **Console** | Acces terminal dans les containers |
+
+### Gestion via Portainer
+
+Au lieu d'utiliser SSH, tu peux :
+1. Aller sur https://portainer.onehealth.cm
+2. Cliquer sur "local" > "Containers"
+3. Voir l'etat de tous les containers
+4. Cliquer sur un container pour voir les logs, stats, ou le redemarrer
+
+### Reinstaller Portainer (si necessaire)
+```bash
+ssh -i "server/OneHealthCmServerKey" ubuntu@84.234.19.107 "sudo docker stop portainer && sudo docker rm portainer && sudo docker run -d -p 9000:9000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest"
+```
 
 ---
 
