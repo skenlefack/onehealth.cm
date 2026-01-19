@@ -14629,6 +14629,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [showPathModal, setShowPathModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
   const [editingModule, setEditingModule] = useState(null);
   const [editingLesson, setEditingLesson] = useState(null);
@@ -16138,55 +16139,463 @@ const OHELearningPage = ({ isDark, token }) => {
   };
 
   // ============ RENDER CATEGORIES TAB ============
-  const renderCategories = () => (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Catégories E-Learning</h2>
-          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{categories.length} catégories</p>
-        </div>
-        <button onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }} style={styles.btnPrimary}>
-          <Plus size={18} /> Nouvelle Catégorie
-        </button>
-      </div>
+  // Available Lucide icons for categories
+  const categoryIconOptions = [
+    { value: 'Heart', label: 'Santé', icon: Heart },
+    { value: 'Activity', label: 'Activité', icon: Activity },
+    { value: 'Users', label: 'Utilisateurs', icon: Users },
+    { value: 'Shield', label: 'Protection', icon: Shield },
+    { value: 'Leaf', label: 'Environnement', icon: Leaf },
+    { value: 'Globe', label: 'Global', icon: Globe },
+    { value: 'Bug', label: 'Insecte/Virus', icon: Bug },
+    { value: 'Skull', label: 'Danger', icon: Skull },
+    { value: 'Siren', label: 'Urgence', icon: Siren },
+    { value: 'GraduationCap', label: 'Formation', icon: GraduationCap },
+    { value: 'BookOpen', label: 'Livre', icon: BookOpen },
+    { value: 'FileText', label: 'Document', icon: FileText },
+    { value: 'Target', label: 'Objectif', icon: Target },
+    { value: 'Zap', label: 'Énergie', icon: Zap },
+    { value: 'Star', label: 'Étoile', icon: Star },
+    { value: 'Award', label: 'Récompense', icon: Award },
+    { value: 'Clock', label: 'Temps', icon: Clock },
+    { value: 'Calendar', label: 'Calendrier', icon: Calendar },
+    { value: 'MapPin', label: 'Localisation', icon: MapPin },
+    { value: 'Database', label: 'Données', icon: Database },
+    { value: 'Server', label: 'Serveur', icon: Server },
+    { value: 'Settings', label: 'Paramètres', icon: Settings },
+    { value: 'HelpCircle', label: 'Aide', icon: HelpCircle },
+    { value: 'AlertTriangle', label: 'Alerte', icon: AlertTriangle },
+    { value: 'CheckCircle', label: 'Validé', icon: CheckCircle },
+    { value: 'XCircle', label: 'Erreur', icon: XCircle },
+    { value: 'Eye', label: 'Vision', icon: Eye },
+    { value: 'Lock', label: 'Sécurité', icon: Lock },
+    { value: 'Mail', label: 'Email', icon: Mail },
+    { value: 'Phone', label: 'Téléphone', icon: Phone },
+    { value: 'Camera', label: 'Caméra', icon: Camera },
+    { value: 'ThermometerSun', label: 'Température', icon: ThermometerSun },
+    { value: 'Tag', label: 'Étiquette', icon: Tag },
+    { value: 'Layers', label: 'Couches', icon: Layers },
+    { value: 'Grid', label: 'Grille', icon: Grid },
+    { value: 'Home', label: 'Accueil', icon: Home },
+  ];
 
-      {/* Categories Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-        {categories.map(cat => (
-          <div key={cat.id} style={{
-            ...styles.card,
-            borderLeft: `4px solid ${cat.color || colors.primary}`
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '40px', height: '40px', borderRadius: '10px',
-                  background: `${cat.color || colors.primary}20`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: cat.color || colors.primary, fontWeight: '700'
-                }}>
-                  {cat.icon ? <span style={{ fontSize: '18px' }}>{cat.icon}</span> : <Tag size={18} />}
+  // Get icon component by name
+  const getCategoryIcon = (iconName) => {
+    const found = categoryIconOptions.find(opt => opt.value === iconName);
+    return found ? found.icon : Tag;
+  };
+
+  // Category Form Component (inline)
+  const CategoryForm = () => {
+    const [form, setForm] = useState({
+      name_fr: editingCategory?.name_fr || '',
+      name_en: editingCategory?.name_en || '',
+      description_fr: editingCategory?.description_fr || '',
+      description_en: editingCategory?.description_en || '',
+      color: editingCategory?.color || '#2196F3',
+      icon: editingCategory?.icon || 'Tag'
+    });
+    const [iconSearch, setIconSearch] = useState('');
+    const [showIconDropdown, setShowIconDropdown] = useState(false);
+
+    const filteredIcons = categoryIconOptions.filter(opt =>
+      opt.label.toLowerCase().includes(iconSearch.toLowerCase()) ||
+      opt.value.toLowerCase().includes(iconSearch.toLowerCase())
+    );
+
+    const selectedIconOption = categoryIconOptions.find(opt => opt.value === form.icon);
+    const SelectedIcon = selectedIconOption?.icon || Tag;
+
+    const handleSubmit = async () => {
+      await handleSaveCategory(form);
+      setShowCategoryForm(false);
+    };
+
+    return (
+      <div>
+        {/* Header with Back button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>
+              {editingCategory ? 'Modifier la Catégorie' : 'Nouvelle Catégorie'}
+            </h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>
+              {editingCategory ? `Modification de "${editingCategory.name_fr}"` : 'Créez une nouvelle catégorie pour organiser vos cours'}
+            </p>
+          </div>
+          <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} style={styles.btnSecondary}>
+            <ArrowLeft size={18} /> Retour
+          </button>
+        </div>
+
+        {/* Form Card - Full Width */}
+        <div style={{ ...styles.card }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            {/* Left Column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Names */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={styles.label}>Nom (Français) *</label>
+                  <input
+                    type="text"
+                    value={form.name_fr}
+                    onChange={e => setForm({ ...form, name_fr: e.target.value })}
+                    style={styles.input}
+                    placeholder="Santé Humaine"
+                  />
                 </div>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{cat.name_fr}</h4>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    {cat.course_count || 0} cours
-                  </p>
+                  <label style={styles.label}>Nom (Anglais)</label>
+                  <input
+                    type="text"
+                    value={form.name_en}
+                    onChange={e => setForm({ ...form, name_en: e.target.value })}
+                    style={styles.input}
+                    placeholder="Human Health"
+                  />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true); }}
-                  style={{ ...styles.btnIcon, width: '32px', height: '32px' }}>
-                  <Edit3 size={14} />
-                </button>
+
+              {/* Descriptions */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={styles.label}>Description (Français)</label>
+                  <textarea
+                    value={form.description_fr}
+                    onChange={e => setForm({ ...form, description_fr: e.target.value })}
+                    style={{ ...styles.input, minHeight: '100px' }}
+                    placeholder="Description de la catégorie..."
+                  />
+                </div>
+                <div>
+                  <label style={styles.label}>Description (Anglais)</label>
+                  <textarea
+                    value={form.description_en}
+                    onChange={e => setForm({ ...form, description_en: e.target.value })}
+                    style={{ ...styles.input, minHeight: '100px' }}
+                    placeholder="Category description..."
+                  />
+                </div>
+              </div>
+
+              {/* Color and Icon */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {/* Color Picker */}
+              <div>
+                <label style={styles.label}>Couleur</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <input
+                    type="color"
+                    value={form.color}
+                    onChange={e => setForm({ ...form, color: e.target.value })}
+                    style={{ width: '50px', height: '44px', padding: '4px', borderRadius: '8px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, cursor: 'pointer' }}
+                  />
+                  <input
+                    type="text"
+                    value={form.color}
+                    onChange={e => setForm({ ...form, color: e.target.value })}
+                    style={{ ...styles.input, flex: 1, fontFamily: 'monospace' }}
+                    placeholder="#2196F3"
+                  />
+                </div>
+              </div>
+
+              {/* Icon Selector with Search */}
+              <div style={{ position: 'relative' }}>
+                <label style={styles.label}>Icône</label>
+                <div
+                  onClick={() => setShowIconDropdown(!showIconDropdown)}
+                  style={{
+                    ...styles.input,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    background: isDark ? '#1e293b' : '#f8fafc'
+                  }}
+                >
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    background: `${form.color}20`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: form.color
+                  }}>
+                    <SelectedIcon size={18} />
+                  </div>
+                  <span style={{ flex: 1 }}>{selectedIconOption?.label || 'Sélectionner une icône'}</span>
+                  <ChevronDown size={18} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                </div>
+
+                {/* Icon Dropdown */}
+                {showIconDropdown && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                    background: isDark ? '#1e293b' : 'white',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                    marginTop: '4px',
+                    maxHeight: '350px',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Search Input */}
+                    <div style={{ padding: '12px', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+                        <input
+                          type="text"
+                          placeholder="Rechercher une icône..."
+                          value={iconSearch}
+                          onChange={e => setIconSearch(e.target.value)}
+                          style={{ ...styles.input, paddingLeft: '36px', fontSize: '13px' }}
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+
+                    {/* Icons Grid */}
+                    <div style={{ padding: '12px', maxHeight: '280px', overflowY: 'auto' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                        {filteredIcons.map(opt => {
+                          const IconComp = opt.icon;
+                          const isSelected = form.icon === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => {
+                                setForm({ ...form, icon: opt.value });
+                                setShowIconDropdown(false);
+                                setIconSearch('');
+                              }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                padding: '10px 12px', borderRadius: '8px',
+                                border: isSelected ? `2px solid ${colors.primary}` : `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                                background: isSelected ? `${colors.primary}10` : 'transparent',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <div style={{
+                                width: '28px', height: '28px', borderRadius: '6px',
+                                background: `${form.color}20`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: form.color
+                              }}>
+                                <IconComp size={16} />
+                              </div>
+                              <span style={{ fontSize: '12px', fontWeight: isSelected ? '600' : '400', color: isDark ? '#e2e8f0' : '#334155' }}>
+                                {opt.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {filteredIcons.length === 0 && (
+                        <p style={{ textAlign: 'center', padding: '20px', color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px' }}>
+                          Aucune icône trouvée
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            </div>
+
+            {/* Right Column - Preview & Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Preview */}
+              <div>
+                <label style={styles.label}>Aperçu de la carte</label>
+                <div style={{
+                  ...styles.card,
+                  borderLeft: `4px solid ${form.color}`,
+                  background: isDark ? '#0f172a' : '#f8fafc'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: '56px', height: '56px', borderRadius: '14px',
+                      background: `${form.color}15`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: form.color
+                    }}>
+                      <SelectedIcon size={28} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '17px', fontWeight: '600' }}>
+                        {form.name_fr || 'Nom de la catégorie'}
+                      </h4>
+                      {form.name_en && (
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic' }}>
+                          {form.name_en}
+                        </p>
+                      )}
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>
+                        0 cours
+                      </p>
+                    </div>
+                  </div>
+                  {form.description_fr && (
+                    <p style={{ margin: '14px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', lineHeight: '1.5' }}>
+                      {form.description_fr.length > 150 ? form.description_fr.substring(0, 150) + '...' : form.description_fr}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Color Preview */}
+              <div>
+                <label style={styles.label}>Palette de couleurs</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {['#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#3F51B5'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setForm({ ...form, color: c })}
+                      style={{
+                        width: '36px', height: '36px', borderRadius: '10px',
+                        background: c, border: form.color === c ? '3px solid white' : 'none',
+                        boxShadow: form.color === c ? `0 0 0 2px ${c}` : '0 2px 4px rgba(0,0,0,0.1)',
+                        cursor: 'pointer', transition: 'all 0.15s ease'
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} style={{ ...styles.btnSecondary, flex: 1 }}>
+                    Annuler
+                  </button>
+                  <button onClick={handleSubmit} style={{ ...styles.btnPrimary, flex: 2 }} disabled={!form.name_fr}>
+                    <Save size={18} /> {editingCategory ? 'Enregistrer' : 'Créer la catégorie'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderCategories = () => {
+    // Show form if active
+    if (showCategoryForm) {
+      return <CategoryForm />;
+    }
+
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Catégories E-Learning</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{categories.length} catégories</p>
+          </div>
+          <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} style={styles.btnPrimary}>
+            <Plus size={18} /> Nouvelle Catégorie
+          </button>
+        </div>
+
+        {/* Categories Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+          {categories.map(cat => {
+            const IconComp = getCategoryIcon(cat.icon);
+            return (
+              <div key={cat.id} style={{
+                ...styles.card,
+                borderLeft: `4px solid ${cat.color || colors.primary}`,
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: '48px', height: '48px', borderRadius: '12px',
+                      background: `${cat.color || colors.primary}15`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: cat.color || colors.primary
+                    }}>
+                      <IconComp size={24} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>{cat.name_fr}</h4>
+                      {cat.name_en && (
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic' }}>
+                          {cat.name_en}
+                        </p>
+                      )}
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>
+                        {cat.course_count || 0} cours
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingCategory(cat); setShowCategoryForm(true); }}
+                      style={{ ...styles.btnIcon, width: '36px', height: '36px', background: `${colors.primary}10`, color: colors.primary }}
+                      title="Modifier"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDialog({
+                          title: 'Supprimer la catégorie',
+                          message: `Êtes-vous sûr de vouloir supprimer "${cat.name_fr}" ? Cette action est irréversible.`,
+                          type: 'danger',
+                          onConfirm: async () => {
+                            try {
+                              await api.delete(`/elearning/categories/${cat.id}`, token);
+                              setCategories(prev => prev.filter(c => c.id !== cat.id));
+                              showToast('Catégorie supprimée', 'success');
+                            } catch (err) {
+                              showToast('Erreur lors de la suppression', 'error');
+                            }
+                            setConfirmDialog(null);
+                          }
+                        });
+                      }}
+                      style={{ ...styles.btnIcon, width: '36px', height: '36px', background: `${colors.error}10`, color: colors.error }}
+                      title="Supprimer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                {cat.description_fr && (
+                  <p style={{ margin: '12px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', lineHeight: '1.5' }}>
+                    {cat.description_fr.length > 100 ? cat.description_fr.substring(0, 100) + '...' : cat.description_fr}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {categories.length === 0 && (
+          <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: `${colors.primary}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Tag size={40} color={colors.primary} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: '600' }}>Aucune catégorie</h3>
+            <p style={{ margin: '0 0 20px', ...styles.textMuted }}>Créez votre première catégorie pour organiser vos cours</p>
+            <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} style={styles.btnPrimary}>
+              <Plus size={18} /> Créer une catégorie
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ============ RENDER ENROLLMENTS TAB ============
   // ============ RENDER CERTIFICATES TAB ============
