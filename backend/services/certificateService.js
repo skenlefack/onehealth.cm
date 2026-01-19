@@ -68,15 +68,27 @@ async function getTemplate(templateIdOrSlug) {
 
     if (templates.length > 0) {
       const template = templates[0];
-      // Parse JSON fields
+      // Parse JSON fields (MySQL2 may return objects or strings)
       if (template.custom_css) {
-        try { template.customSettings = JSON.parse(template.custom_css); } catch (e) { template.customSettings = {}; }
+        if (typeof template.custom_css === 'string') {
+          try { template.customSettings = JSON.parse(template.custom_css); } catch (e) { template.customSettings = {}; }
+        } else {
+          template.customSettings = template.custom_css;
+        }
       } else { template.customSettings = {}; }
       if (template.logos) {
-        try { template.logosArray = JSON.parse(template.logos); } catch (e) { template.logosArray = []; }
+        if (typeof template.logos === 'string') {
+          try { template.logosArray = JSON.parse(template.logos); } catch (e) { template.logosArray = []; }
+        } else {
+          template.logosArray = Array.isArray(template.logos) ? template.logos : [];
+        }
       } else { template.logosArray = []; }
       if (template.signatories) {
-        try { template.signatoriesArray = JSON.parse(template.signatories); } catch (e) { template.signatoriesArray = []; }
+        if (typeof template.signatories === 'string') {
+          try { template.signatoriesArray = JSON.parse(template.signatories); } catch (e) { template.signatoriesArray = []; }
+        } else {
+          template.signatoriesArray = Array.isArray(template.signatories) ? template.signatories : [];
+        }
       } else { template.signatoriesArray = []; }
       return template;
     }
@@ -88,14 +100,27 @@ async function getTemplate(templateIdOrSlug) {
 
     if (defaultTemplates.length > 0) {
       const template = defaultTemplates[0];
+      // Parse JSON fields (MySQL2 may return objects or strings)
       if (template.custom_css) {
-        try { template.customSettings = JSON.parse(template.custom_css); } catch (e) { template.customSettings = {}; }
+        if (typeof template.custom_css === 'string') {
+          try { template.customSettings = JSON.parse(template.custom_css); } catch (e) { template.customSettings = {}; }
+        } else {
+          template.customSettings = template.custom_css;
+        }
       } else { template.customSettings = {}; }
       if (template.logos) {
-        try { template.logosArray = JSON.parse(template.logos); } catch (e) { template.logosArray = []; }
+        if (typeof template.logos === 'string') {
+          try { template.logosArray = JSON.parse(template.logos); } catch (e) { template.logosArray = []; }
+        } else {
+          template.logosArray = Array.isArray(template.logos) ? template.logos : [];
+        }
       } else { template.logosArray = []; }
       if (template.signatories) {
-        try { template.signatoriesArray = JSON.parse(template.signatories); } catch (e) { template.signatoriesArray = []; }
+        if (typeof template.signatories === 'string') {
+          try { template.signatoriesArray = JSON.parse(template.signatories); } catch (e) { template.signatoriesArray = []; }
+        } else {
+          template.signatoriesArray = Array.isArray(template.signatories) ? template.signatories : [];
+        }
       } else { template.signatoriesArray = []; }
       return template;
     }
