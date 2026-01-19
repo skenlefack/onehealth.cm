@@ -12,13 +12,13 @@ import {
   Layers, Layout, Palette, Sliders, FileCode, GripVertical, Copy,
   Link, Tag, ImageIcon, Type, Box, Grid, Move, Maximize2, Monitor,
   Smartphone, Tablet, Code, Paintbrush, PanelLeft, LayoutTemplate,
-  FolderOpen, Home, ExternalLink, MoreVertical, ArrowUp, ArrowDown,
+  FolderOpen, Home, ExternalLink, MoreVertical, ArrowUp, ArrowDown, ArrowLeft, ArrowRightLeft,
   Columns, Square, Circle, Triangle, Star, Zap, Play, Pause, Camera,
   MapPin, GraduationCap, BookOpen, Award, Phone, Linkedin, Twitter,
   HelpCircle, FileQuestion, ListChecks, Timer, Target, CheckCircle2, CheckCircle, XCircle, File,
   Navigation, Map, Radio, AlertTriangle, Megaphone, Radar, Send, MessageCircle, Hash,
   Wifi, WifiOff, Signal, Smartphone as SmartphoneIcon, Database, Server, TrendingDown,
-  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode
+  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode, ToggleLeft, TextCursorInput
 } from 'lucide-react';
 
 // ============== COULEURS ONE HEALTH ==============
@@ -14640,8 +14640,8 @@ const OHELearningPage = ({ isDark, token }) => {
   const [selectedModule, setSelectedModule] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
-  const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showQuestionForm, setShowQuestionForm] = useState(false);
+  const [showQuizForm, setShowQuizForm] = useState(false);
   const [showQuizQuestionsModal, setShowQuizQuestionsModal] = useState(false);
 
   // Filters
@@ -14655,6 +14655,9 @@ const OHELearningPage = ({ isDark, token }) => {
   const [quizTypeFilter, setQuizTypeFilter] = useState('all');
   const [certificateSearch, setCertificateSearch] = useState('');
   const [certificateStatusFilter, setCertificateStatusFilter] = useState('all');
+  const [certificateTemplates, setCertificateTemplates] = useState([]);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
   const [pathSearch, setPathSearch] = useState('');
   const [pathStatusFilter, setPathStatusFilter] = useState('all');
   const [selectedPath, setSelectedPath] = useState(null);
@@ -14726,6 +14729,15 @@ const OHELearningPage = ({ isDark, token }) => {
     }
   };
 
+  const fetchCertificateTemplates = async () => {
+    try {
+      const res = await api.get('/elearning/certificate-templates', token);
+      if (res.success) setCertificateTemplates(res.data);
+    } catch (error) {
+      console.error('Fetch certificate templates error:', error);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchCourses();
@@ -14734,6 +14746,7 @@ const OHELearningPage = ({ isDark, token }) => {
     fetchQuestions();
     fetchQuizzes();
     fetchCertificates();
+    fetchCertificateTemplates();
   }, [token]);
 
   // Course CRUD
@@ -14925,7 +14938,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
       if (res.success) {
         setToast({ message: editingQuestion ? 'Question mise à jour' : 'Question créée', type: 'success' });
-        setShowQuestionModal(false);
+        setShowQuestionForm(false);
         setEditingQuestion(null);
         fetchQuestions();
       } else {
@@ -14965,7 +14978,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
       if (res.success) {
         setToast({ message: editingQuiz ? 'Quiz mis à jour' : 'Quiz créé', type: 'success' });
-        setShowQuizModal(false);
+        setShowQuizForm(false);
         setEditingQuiz(null);
         fetchQuizzes();
       } else {
@@ -15768,136 +15781,221 @@ const OHELearningPage = ({ isDark, token }) => {
   };
 
   // ============ RENDER QUESTIONS TAB ============
-  const renderQuestions = () => (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Banque de Questions</h2>
-          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredQuestions.length} questions</p>
-        </div>
-        <button onClick={() => { setEditingQuestion(null); setShowQuestionModal(true); }} style={styles.btnPrimary}>
-          <Plus size={18} /> Nouvelle Question
-        </button>
-      </div>
+  const renderQuestions = () => {
+    // If showing the form, render the inline question form
+    if (showQuestionForm) {
+      return <QuestionFormInline />;
+    }
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 2, minWidth: '200px' }}>
-          <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
-          <input
-            type="text"
-            placeholder="Rechercher une question..."
-            value={questionSearch}
-            onChange={e => setQuestionSearch(e.target.value)}
-            style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
-          />
+    // Otherwise show the questions list
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Banque de Questions</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredQuestions.length} questions</p>
+          </div>
+          <button onClick={() => { setEditingQuestion(null); setShowQuestionForm(true); }} style={styles.btnPrimary}>
+            <Plus size={18} /> Nouvelle Question
+          </button>
         </div>
-        <select value={questionTypeFilter} onChange={e => setQuestionTypeFilter(e.target.value)} style={{ ...styles.select, minWidth: '160px' }}>
-          <option value="all">Tous les types</option>
-          <option value="mcq">QCM</option>
-          <option value="multiple_select">Sélection Multiple</option>
-          <option value="true_false">Vrai/Faux</option>
-          <option value="short_answer">Réponse Courte</option>
-          <option value="matching">Association</option>
-          <option value="fill_blank">Texte à Trous</option>
-        </select>
-        <select value={questionDifficultyFilter} onChange={e => setQuestionDifficultyFilter(e.target.value)} style={{ ...styles.select, minWidth: '140px' }}>
-          <option value="all">Toutes difficultés</option>
-          <option value="easy">Facile</option>
-          <option value="medium">Moyen</option>
-          <option value="hard">Difficile</option>
-        </select>
-      </div>
 
-      {/* Questions Grid */}
-      {filteredQuestions.length === 0 ? (
-        <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
-          <HelpCircle size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px' }}>Aucune question trouvée</h3>
-          <p style={styles.textMuted}>Créez des questions pour les utiliser dans vos quiz</p>
+        {/* Filters - All on one line */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+            <input
+              type="text"
+              placeholder="Rechercher une question..."
+              value={questionSearch}
+              onChange={e => setQuestionSearch(e.target.value)}
+              style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
+            />
+          </div>
+          <select value={questionTypeFilter} onChange={e => setQuestionTypeFilter(e.target.value)} style={{ ...styles.select, width: '170px', flexShrink: 0 }}>
+            <option value="all">Tous les types</option>
+            <option value="mcq">QCM</option>
+            <option value="multiple_select">Sélection Multiple</option>
+            <option value="true_false">Vrai/Faux</option>
+            <option value="short_answer">Réponse Courte</option>
+            <option value="matching">Association</option>
+            <option value="fill_blank">Texte à Trous</option>
+          </select>
+          <select value={questionDifficultyFilter} onChange={e => setQuestionDifficultyFilter(e.target.value)} style={{ ...styles.select, width: '150px', flexShrink: 0 }}>
+            <option value="all">Toutes difficultés</option>
+            <option value="easy">Facile</option>
+            <option value="medium">Moyen</option>
+            <option value="hard">Difficile</option>
+          </select>
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {filteredQuestions.map(question => (
-            <div key={question.id} style={{
-              ...styles.card,
-              borderLeft: `4px solid ${
-                question.question_type === 'mcq' ? colors.primary :
-                question.question_type === 'true_false' ? colors.teal :
-                question.question_type === 'multiple_select' ? colors.purple :
-                colors.warning
-              }`
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1, marginRight: '16px' }}>
-                  <p style={{ margin: '0 0 10px', fontSize: '15px', fontWeight: '500', lineHeight: '1.5' }}>
-                    {question.question_text_fr?.substring(0, 200) || 'Question sans texte'}
-                    {question.question_text_fr?.length > 200 && '...'}
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {getQuestionTypeBadge(question.question_type)}
-                    {getDifficultyBadge(question.difficulty)}
-                    <span style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                      {question.points} pt{question.points > 1 ? 's' : ''}
+
+        {/* Questions Grid */}
+        {filteredQuestions.length === 0 ? (
+          <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
+            <HelpCircle size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px' }}>Aucune question trouvée</h3>
+            <p style={styles.textMuted}>Créez des questions pour les utiliser dans vos quiz</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {filteredQuestions.map(question => (
+              <div key={question.id} style={{
+                ...styles.card,
+                borderLeft: `4px solid ${
+                  question.question_type === 'mcq' ? colors.primary :
+                  question.question_type === 'true_false' ? colors.teal :
+                  question.question_type === 'multiple_select' ? colors.purple :
+                  question.question_type === 'matching' ? colors.success :
+                  question.question_type === 'fill_blank' ? colors.error :
+                  colors.warning
+                }`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, marginRight: '16px' }}>
+                    <p style={{ margin: '0 0 10px', fontSize: '15px', fontWeight: '500', lineHeight: '1.5' }}>
+                      {question.question_text_fr?.substring(0, 200) || 'Question sans texte'}
+                      {question.question_text_fr?.length > 200 && '...'}
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {getQuestionTypeBadge(question.question_type)}
+                      {getDifficultyBadge(question.difficulty)}
+                      <span style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        {question.points} pt{question.points > 1 ? 's' : ''}
+                      </span>
+                      {question.quiz_count > 0 && (
+                        <span style={{ fontSize: '12px', color: colors.primary }}>
+                          <FileQuestion size={12} style={{ marginRight: '4px' }} />
+                          {question.quiz_count} quiz
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => { setEditingQuestion(question); setShowQuestionForm(true); }}
+                      style={styles.btnIcon}
+                      title="Modifier"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteQuestion(question)}
+                      style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
+                      title="Supprimer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Options preview for MCQ/Multiple Select */}
+                {(question.question_type === 'mcq' || question.question_type === 'multiple_select') && question.options && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase' }}>Options:</p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {(Array.isArray(question.options) ? question.options : []).slice(0, 4).map((opt, idx) => (
+                        <span key={idx} style={{
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                          background: isDark ? '#0f172a' : '#f1f5f9',
+                          border: `1px solid ${
+                            (question.question_type === 'mcq' && question.correct_answer === idx) ||
+                            (question.question_type === 'multiple_select' && Array.isArray(question.correct_answer) && question.correct_answer.includes(idx))
+                              ? colors.success : 'transparent'
+                          }`,
+                          color: isDark ? '#e2e8f0' : '#475569'
+                        }}>
+                          {typeof opt === 'string' ? opt : opt.text_fr || opt.text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview for Matching */}
+                {question.question_type === 'matching' && question.options && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase' }}>Paires:</p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {(Array.isArray(question.options) ? question.options : []).slice(0, 3).map((pair, idx) => (
+                        <span key={idx} style={{
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                          background: isDark ? '#0f172a' : '#f1f5f9',
+                          color: isDark ? '#e2e8f0' : '#475569'
+                        }}>
+                          {pair.left_fr || pair.left} ↔ {pair.right_fr || pair.right}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview for Fill Blank */}
+                {question.question_type === 'fill_blank' && question.correct_answer && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase' }}>Réponses attendues:</p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {(Array.isArray(question.correct_answer) ? question.correct_answer : []).map((ans, idx) => (
+                        <span key={idx} style={{
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                          background: `${colors.success}15`, border: `1px solid ${colors.success}`,
+                          color: colors.success
+                        }}>
+                          [{idx + 1}] {ans}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview for Short Answer */}
+                {question.question_type === 'short_answer' && question.correct_answer && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase' }}>Réponses acceptées:</p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {(Array.isArray(question.correct_answer) ? question.correct_answer : [question.correct_answer]).map((ans, idx) => (
+                        <span key={idx} style={{
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                          background: `${colors.success}15`, border: `1px solid ${colors.success}`,
+                          color: colors.success
+                        }}>
+                          {ans}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview for True/False */}
+                {question.question_type === 'true_false' && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase' }}>Bonne réponse:</p>
+                    <span style={{
+                      padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                      background: question.correct_answer === true ? `${colors.success}15` : `${colors.error}15`,
+                      border: `1px solid ${question.correct_answer === true ? colors.success : colors.error}`,
+                      color: question.correct_answer === true ? colors.success : colors.error
+                    }}>
+                      {question.correct_answer === true ? 'Vrai' : 'Faux'}
                     </span>
-                    {question.quiz_count > 0 && (
-                      <span style={{ fontSize: '12px', color: colors.primary }}>
-                        <FileQuestion size={12} style={{ marginRight: '4px' }} />
-                        {question.quiz_count} quiz
-                      </span>
-                    )}
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => { setEditingQuestion(question); setShowQuestionModal(true); }}
-                    style={styles.btnIcon}
-                    title="Modifier"
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteQuestion(question)}
-                    style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
-                    title="Supprimer"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                )}
               </div>
-
-              {/* Options preview for MCQ */}
-              {(question.question_type === 'mcq' || question.question_type === 'multiple_select') && question.options && (
-                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-                  <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase' }}>Options:</p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {(Array.isArray(question.options) ? question.options : []).slice(0, 4).map((opt, idx) => (
-                      <span key={idx} style={{
-                        padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
-                        background: isDark ? '#0f172a' : '#f1f5f9',
-                        border: `1px solid ${
-                          (question.question_type === 'mcq' && question.correct_answer === idx) ||
-                          (question.question_type === 'multiple_select' && Array.isArray(question.correct_answer) && question.correct_answer.includes(idx))
-                            ? colors.success : 'transparent'
-                        }`,
-                        color: isDark ? '#e2e8f0' : '#475569'
-                      }}>
-                        {typeof opt === 'string' ? opt : opt.text_fr || opt.text}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ============ RENDER QUIZZES TAB ============
-  const renderQuizzes = () => (
+  const renderQuizzes = () => {
+    // If showing the form, render the inline quiz form
+    if (showQuizForm) {
+      return <QuizFormInline />;
+    }
+
+    return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -15905,14 +16003,14 @@ const OHELearningPage = ({ isDark, token }) => {
           <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Gestion des Quiz</h2>
           <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredQuizzes.length} quiz</p>
         </div>
-        <button onClick={() => { setEditingQuiz(null); setShowQuizModal(true); }} style={styles.btnPrimary}>
+        <button onClick={() => { setEditingQuiz(null); setShowQuizForm(true); }} style={styles.btnPrimary}>
           <Plus size={18} /> Nouveau Quiz
         </button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 2, minWidth: '200px' }}>
+      {/* Filters - All on one line */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
           <input
             type="text"
@@ -15922,7 +16020,7 @@ const OHELearningPage = ({ isDark, token }) => {
             style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
           />
         </div>
-        <select value={quizTypeFilter} onChange={e => setQuizTypeFilter(e.target.value)} style={{ ...styles.select, minWidth: '160px' }}>
+        <select value={quizTypeFilter} onChange={e => setQuizTypeFilter(e.target.value)} style={{ ...styles.select, width: '160px', flexShrink: 0 }}>
           <option value="all">Tous les types</option>
           <option value="practice">Pratique</option>
           <option value="graded">Noté</option>
@@ -16017,7 +16115,7 @@ const OHELearningPage = ({ isDark, token }) => {
                   <ListChecks size={16} /> Gérer Questions
                 </button>
                 <button
-                  onClick={() => { setEditingQuiz(quiz); setShowQuizModal(true); }}
+                  onClick={() => { setEditingQuiz(quiz); setShowQuizForm(true); }}
                   style={styles.btnIcon}
                   title="Modifier"
                 >
@@ -16036,7 +16134,8 @@ const OHELearningPage = ({ isDark, token }) => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // ============ RENDER CATEGORIES TAB ============
   const renderCategories = () => (
@@ -16092,47 +16191,140 @@ const OHELearningPage = ({ isDark, token }) => {
   // ============ RENDER ENROLLMENTS TAB ============
   // ============ RENDER CERTIFICATES TAB ============
   const renderCertificates = () => {
+    // Show template editor if active
+    if (showTemplateEditor) {
+      return <CertificateTemplateEditor />;
+    }
+
     const getCertStatusBadge = (status) => {
       const config = {
-        active: { label: 'Actif', color: colors.success },
-        expired: { label: 'Expiré', color: colors.warning },
-        revoked: { label: 'Révoqué', color: colors.error },
-        pending: { label: 'En attente', color: colors.textSecondary }
+        active: { label: 'Actif', color: colors.success, icon: CheckCircle },
+        expired: { label: 'Expiré', color: colors.warning, icon: Clock },
+        revoked: { label: 'Révoqué', color: colors.error, icon: XCircle },
+        pending: { label: 'En attente', color: colors.textSecondary, icon: Clock }
       };
       const c = config[status] || config.active;
+      const Icon = c.icon;
       return (
         <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: '4px',
           padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
-          background: `${c.color}20`, color: c.color
+          background: `${c.color}15`, color: c.color
         }}>
+          <Icon size={12} />
           {c.label}
         </span>
       );
     };
 
+    // Stats
+    const totalCerts = filteredCertificates.length;
+    const activeCerts = filteredCertificates.filter(c => c.status === 'active').length;
+    const expiredCerts = filteredCertificates.filter(c => c.status === 'expired').length;
+    const revokedCerts = filteredCertificates.filter(c => c.status === 'revoked').length;
+    const defaultTemplate = certificateTemplates.find(t => t.is_default);
+
     return (
       <div>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Certificats</h2>
-            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredCertificates.length} certificats émis</p>
+        {/* Stats Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+          <div style={{
+            ...styles.card,
+            background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.primary}05 100%)`,
+            borderLeft: `4px solid ${colors.primary}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>Total Certificats</p>
+                <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: '700', color: colors.primary }}>{totalCerts}</p>
+              </div>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: `${colors.primary}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Award size={24} color={colors.primary} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{
+            ...styles.card,
+            background: `linear-gradient(135deg, ${colors.success}15 0%, ${colors.success}05 100%)`,
+            borderLeft: `4px solid ${colors.success}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>Actifs</p>
+                <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: '700', color: colors.success }}>{activeCerts}</p>
+              </div>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: `${colors.success}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle size={24} color={colors.success} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{
+            ...styles.card,
+            background: `linear-gradient(135deg, ${colors.warning}15 0%, ${colors.warning}05 100%)`,
+            borderLeft: `4px solid ${colors.warning}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>Expirés</p>
+                <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: '700', color: colors.warning }}>{expiredCerts}</p>
+              </div>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: `${colors.warning}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={24} color={colors.warning} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{
+            ...styles.card,
+            background: `linear-gradient(135deg, ${colors.error}15 0%, ${colors.error}05 100%)`,
+            borderLeft: `4px solid ${colors.error}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>Révoqués</p>
+                <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: '700', color: colors.error }}>{revokedCerts}</p>
+              </div>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: `${colors.error}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <XCircle size={24} color={colors.error} />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 2, minWidth: '200px' }}>
+        {/* Header with Template Button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Certificats Émis</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>
+              Template actuel: <strong style={{ color: colors.primary }}>{defaultTemplate?.name || 'Classique'}</strong>
+            </p>
+          </div>
+          <button
+            onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
+            style={{
+              ...styles.btnPrimary,
+              background: `linear-gradient(135deg, ${colors.purple} 0%, ${colors.primary} 100%)`
+            }}
+          >
+            <Palette size={18} /> Personnaliser le Diplôme
+          </button>
+        </div>
+
+        {/* Filters - All on one line */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
             <input
               type="text"
-              placeholder="Rechercher par numéro, nom..."
+              placeholder="Rechercher par numéro, nom, email..."
               value={certificateSearch}
               onChange={e => setCertificateSearch(e.target.value)}
               style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
             />
           </div>
-          <select value={certificateStatusFilter} onChange={e => setCertificateStatusFilter(e.target.value)} style={{ ...styles.select, minWidth: '150px' }}>
+          <select value={certificateStatusFilter} onChange={e => setCertificateStatusFilter(e.target.value)} style={{ ...styles.select, width: '150px', flexShrink: 0 }}>
             <option value="all">Tous les statuts</option>
             <option value="active">Actif</option>
             <option value="expired">Expiré</option>
@@ -16143,71 +16335,119 @@ const OHELearningPage = ({ isDark, token }) => {
         {/* Certificates Table */}
         {filteredCertificates.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
-            <Award size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px' }}>Aucun certificat</h3>
-            <p style={styles.textMuted}>Les certificats seront générés automatiquement lorsque les apprenants termineront leurs cours.</p>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: `${colors.primary}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Award size={40} color={colors.primary} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '18px' }}>Aucun certificat émis</h3>
+            <p style={{ ...styles.textMuted, maxWidth: '400px', margin: '0 auto' }}>
+              Les certificats seront générés automatiquement lorsque les apprenants termineront leurs cours ou parcours avec succès.
+            </p>
           </div>
         ) : (
-          <div style={styles.card}>
+          <div style={{ ...styles.card, padding: 0, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Numéro</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Titulaire</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Cours/Parcours</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Date</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Score</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Statut</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>Actions</th>
+                  <tr style={{ background: isDark ? '#1e293b' : '#f8fafc' }}>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Certificat</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Titulaire</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Formation</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Score</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Statut</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCertificates.map(cert => (
-                    <tr key={cert.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: '13px', color: colors.primary }}>{cert.certificate_number}</span>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div>
-                          <div style={{ fontWeight: '500', color: colors.text }}>{cert.recipient_name}</div>
-                          <div style={{ fontSize: '12px', color: colors.textSecondary }}>{cert.username || cert.user_email}</div>
+                  {filteredCertificates.map((cert, idx) => (
+                    <tr key={cert.id} style={{
+                      borderBottom: idx < filteredCertificates.length - 1 ? `1px solid ${isDark ? '#334155' : '#e2e8f0'}` : 'none',
+                      background: isDark ? 'transparent' : 'white',
+                      transition: 'background 0.15s'
+                    }}>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '40px', height: '40px', borderRadius: '10px',
+                            background: `linear-gradient(135deg, ${colors.warning}30 0%, ${colors.warning}10 100%)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            <Award size={20} color={colors.warning} />
+                          </div>
+                          <div>
+                            <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: '600', color: colors.primary }}>
+                              {cert.certificate_number}
+                            </span>
+                            <div style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '2px' }}>
+                              ID: {cert.id}
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {cert.enrollable_type === 'learning_path' ? (
-                            <Award size={16} color={colors.purple} />
-                          ) : (
-                            <BookOpen size={16} color={colors.primary} />
-                          )}
-                          <span style={{ color: colors.text, fontSize: '13px' }}>{cert.course_title_fr || cert.title_fr}</span>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>{cert.recipient_name}</div>
+                        <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '2px' }}>
+                          {cert.username || cert.user_email}
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px', color: colors.textSecondary, fontSize: '13px' }}>
-                        {new Date(cert.issue_date).toLocaleDateString('fr-FR')}
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '8px',
+                            background: cert.enrollable_type === 'learning_path' ? `${colors.purple}15` : `${colors.primary}15`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            {cert.enrollable_type === 'learning_path' ? (
+                              <GraduationCap size={16} color={colors.purple} />
+                            ) : (
+                              <BookOpen size={16} color={colors.primary} />
+                            )}
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                              {cert.course_title_fr || cert.title_fr}
+                            </span>
+                            <div style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '2px' }}>
+                              {cert.enrollable_type === 'learning_path' ? 'Parcours' : 'Cours'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                          {new Date(cert.issue_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
                         {cert.expiry_date && (
-                          <div style={{ fontSize: '11px', color: colors.warning }}>
+                          <div style={{ fontSize: '11px', color: colors.warning, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={10} />
                             Expire: {new Date(cert.expiry_date).toLocaleDateString('fr-FR')}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
                         {cert.final_score ? (
-                          <span style={{ fontWeight: '600', color: cert.final_score >= 70 ? colors.success : colors.warning }}>
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '6px 12px', borderRadius: '20px',
+                            background: cert.final_score >= 80 ? `${colors.success}15` : cert.final_score >= 60 ? `${colors.warning}15` : `${colors.error}15`,
+                            color: cert.final_score >= 80 ? colors.success : cert.final_score >= 60 ? colors.warning : colors.error,
+                            fontWeight: '700', fontSize: '14px'
+                          }}>
                             {Math.round(cert.final_score)}%
-                          </span>
-                        ) : '-'}
+                          </div>
+                        ) : (
+                          <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>-</span>
+                        )}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
                         {getCertStatusBadge(cert.status)}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           {cert.status === 'active' ? (
                             <button
                               onClick={() => handleRevokeCertificate(cert)}
-                              title="Révoquer"
+                              title="Révoquer ce certificat"
                               style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
                             >
                               <XCircle size={16} />
@@ -16215,7 +16455,7 @@ const OHELearningPage = ({ isDark, token }) => {
                           ) : cert.status === 'revoked' ? (
                             <button
                               onClick={() => handleReinstateCertificate(cert)}
-                              title="Réactiver"
+                              title="Réactiver ce certificat"
                               style={{ ...styles.btnIcon, background: `${colors.success}15`, color: colors.success }}
                             >
                               <CheckCircle size={16} />
@@ -16711,27 +16951,35 @@ const OHELearningPage = ({ isDark, token }) => {
     );
   };
 
-  // ============ QUESTION MODAL ============
-  const QuestionModal = () => {
+  // ============ QUESTION FORM INLINE ============
+  const QuestionFormInline = () => {
     // Parser les options si c'est une chaîne JSON
-    const parseOptions = (opts) => {
-      if (!opts) return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+    const parseOptions = (opts, type) => {
+      if (!opts) {
+        if (type === 'matching') return [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
+        return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+      }
       if (Array.isArray(opts)) return opts;
       try { return JSON.parse(opts); } catch { return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }]; }
     };
-    const parseCorrectAnswer = (ans) => {
-      if (ans === null || ans === undefined) return 0;
-      if (typeof ans === 'number' || Array.isArray(ans)) return ans;
-      try { return JSON.parse(ans); } catch { return 0; }
+    const parseCorrectAnswer = (ans, type) => {
+      if (ans === null || ans === undefined) {
+        if (type === 'multiple_select' || type === 'fill_blank') return [];
+        if (type === 'true_false') return true;
+        return 0;
+      }
+      if (typeof ans === 'number' || typeof ans === 'boolean' || Array.isArray(ans)) return ans;
+      try { return JSON.parse(ans); } catch { return type === 'fill_blank' || type === 'multiple_select' ? [] : 0; }
     };
+
     const [form, setForm] = useState({
       question_text_fr: editingQuestion?.question_text_fr || '',
       question_text_en: editingQuestion?.question_text_en || '',
       question_type: editingQuestion?.question_type || 'mcq',
       explanation_fr: editingQuestion?.explanation_fr || '',
       explanation_en: editingQuestion?.explanation_en || '',
-      options: parseOptions(editingQuestion?.options),
-      correct_answer: parseCorrectAnswer(editingQuestion?.correct_answer),
+      options: parseOptions(editingQuestion?.options, editingQuestion?.question_type),
+      correct_answer: parseCorrectAnswer(editingQuestion?.correct_answer, editingQuestion?.question_type),
       points: editingQuestion?.points || 1,
       difficulty: editingQuestion?.difficulty || 'medium',
       is_active: editingQuestion?.is_active !== false
@@ -16744,7 +16992,11 @@ const OHELearningPage = ({ isDark, token }) => {
     };
 
     const addOption = () => {
-      setForm({ ...form, options: [...form.options, { text_fr: '', text_en: '' }] });
+      if (form.question_type === 'matching') {
+        setForm({ ...form, options: [...form.options, { left_fr: '', left_en: '', right_fr: '', right_en: '' }] });
+      } else {
+        setForm({ ...form, options: [...form.options, { text_fr: '', text_en: '' }] });
+      }
     };
 
     const removeOption = (index) => {
@@ -16766,76 +17018,216 @@ const OHELearningPage = ({ isDark, token }) => {
       }
     };
 
+    // Handle fill_blank answer change
+    const handleFillBlankAnswer = (index, value) => {
+      const newAnswers = [...(Array.isArray(form.correct_answer) ? form.correct_answer : [])];
+      newAnswers[index] = value;
+      setForm({ ...form, correct_answer: newAnswers });
+    };
+
+    const addFillBlankSlot = () => {
+      const newAnswers = [...(Array.isArray(form.correct_answer) ? form.correct_answer : []), ''];
+      setForm({ ...form, correct_answer: newAnswers });
+    };
+
+    const removeFillBlankSlot = (index) => {
+      const newAnswers = (Array.isArray(form.correct_answer) ? form.correct_answer : []).filter((_, i) => i !== index);
+      setForm({ ...form, correct_answer: newAnswers });
+    };
+
+    // Count blanks in question text for fill_blank type
+    const countBlanks = (text) => {
+      const matches = text.match(/_{3,}|\[___\]|\{\{blank\}\}/g);
+      return matches ? matches.length : 0;
+    };
+
     return (
-      <Modal isOpen={showQuestionModal} onClose={() => setShowQuestionModal(false)} title={editingQuestion ? 'Modifier la Question' : 'Nouvelle Question'} isDark={isDark} width="700px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '70vh', overflowY: 'auto', padding: '4px' }}>
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header with title and Retour button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `${colors.primary}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <HelpCircle size={20} color={colors.primary} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+                {editingQuestion ? 'Modifier la Question' : 'Nouvelle Question'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Remplissez les informations pour créer une question
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowQuestionForm(false)}
+            style={{
+              ...styles.btnSecondary,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Retour
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Question Type */}
-          <div>
-            <label style={styles.label}>Type de question *</label>
-            <select
-              value={form.question_type}
-              onChange={e => {
-                const type = e.target.value;
-                setForm({
-                  ...form,
-                  question_type: type,
-                  correct_answer: type === 'multiple_select' ? [] : type === 'true_false' ? true : 0
-                });
-              }}
-              style={styles.select}
-            >
-              <option value="mcq">QCM (choix unique)</option>
-              <option value="multiple_select">Sélection multiple</option>
-              <option value="true_false">Vrai/Faux</option>
-              <option value="short_answer">Réponse courte</option>
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Type de question *</label>
+              <select
+                value={form.question_type}
+                onChange={e => {
+                  const type = e.target.value;
+                  let newOptions = form.options;
+                  let newAnswer = form.correct_answer;
+
+                  if (type === 'matching') {
+                    newOptions = [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
+                    newAnswer = null; // Matching uses options order as answer
+                  } else if (type === 'fill_blank') {
+                    newOptions = [];
+                    newAnswer = [''];
+                  } else if (type === 'multiple_select') {
+                    newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+                    newAnswer = [];
+                  } else if (type === 'true_false') {
+                    newOptions = [];
+                    newAnswer = true;
+                  } else if (type === 'short_answer') {
+                    newOptions = [];
+                    newAnswer = [];
+                  } else {
+                    newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+                    newAnswer = 0;
+                  }
+
+                  setForm({ ...form, question_type: type, options: newOptions, correct_answer: newAnswer });
+                }}
+                style={styles.select}
+              >
+                <option value="mcq">QCM (choix unique)</option>
+                <option value="multiple_select">Sélection multiple</option>
+                <option value="true_false">Vrai/Faux</option>
+                <option value="short_answer">Réponse courte</option>
+                <option value="matching">Association (paires)</option>
+                <option value="fill_blank">Texte à trous</option>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={styles.label}>Difficulté</label>
+                <select value={form.difficulty} onChange={e => setForm({ ...form, difficulty: e.target.value })} style={styles.select}>
+                  <option value="easy">Facile</option>
+                  <option value="medium">Moyen</option>
+                  <option value="hard">Difficile</option>
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Points</label>
+                <input
+                  type="number"
+                  value={form.points}
+                  onChange={e => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
+                  style={styles.input}
+                  min="1"
+                  max="10"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Question Text */}
-          <div>
-            <label style={styles.label}>Question (Français) *</label>
-            <textarea
-              value={form.question_text_fr}
-              onChange={e => setForm({ ...form, question_text_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '100px' }}
-              placeholder="Entrez la question..."
-            />
-          </div>
-          <div>
-            <label style={styles.label}>Question (Anglais)</label>
-            <textarea
-              value={form.question_text_en}
-              onChange={e => setForm({ ...form, question_text_en: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px' }}
-              placeholder="Enter question in English..."
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>
+                Question (Français) *
+                {form.question_type === 'fill_blank' && (
+                  <span style={{ fontSize: '11px', color: colors.primary, marginLeft: '8px' }}>
+                    Utilisez ___ ou [___] pour les trous
+                  </span>
+                )}
+              </label>
+              <textarea
+                value={form.question_text_fr}
+                onChange={e => setForm({ ...form, question_text_fr: e.target.value })}
+                style={{ ...styles.input, minHeight: '120px' }}
+                placeholder={form.question_type === 'fill_blank'
+                  ? "Ex: Le capital de France est ___. La monnaie est ___."
+                  : "Entrez la question..."
+                }
+              />
+              {form.question_type === 'fill_blank' && (
+                <p style={{ margin: '6px 0 0', fontSize: '12px', color: colors.primary }}>
+                  {countBlanks(form.question_text_fr)} trou(s) détecté(s)
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={styles.label}>Question (Anglais)</label>
+              <textarea
+                value={form.question_text_en}
+                onChange={e => setForm({ ...form, question_text_en: e.target.value })}
+                style={{ ...styles.input, minHeight: '120px' }}
+                placeholder="Enter question in English..."
+              />
+            </div>
           </div>
 
           {/* Options for MCQ/Multiple Select */}
           {(form.question_type === 'mcq' || form.question_type === 'multiple_select') && (
-            <div>
-              <label style={styles.label}>
-                Options {form.question_type === 'multiple_select' ? '(sélectionnez les bonnes réponses)' : '(sélectionnez la bonne réponse)'}
+            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ListChecks size={16} color={colors.primary} />
+                  Options {form.question_type === 'multiple_select' ? '(cochez les bonnes réponses)' : '(sélectionnez la bonne réponse)'}
+                </span>
               </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {form.options.map((option, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div key={idx} style={{
+                    display: 'flex', gap: '12px', alignItems: 'center',
+                    padding: '12px', borderRadius: '10px',
+                    background: isDark ? '#1e293b' : 'white',
+                    border: `1px solid ${
+                      (form.question_type === 'mcq' && form.correct_answer === idx) ||
+                      (form.question_type === 'multiple_select' && Array.isArray(form.correct_answer) && form.correct_answer.includes(idx))
+                        ? colors.success : (isDark ? '#334155' : '#e2e8f0')
+                    }`
+                  }}>
                     {form.question_type === 'mcq' ? (
                       <input
                         type="radio"
                         name="correct_answer"
                         checked={form.correct_answer === idx}
                         onChange={() => setForm({ ...form, correct_answer: idx })}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: colors.success }}
                       />
                     ) : (
                       <input
                         type="checkbox"
                         checked={Array.isArray(form.correct_answer) && form.correct_answer.includes(idx)}
                         onChange={() => toggleMultipleAnswer(idx)}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: colors.success }}
                       />
                     )}
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', minWidth: '20px' }}>
+                      {String.fromCharCode(65 + idx)}.
+                    </span>
                     <input
                       type="text"
                       value={option.text_fr || ''}
@@ -16859,7 +17251,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 ))}
               </div>
               {form.options.length < 6 && (
-                <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '10px', fontSize: '13px' }}>
+                <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
                   <Plus size={14} /> Ajouter une option
                 </button>
               )}
@@ -16868,18 +17260,33 @@ const OHELearningPage = ({ isDark, token }) => {
 
           {/* True/False */}
           {form.question_type === 'true_false' && (
-            <div>
-              <label style={styles.label}>Bonne réponse</label>
+            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ToggleLeft size={16} color={colors.teal} />
+                  Bonne réponse
+                </span>
+              </label>
               <div style={{ display: 'flex', gap: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '12px 20px', borderRadius: '10px', background: form.correct_answer === true ? `${colors.success}20` : (isDark ? '#1e293b' : '#f1f5f9'), border: form.correct_answer === true ? `2px solid ${colors.success}` : '2px solid transparent' }}>
+                <label style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                  cursor: 'pointer', padding: '20px', borderRadius: '12px',
+                  background: form.correct_answer === true ? `${colors.success}15` : (isDark ? '#1e293b' : 'white'),
+                  border: form.correct_answer === true ? `2px solid ${colors.success}` : `2px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                }}>
                   <input type="radio" name="tf_answer" checked={form.correct_answer === true} onChange={() => setForm({ ...form, correct_answer: true })} style={{ display: 'none' }} />
-                  <CheckCircle2 size={20} color={form.correct_answer === true ? colors.success : '#94a3b8'} />
-                  <span style={{ fontWeight: '600' }}>Vrai</span>
+                  <CheckCircle2 size={24} color={form.correct_answer === true ? colors.success : '#94a3b8'} />
+                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Vrai</span>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '12px 20px', borderRadius: '10px', background: form.correct_answer === false ? `${colors.error}20` : (isDark ? '#1e293b' : '#f1f5f9'), border: form.correct_answer === false ? `2px solid ${colors.error}` : '2px solid transparent' }}>
+                <label style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                  cursor: 'pointer', padding: '20px', borderRadius: '12px',
+                  background: form.correct_answer === false ? `${colors.error}15` : (isDark ? '#1e293b' : 'white'),
+                  border: form.correct_answer === false ? `2px solid ${colors.error}` : `2px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                }}>
                   <input type="radio" name="tf_answer" checked={form.correct_answer === false} onChange={() => setForm({ ...form, correct_answer: false })} style={{ display: 'none' }} />
-                  <XCircle size={20} color={form.correct_answer === false ? colors.error : '#94a3b8'} />
-                  <span style={{ fontWeight: '600' }}>Faux</span>
+                  <XCircle size={24} color={form.correct_answer === false ? colors.error : '#94a3b8'} />
+                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Faux</span>
                 </label>
               </div>
             </div>
@@ -16887,79 +17294,193 @@ const OHELearningPage = ({ isDark, token }) => {
 
           {/* Short Answer */}
           {form.question_type === 'short_answer' && (
-            <div>
-              <label style={styles.label}>Réponse(s) acceptée(s) (séparées par une virgule)</label>
+            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Type size={16} color={colors.warning} />
+                  Réponse(s) acceptée(s)
+                </span>
+              </label>
               <input
                 type="text"
-                value={Array.isArray(form.correct_answer) ? form.correct_answer.join(', ') : form.correct_answer}
+                value={Array.isArray(form.correct_answer) ? form.correct_answer.join(', ') : (form.correct_answer || '')}
                 onChange={e => setForm({ ...form, correct_answer: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
                 style={styles.input}
-                placeholder="réponse1, réponse2, ..."
+                placeholder="réponse1, réponse2, réponse3..."
               />
-              <p style={{ margin: '6px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                La comparaison est insensible à la casse
+              <p style={{ margin: '8px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Séparez les réponses alternatives par des virgules. La comparaison est insensible à la casse.
               </p>
             </div>
           )}
 
-          {/* Explanation */}
-          <div>
-            <label style={styles.label}>Explication (FR)</label>
-            <textarea
-              value={form.explanation_fr}
-              onChange={e => setForm({ ...form, explanation_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px' }}
-              placeholder="Explication de la bonne réponse..."
-            />
-          </div>
+          {/* Matching - Association de paires */}
+          {form.question_type === 'matching' && (
+            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ArrowRightLeft size={16} color={colors.success} />
+                  Paires à associer
+                </span>
+              </label>
+              <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Créez les paires correctes. Les éléments de droite seront mélangés lors du quiz.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {form.options.map((pair, idx) => (
+                  <div key={idx} style={{
+                    display: 'grid', gridTemplateColumns: '1fr auto 1fr auto', gap: '12px', alignItems: 'center',
+                    padding: '12px', borderRadius: '10px',
+                    background: isDark ? '#1e293b' : 'white',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <input
+                        type="text"
+                        value={pair.left_fr || ''}
+                        onChange={e => handleOptionChange(idx, 'left_fr', e.target.value)}
+                        style={styles.input}
+                        placeholder={`Élément gauche ${idx + 1} (FR)`}
+                      />
+                      <input
+                        type="text"
+                        value={pair.left_en || ''}
+                        onChange={e => handleOptionChange(idx, 'left_en', e.target.value)}
+                        style={{ ...styles.input, fontSize: '12px' }}
+                        placeholder="(EN)"
+                      />
+                    </div>
+                    <ArrowRightLeft size={20} color={colors.success} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <input
+                        type="text"
+                        value={pair.right_fr || ''}
+                        onChange={e => handleOptionChange(idx, 'right_fr', e.target.value)}
+                        style={styles.input}
+                        placeholder={`Élément droit ${idx + 1} (FR)`}
+                      />
+                      <input
+                        type="text"
+                        value={pair.right_en || ''}
+                        onChange={e => handleOptionChange(idx, 'right_en', e.target.value)}
+                        style={{ ...styles.input, fontSize: '12px' }}
+                        placeholder="(EN)"
+                      />
+                    </div>
+                    {form.options.length > 2 && (
+                      <button onClick={() => removeOption(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {form.options.length < 8 && (
+                <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
+                  <Plus size={14} /> Ajouter une paire
+                </button>
+              )}
+            </div>
+          )}
 
-          {/* Points & Difficulty */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          {/* Fill Blank - Texte à trous */}
+          {form.question_type === 'fill_blank' && (
+            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <TextCursorInput size={16} color={colors.error} />
+                  Réponses pour chaque trou
+                </span>
+              </label>
+              <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Entrez la réponse attendue pour chaque trou dans l'ordre d'apparition dans le texte.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(Array.isArray(form.correct_answer) ? form.correct_answer : ['']).map((answer, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '28px', height: '28px', borderRadius: '8px',
+                      background: colors.primary, color: 'white', fontSize: '12px', fontWeight: '700'
+                    }}>
+                      {idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={answer || ''}
+                      onChange={e => handleFillBlankAnswer(idx, e.target.value)}
+                      style={{ ...styles.input, flex: 1 }}
+                      placeholder={`Réponse pour le trou ${idx + 1}`}
+                    />
+                    {(Array.isArray(form.correct_answer) ? form.correct_answer : []).length > 1 && (
+                      <button onClick={() => removeFillBlankSlot(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={addFillBlankSlot} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
+                <Plus size={14} /> Ajouter un trou
+              </button>
+            </div>
+          )}
+
+          {/* Explanation */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={styles.label}>Points</label>
-              <input
-                type="number"
-                value={form.points}
-                onChange={e => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
-                style={styles.input}
-                min="1"
-                max="10"
+              <label style={styles.label}>Explication (FR) - Affichée après la réponse</label>
+              <textarea
+                value={form.explanation_fr}
+                onChange={e => setForm({ ...form, explanation_fr: e.target.value })}
+                style={{ ...styles.input, minHeight: '100px' }}
+                placeholder="Explication de la bonne réponse..."
               />
             </div>
             <div>
-              <label style={styles.label}>Difficulté</label>
-              <select value={form.difficulty} onChange={e => setForm({ ...form, difficulty: e.target.value })} style={styles.select}>
-                <option value="easy">Facile</option>
-                <option value="medium">Moyen</option>
-                <option value="hard">Difficile</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', paddingTop: '28px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
-                <span style={{ fontSize: '14px' }}>Active</span>
-              </label>
+              <label style={styles.label}>Explication (EN)</label>
+              <textarea
+                value={form.explanation_en}
+                onChange={e => setForm({ ...form, explanation_en: e.target.value })}
+                style={{ ...styles.input, minHeight: '100px' }}
+                placeholder="Explanation in English..."
+              />
             </div>
           </div>
 
+          {/* Active checkbox */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} style={{ width: '18px', height: '18px' }} />
+              <span style={{ fontSize: '14px' }}>Question active (visible dans les quiz)</span>
+            </label>
+          </div>
+
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowQuestionModal(false)} style={styles.btnSecondary}>Annuler</button>
+          <div style={{
+            display: 'flex', gap: '12px', justifyContent: 'flex-end',
+            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <button onClick={() => setShowQuestionForm(false)} style={styles.btnSecondary}>
+              Annuler
+            </button>
             <button onClick={() => handleSaveQuestion(form)} style={styles.btnPrimary} disabled={!form.question_text_fr}>
-              {editingQuestion ? 'Enregistrer' : 'Créer la question'}
+              {editingQuestion ? 'Enregistrer les modifications' : 'Créer la question'}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
     );
   };
 
   // ============ QUIZ MODAL ============
-  const QuizModal = () => {
+  // ============ QUIZ FORM INLINE ============
+  const QuizFormInline = () => {
     const [form, setForm] = useState({
       title_fr: editingQuiz?.title_fr || '',
       title_en: editingQuiz?.title_en || '',
       description_fr: editingQuiz?.description_fr || '',
+      description_en: editingQuiz?.description_en || '',
       quiz_type: editingQuiz?.quiz_type || 'graded',
       time_limit_minutes: editingQuiz?.time_limit_minutes || null,
       passing_score: editingQuiz?.passing_score || 70,
@@ -16973,43 +17494,97 @@ const OHELearningPage = ({ isDark, token }) => {
     });
 
     return (
-      <Modal isOpen={showQuizModal} onClose={() => setShowQuizModal(false)} title={editingQuiz ? 'Modifier le Quiz' : 'Nouveau Quiz'} isDark={isDark} width="650px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '70vh', overflowY: 'auto', padding: '4px' }}>
-          {/* Title */}
-          <div>
-            <label style={styles.label}>Titre (Français) *</label>
-            <input
-              type="text"
-              value={form.title_fr}
-              onChange={e => setForm({ ...form, title_fr: e.target.value })}
-              style={styles.input}
-              placeholder="Quiz Module 1"
-            />
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header with title and Retour button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `${colors.purple}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <FileQuestion size={20} color={colors.purple} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+                {editingQuiz ? 'Modifier le Quiz' : 'Nouveau Quiz'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Configurez les paramètres du quiz
+              </p>
+            </div>
           </div>
-          <div>
-            <label style={styles.label}>Titre (Anglais)</label>
-            <input
-              type="text"
-              value={form.title_en}
-              onChange={e => setForm({ ...form, title_en: e.target.value })}
-              style={styles.input}
-              placeholder="Module 1 Quiz"
-            />
-          </div>
+          <button
+            onClick={() => setShowQuizForm(false)}
+            style={{
+              ...styles.btnSecondary,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Retour
+          </button>
+        </div>
 
-          {/* Description */}
-          <div>
-            <label style={styles.label}>Description</label>
-            <textarea
-              value={form.description_fr}
-              onChange={e => setForm({ ...form, description_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px' }}
-              placeholder="Description du quiz..."
-            />
-          </div>
-
-          {/* Type & Status */}
+        {/* Form Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Title FR/EN side by side */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Titre (Français) *</label>
+              <input
+                type="text"
+                value={form.title_fr}
+                onChange={e => setForm({ ...form, title_fr: e.target.value })}
+                style={styles.input}
+                placeholder="Quiz Module 1"
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Titre (Anglais)</label>
+              <input
+                type="text"
+                value={form.title_en}
+                onChange={e => setForm({ ...form, title_en: e.target.value })}
+                style={styles.input}
+                placeholder="Module 1 Quiz"
+              />
+            </div>
+          </div>
+
+          {/* Description FR/EN side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Description (Français)</label>
+              <textarea
+                value={form.description_fr}
+                onChange={e => setForm({ ...form, description_fr: e.target.value })}
+                style={{ ...styles.input, minHeight: '100px' }}
+                placeholder="Description du quiz..."
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Description (Anglais)</label>
+              <textarea
+                value={form.description_en}
+                onChange={e => setForm({ ...form, description_en: e.target.value })}
+                style={{ ...styles.input, minHeight: '100px' }}
+                placeholder="Quiz description..."
+              />
+            </div>
+          </div>
+
+          {/* Type, Status, and Settings all on same row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Type de quiz</label>
               <select value={form.quiz_type} onChange={e => setForm({ ...form, quiz_type: e.target.value })} style={styles.select}>
@@ -17025,12 +17600,8 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="published">Publié</option>
               </select>
             </div>
-          </div>
-
-          {/* Scores & Time */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={styles.label}>Seuil de réussite (%)</label>
+              <label style={styles.label}>Seuil réussite (%)</label>
               <input
                 type="number"
                 value={form.passing_score}
@@ -17041,7 +17612,7 @@ const OHELearningPage = ({ isDark, token }) => {
               />
             </div>
             <div>
-              <label style={styles.label}>Limite de temps (min)</label>
+              <label style={styles.label}>Limite temps (min)</label>
               <input
                 type="number"
                 value={form.time_limit_minutes || ''}
@@ -17065,41 +17636,896 @@ const OHELearningPage = ({ isDark, token }) => {
           </div>
 
           {/* Options */}
-          <div>
-            <label style={styles.label}>Options</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc' }}>
-                <input type="checkbox" checked={form.shuffle_questions} onChange={e => setForm({ ...form, shuffle_questions: e.target.checked })} />
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Settings size={16} color={colors.primary} />
+                Options du Quiz
+              </span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.shuffle_questions ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.shuffle_questions ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input type="checkbox" checked={form.shuffle_questions} onChange={e => setForm({ ...form, shuffle_questions: e.target.checked })} style={{ accentColor: colors.success }} />
                 <span style={{ fontSize: '13px' }}>Mélanger les questions</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc' }}>
-                <input type="checkbox" checked={form.shuffle_options} onChange={e => setForm({ ...form, shuffle_options: e.target.checked })} />
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.shuffle_options ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.shuffle_options ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input type="checkbox" checked={form.shuffle_options} onChange={e => setForm({ ...form, shuffle_options: e.target.checked })} style={{ accentColor: colors.success }} />
                 <span style={{ fontSize: '13px' }}>Mélanger les options</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc' }}>
-                <input type="checkbox" checked={form.show_correct_answers} onChange={e => setForm({ ...form, show_correct_answers: e.target.checked })} />
-                <span style={{ fontSize: '13px' }}>Afficher les bonnes réponses</span>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.show_correct_answers ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.show_correct_answers ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input type="checkbox" checked={form.show_correct_answers} onChange={e => setForm({ ...form, show_correct_answers: e.target.checked })} style={{ accentColor: colors.success }} />
+                <span style={{ fontSize: '13px' }}>Afficher bonnes réponses</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc' }}>
-                <input type="checkbox" checked={form.show_explanation} onChange={e => setForm({ ...form, show_explanation: e.target.checked })} />
-                <span style={{ fontSize: '13px' }}>Afficher les explications</span>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.show_explanation ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.show_explanation ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input type="checkbox" checked={form.show_explanation} onChange={e => setForm({ ...form, show_explanation: e.target.checked })} style={{ accentColor: colors.success }} />
+                <span style={{ fontSize: '13px' }}>Afficher explications</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc' }}>
-                <input type="checkbox" checked={form.allow_retake} onChange={e => setForm({ ...form, allow_retake: e.target.checked })} />
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.allow_retake ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.allow_retake ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input type="checkbox" checked={form.allow_retake} onChange={e => setForm({ ...form, allow_retake: e.target.checked })} style={{ accentColor: colors.success }} />
                 <span style={{ fontSize: '13px' }}>Permettre les reprises</span>
               </label>
             </div>
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowQuizModal(false)} style={styles.btnSecondary}>Annuler</button>
+          <div style={{
+            display: 'flex', gap: '12px', justifyContent: 'flex-end',
+            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <button onClick={() => setShowQuizForm(false)} style={styles.btnSecondary}>
+              Annuler
+            </button>
             <button onClick={() => handleSaveQuiz(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingQuiz ? 'Enregistrer' : 'Créer le quiz'}
+              {editingQuiz ? 'Enregistrer les modifications' : 'Créer le quiz'}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
+    );
+  };
+
+  // ============ CERTIFICATE TEMPLATE EDITOR ============
+  const CertificateTemplateEditor = () => {
+    const [activeTab, setActiveTab] = useState('templates'); // templates, design, preview
+    const [selectedTemplate, setSelectedTemplate] = useState(editingTemplate || certificateTemplates.find(t => t.is_default) || null);
+
+    // Parse logos and signatories from template
+    const parseLogos = (template) => {
+      if (template?.logos) {
+        try { return JSON.parse(template.logos); } catch (e) { return []; }
+      }
+      // Fallback to legacy single logo
+      if (template?.logo_url) {
+        return [{ url: template.logo_url, position: template.logo_position || 'top-center', width: template.logo_width || 100 }];
+      }
+      return [];
+    };
+
+    const parseSignatories = (template) => {
+      if (template?.signatories) {
+        try { return JSON.parse(template.signatories); } catch (e) { return []; }
+      }
+      // Fallback to legacy single signatory
+      if (template?.signatory_name) {
+        return [{ name: template.signatory_name, title: template.signatory_title || '', position: 'center' }];
+      }
+      return [];
+    };
+
+    const [form, setForm] = useState({
+      name: selectedTemplate?.name || '',
+      description: selectedTemplate?.description || '',
+      background_image: selectedTemplate?.background_image || '',
+      background_color: selectedTemplate?.background_color || '#ffffff',
+      logos: parseLogos(selectedTemplate),
+      title_text: selectedTemplate?.title_text || 'CERTIFICAT DE RÉUSSITE',
+      title_font: selectedTemplate?.title_font || 'serif',
+      title_size: selectedTemplate?.title_size || 36,
+      title_color: selectedTemplate?.title_color || '#1a365d',
+      body_font: selectedTemplate?.body_font || 'sans-serif',
+      body_color: selectedTemplate?.body_color || '#2d3748',
+      border_style: selectedTemplate?.border_style || 'ornate',
+      border_color: selectedTemplate?.border_color || '#c5a572',
+      border_width: selectedTemplate?.border_width || 10,
+      signatories: parseSignatories(selectedTemplate),
+      show_signature: selectedTemplate?.show_signature !== false,
+      show_qr_code: selectedTemplate?.show_qr_code !== false,
+      qr_position: selectedTemplate?.qr_position || 'bottom-right',
+      show_score: selectedTemplate?.show_score !== false,
+      show_date: selectedTemplate?.show_date !== false,
+      show_hours: selectedTemplate?.show_hours !== false,
+      is_default: selectedTemplate?.is_default || false
+    });
+
+    const [uploading, setUploading] = useState(false);
+
+    const handleBackgroundUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await api.upload('/elearning/certificate-templates/upload-background', formData, token);
+        if (res.success) {
+          setForm({ ...form, background_image: res.data.url });
+          setToast({ message: 'Image uploadée', type: 'success' });
+        }
+      } catch (error) {
+        setToast({ message: 'Erreur upload', type: 'error' });
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const handleLogoUpload = async (e, logoIndex = null) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await api.upload('/elearning/certificate-templates/upload-background', formData, token);
+        if (res.success) {
+          const newLogos = [...form.logos];
+          if (logoIndex !== null && logoIndex < newLogos.length) {
+            newLogos[logoIndex] = { ...newLogos[logoIndex], url: res.data.url };
+          } else {
+            // Add new logo
+            const positions = ['top-left', 'top-center', 'top-right'];
+            const usedPositions = newLogos.map(l => l.position);
+            const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'top-center';
+            newLogos.push({ url: res.data.url, position: availablePosition, width: 90 });
+          }
+          setForm({ ...form, logos: newLogos });
+          setToast({ message: 'Logo uploadé', type: 'success' });
+        }
+      } catch (error) {
+        setToast({ message: 'Erreur upload', type: 'error' });
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const removeLogo = (index) => {
+      const newLogos = form.logos.filter((_, i) => i !== index);
+      setForm({ ...form, logos: newLogos });
+    };
+
+    const updateLogo = (index, field, value) => {
+      const newLogos = [...form.logos];
+      newLogos[index] = { ...newLogos[index], [field]: value };
+      setForm({ ...form, logos: newLogos });
+    };
+
+    const addSignatory = () => {
+      if (form.signatories.length >= 3) return;
+      const positions = ['left', 'center', 'right'];
+      const usedPositions = form.signatories.map(s => s.position);
+      const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'center';
+      setForm({
+        ...form,
+        signatories: [...form.signatories, { name: '', title: '', position: availablePosition }]
+      });
+    };
+
+    const removeSignatory = (index) => {
+      const newSignatories = form.signatories.filter((_, i) => i !== index);
+      setForm({ ...form, signatories: newSignatories });
+    };
+
+    const updateSignatory = (index, field, value) => {
+      const newSignatories = [...form.signatories];
+      newSignatories[index] = { ...newSignatories[index], [field]: value };
+      setForm({ ...form, signatories: newSignatories });
+    };
+
+    const handleSaveTemplate = async () => {
+      try {
+        const endpoint = selectedTemplate?.id
+          ? `/elearning/certificate-templates/${selectedTemplate.id}`
+          : '/elearning/certificate-templates';
+        const method = selectedTemplate?.id ? 'put' : 'post';
+
+        // Prepare data with JSON stringified logos and signatories
+        const saveData = {
+          ...form,
+          logos: JSON.stringify(form.logos),
+          signatories: JSON.stringify(form.signatories),
+          // Legacy fields for backward compatibility
+          logo_url: form.logos[0]?.url || '',
+          logo_position: form.logos[0]?.position || 'top-center',
+          logo_width: form.logos[0]?.width || 100,
+          signatory_name: form.signatories[0]?.name || '',
+          signatory_title: form.signatories[0]?.title || ''
+        };
+
+        const res = await api[method](endpoint, saveData, token);
+        if (res.success) {
+          setToast({ message: 'Template sauvegardé', type: 'success' });
+          fetchCertificateTemplates();
+          if (!selectedTemplate?.id) {
+            setSelectedTemplate({ ...form, id: res.data?.id });
+          }
+        }
+      } catch (error) {
+        setToast({ message: 'Erreur de sauvegarde', type: 'error' });
+      }
+    };
+
+    const handleSetDefault = async (templateId) => {
+      try {
+        await api.put(`/elearning/certificate-templates/${templateId}`, { is_default: true }, token);
+        setToast({ message: 'Template par défaut mis à jour', type: 'success' });
+        fetchCertificateTemplates();
+      } catch (error) {
+        setToast({ message: 'Erreur', type: 'error' });
+      }
+    };
+
+    const borderStyles = [
+      { value: 'none', label: 'Aucune', preview: 'transparent' },
+      { value: 'simple', label: 'Simple', preview: '#e2e8f0' },
+      { value: 'double', label: 'Double', preview: '#94a3b8' },
+      { value: 'ornate', label: 'Ornée', preview: '#c5a572' },
+      { value: 'gold', label: 'Dorée', preview: '#d4af37' }
+    ];
+
+    return (
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `linear-gradient(135deg, ${colors.purple}20 0%, ${colors.primary}20 100%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Award size={20} color={colors.purple} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Personnaliser le Diplôme</h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Configurez l'apparence de vos certificats
+              </p>
+            </div>
+          </div>
+          <button onClick={() => setShowTemplateEditor(false)} style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ArrowLeft size={16} /> Retour
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+          {[
+            { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+            { id: 'design', label: 'Design', icon: Palette },
+            { id: 'preview', label: 'Aperçu', icon: Eye }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '14px 24px', border: 'none', cursor: 'pointer',
+                background: 'transparent', fontSize: '14px', fontWeight: '500',
+                color: activeTab === tab.id ? colors.primary : (isDark ? '#94a3b8' : '#64748b'),
+                borderBottom: activeTab === tab.id ? `2px solid ${colors.primary}` : '2px solid transparent',
+                marginBottom: '-1px', transition: 'all 0.2s'
+              }}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '24px' }}>
+          {/* Templates Tab */}
+          {activeTab === 'templates' && (
+            <div>
+              <p style={{ margin: '0 0 20px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                Sélectionnez un template prédéfini ou créez le vôtre
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                {certificateTemplates.map(template => (
+                  <div
+                    key={template.id}
+                    onClick={() => {
+                      setSelectedTemplate(template);
+                      setForm({
+                        ...form,
+                        name: template.name,
+                        description: template.description,
+                        background_image: template.background_image,
+                        background_color: template.background_color,
+                        logos: parseLogos(template),
+                        border_style: template.border_style,
+                        border_color: template.border_color,
+                        title_text: template.title_text,
+                        title_color: template.title_color,
+                        signatories: parseSignatories(template),
+                        is_default: template.is_default
+                      });
+                    }}
+                    style={{
+                      padding: '20px', borderRadius: '12px', cursor: 'pointer',
+                      border: `2px solid ${selectedTemplate?.id === template.id ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
+                      background: selectedTemplate?.id === template.id ? `${colors.primary}10` : (isDark ? '#1e293b' : 'white'),
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {/* Mini Preview */}
+                    <div style={{
+                      height: '120px', borderRadius: '8px', marginBottom: '12px',
+                      background: template.background_image ? `url(${template.background_image}) center/cover` : template.background_color || '#f8fafc',
+                      border: template.border_style !== 'none' ? `3px ${template.border_style === 'double' ? 'double' : 'solid'} ${template.border_color || '#c5a572'}` : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      position: 'relative'
+                    }}>
+                      <Award size={32} color={template.title_color || '#1a365d'} style={{ opacity: 0.3 }} />
+                      {template.is_default && (
+                        <span style={{
+                          position: 'absolute', top: '8px', right: '8px',
+                          padding: '2px 8px', borderRadius: '10px', fontSize: '10px',
+                          background: colors.success, color: 'white', fontWeight: '600'
+                        }}>
+                          Défaut
+                        </span>
+                      )}
+                    </div>
+                    <h4 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: '600' }}>{template.name}</h4>
+                    <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      {template.description || 'Aucune description'}
+                    </p>
+                    {!template.is_default && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleSetDefault(template.id); }}
+                        style={{ ...styles.btnSecondary, marginTop: '12px', width: '100%', fontSize: '12px', padding: '8px' }}
+                      >
+                        Définir par défaut
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* New Template Card */}
+                <div
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setForm({
+                      name: 'Nouveau Template',
+                      description: '',
+                      background_image: '',
+                      background_color: '#ffffff',
+                      logos: [],
+                      title_text: 'CERTIFICAT DE RÉUSSITE',
+                      title_font: 'serif',
+                      title_size: 36,
+                      title_color: '#1a365d',
+                      body_font: 'sans-serif',
+                      body_color: '#2d3748',
+                      border_style: 'ornate',
+                      border_color: '#c5a572',
+                      border_width: 10,
+                      signatories: [],
+                      show_signature: true,
+                      show_qr_code: true,
+                      qr_position: 'bottom-right',
+                      show_score: true,
+                      show_date: true,
+                      show_hours: true,
+                      is_default: false
+                    });
+                    setActiveTab('design');
+                  }}
+                  style={{
+                    padding: '20px', borderRadius: '12px', cursor: 'pointer',
+                    border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                    background: isDark ? '#0f172a' : '#f8fafc',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    minHeight: '200px', transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{
+                    width: '48px', height: '48px', borderRadius: '50%',
+                    background: `${colors.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: '12px'
+                  }}>
+                    <Plus size={24} color={colors.primary} />
+                  </div>
+                  <span style={{ fontWeight: '500', color: colors.primary }}>Créer un Template</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Design Tab */}
+          {activeTab === 'design' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              {/* Left Column - Settings */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Basic Info */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={16} color={colors.primary} /> Informations
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label style={styles.label}>Nom du template</label>
+                      <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={styles.input} />
+                    </div>
+                    <div>
+                      <label style={styles.label}>Titre du certificat</label>
+                      <input type="text" value={form.title_text} onChange={e => setForm({ ...form, title_text: e.target.value })} style={styles.input} placeholder="CERTIFICAT DE RÉUSSITE" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Background */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ImageIcon size={16} color={colors.primary} /> Arrière-plan
+                  </h4>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.label}>Couleur</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input type="color" value={form.background_color} onChange={e => setForm({ ...form, background_color: e.target.value })} style={{ width: '50px', height: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
+                        <input type="text" value={form.background_color} onChange={e => setForm({ ...form, background_color: e.target.value })} style={{ ...styles.input, flex: 1 }} />
+                      </div>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.label}>Image (optionnel)</label>
+                      <input type="file" accept="image/*" onChange={handleBackgroundUpload} style={{ display: 'none' }} id="bg-upload" />
+                      <label htmlFor="bg-upload" style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', justifyContent: 'center' }}>
+                        {uploading ? <Loader size={14} className="spin" /> : <Upload size={14} />}
+                        {form.background_image ? 'Changer' : 'Uploader'}
+                      </label>
+                    </div>
+                  </div>
+                  {form.background_image && (
+                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <img src={form.background_image} alt="bg" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
+                      <button onClick={() => setForm({ ...form, background_image: '' })} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Border */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Square size={16} color={colors.primary} /> Bordure
+                  </h4>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {borderStyles.map(style => (
+                      <button
+                        key={style.value}
+                        onClick={() => setForm({ ...form, border_style: style.value })}
+                        style={{
+                          padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                          border: `2px solid ${form.border_style === style.value ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
+                          background: form.border_style === style.value ? `${colors.primary}15` : 'transparent',
+                          color: form.border_style === style.value ? colors.primary : (isDark ? '#e2e8f0' : '#1e293b'),
+                          fontSize: '13px', fontWeight: '500'
+                        }}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
+                  {form.border_style !== 'none' && (
+                    <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <label style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>Couleur:</label>
+                      <input type="color" value={form.border_color} onChange={e => setForm({ ...form, border_color: e.target.value })} style={{ width: '40px', height: '30px', border: 'none', borderRadius: '6px', cursor: 'pointer' }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Logos (Multiple) */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ImageIcon size={16} color={colors.primary} /> Logos ({form.logos.length}/3)
+                  </h4>
+
+                  {/* Logos ajoutés */}
+                  {form.logos.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                      {form.logos.map((logo, index) => (
+                        <div key={index} style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '10px', borderRadius: '8px',
+                          background: isDark ? '#1e293b' : 'white',
+                          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                        }}>
+                          <div style={{ width: '50px', height: '35px', background: '#f1f5f9', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                            <img src={logo.url.startsWith('/') ? `http://localhost:3003${logo.url}` : logo.url} alt={`Logo ${index + 1}`} style={{ maxHeight: '32px', maxWidth: '48px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          </div>
+                          <select
+                            value={logo.position}
+                            onChange={(e) => updateLogo(index, 'position', e.target.value)}
+                            style={{ ...styles.select, width: '90px', fontSize: '11px', padding: '6px 8px' }}
+                          >
+                            <option value="top-left">Gauche</option>
+                            <option value="top-center">Centre</option>
+                            <option value="top-right">Droite</option>
+                          </select>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>Taille:</span>
+                            <input
+                              type="number"
+                              value={logo.width}
+                              onChange={(e) => updateLogo(index, 'width', parseInt(e.target.value) || 80)}
+                              style={{ ...styles.input, width: '55px', fontSize: '11px', padding: '6px 8px' }}
+                              min="40"
+                              max="200"
+                            />
+                          </div>
+                          <button onClick={() => removeLogo(index)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error, padding: '6px' }}>
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sélection de logos prédéfinis */}
+                  {form.logos.length < 3 && (
+                    <div>
+                      <p style={{ margin: '0 0 10px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                        Sélectionnez un logo :
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                        {[
+                          { url: '/uploads/images/Logo_Programme_Zoonoses.png', name: 'Programme Zoonoses' },
+                          { url: '/uploads/images/partners/minsante.png', name: 'MINSANTE' },
+                          { url: '/uploads/images/partners/minepia.png', name: 'MINEPIA' },
+                          { url: '/uploads/images/partners/oms.png', name: 'OMS' },
+                          { url: '/uploads/images/partners/fao.png', name: 'FAO' },
+                          { url: '/uploads/images/partners/cdc100.png', name: 'CDC' },
+                          { url: '/uploads/images/partners/usaid.jpg', name: 'USAID' },
+                          { url: '/uploads/images/partners/afrohun100.png', name: 'AFROHUN' }
+                        ].map((preset, idx) => {
+                          const isSelected = form.logos.some(l => l.url === preset.url);
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                if (isSelected) return;
+                                const positions = ['top-left', 'top-center', 'top-right'];
+                                const usedPositions = form.logos.map(l => l.position);
+                                const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'top-center';
+                                setForm({ ...form, logos: [...form.logos, { url: preset.url, position: availablePosition, width: 90 }] });
+                              }}
+                              disabled={isSelected}
+                              style={{
+                                padding: '8px', borderRadius: '8px', cursor: isSelected ? 'not-allowed' : 'pointer',
+                                border: `2px solid ${isSelected ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`,
+                                background: isSelected ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                                opacity: isSelected ? 0.6 : 1,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+                              }}
+                              title={preset.name}
+                            >
+                              <div style={{ width: '40px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img
+                                  src={`http://localhost:3003${preset.url}`}
+                                  alt={preset.name}
+                                  style={{ maxWidth: '38px', maxHeight: '28px', objectFit: 'contain' }}
+                                  onError={(e) => { e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="gray" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'; }}
+                                />
+                              </div>
+                              <span style={{ fontSize: '9px', color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center', lineHeight: 1.1 }}>{preset.name}</span>
+                              {isSelected && <Check size={10} color={colors.success} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Upload personnalisé */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '8px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                        <span style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Ou :</span>
+                        <input type="file" accept="image/*" onChange={(e) => handleLogoUpload(e)} style={{ display: 'none' }} id="add-logo-upload" />
+                        <label htmlFor="add-logo-upload" style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', padding: '6px 12px' }}>
+                          {uploading ? <Loader size={12} className="spin" /> : <Upload size={12} />}
+                          Uploader un logo
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Signatories (Multiple) */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Edit3 size={16} color={colors.primary} /> Signataires ({form.signatories.length}/3)
+                    </h4>
+                    {form.signatories.length < 3 && (
+                      <button onClick={addSignatory} style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}>
+                        <Plus size={12} /> Ajouter
+                      </button>
+                    )}
+                  </div>
+
+                  {form.signatories.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px', background: isDark ? '#1e293b' : '#f1f5f9', borderRadius: '8px' }}>
+                      <Edit3 size={24} color={isDark ? '#64748b' : '#94a3b8'} style={{ marginBottom: '8px' }} />
+                      <p style={{ margin: 0, fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        Aucun signataire. Cliquez sur "Ajouter".
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {form.signatories.map((sig, index) => (
+                        <div key={index} style={{
+                          padding: '12px', borderRadius: '8px',
+                          background: isDark ? '#1e293b' : 'white',
+                          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                        }}>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                            <div style={{ flex: 1 }}>
+                              <input
+                                type="text"
+                                value={sig.name}
+                                onChange={(e) => updateSignatory(index, 'name', e.target.value)}
+                                style={{ ...styles.input, fontSize: '13px' }}
+                                placeholder="Nom du signataire"
+                              />
+                            </div>
+                            <select
+                              value={sig.position}
+                              onChange={(e) => updateSignatory(index, 'position', e.target.value)}
+                              style={{ ...styles.select, width: '100px', fontSize: '12px' }}
+                            >
+                              <option value="left">Gauche</option>
+                              <option value="center">Centre</option>
+                              <option value="right">Droite</option>
+                            </select>
+                            <button onClick={() => removeSignatory(index)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                              <X size={14} />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={sig.title}
+                            onChange={(e) => updateSignatory(index, 'title', e.target.value)}
+                            style={{ ...styles.input, fontSize: '12px' }}
+                            placeholder="Titre/Fonction"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column - Options & Preview */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Display Options */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Settings size={16} color={colors.primary} /> Options d'affichage
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {[
+                      { key: 'show_score', label: 'Afficher le score' },
+                      { key: 'show_date', label: 'Afficher la date' },
+                      { key: 'show_hours', label: 'Afficher les heures' },
+                      { key: 'show_qr_code', label: 'Afficher QR Code' },
+                      { key: 'show_signature', label: 'Afficher signature' }
+                    ].map(opt => (
+                      <label key={opt.key} style={{
+                        display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                        padding: '12px', borderRadius: '8px',
+                        background: form[opt.key] ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                        border: `1px solid ${form[opt.key] ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+                      }}>
+                        <input type="checkbox" checked={form[opt.key]} onChange={e => setForm({ ...form, [opt.key]: e.target.checked })} style={{ accentColor: colors.success }} />
+                        <span style={{ fontSize: '13px' }}>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mini Preview */}
+                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Eye size={16} color={colors.primary} /> Aperçu
+                  </h4>
+                  <div style={{
+                    aspectRatio: '1.4/1', borderRadius: '12px',
+                    background: form.background_image ? `url(${form.background_image}) center/cover` : form.background_color,
+                    border: form.border_style !== 'none' ? `${Math.max(form.border_width / 3, 3)}px ${form.border_style === 'double' ? 'double' : 'solid'} ${form.border_color}` : 'none',
+                    padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    position: 'relative', textAlign: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                  }}>
+                    {/* Multiple Logos */}
+                    {form.logos.map((logo, idx) => (
+                      <img key={idx} src={logo.url} alt={`logo-${idx}`} style={{
+                        position: 'absolute',
+                        top: '8px',
+                        [logo.position === 'top-left' ? 'left' : logo.position === 'top-right' ? 'right' : 'left']: logo.position === 'top-center' ? '50%' : '8px',
+                        transform: logo.position === 'top-center' ? 'translateX(-50%)' : 'none',
+                        height: `${Math.min(logo.width / 3, 25)}px`, objectFit: 'contain'
+                      }} />
+                    ))}
+                    <Award size={20} color={form.title_color} style={{ marginBottom: '6px', opacity: 0.5, marginTop: form.logos.length > 0 ? '20px' : 0 }} />
+                    <h3 style={{ margin: 0, fontSize: '11px', fontFamily: form.title_font, color: form.title_color, fontWeight: '700' }}>
+                      {form.title_text}
+                    </h3>
+                    <p style={{ margin: '4px 0', fontSize: '8px', color: form.body_color }}>
+                      Décerné à <strong>Jean Exemple</strong>
+                    </p>
+                    {form.show_score && <p style={{ margin: '2px 0', fontSize: '7px', color: form.body_color }}>Score: 95%</p>}
+                    {/* Multiple Signatories */}
+                    {form.signatories.length > 0 && (
+                      <div style={{
+                        position: 'absolute', bottom: '8px', left: 0, right: 0,
+                        display: 'flex', justifyContent: form.signatories.length === 1 ? 'center' : 'space-around',
+                        padding: '0 10px'
+                      }}>
+                        {form.signatories.slice(0, 3).map((sig, idx) => (
+                          <div key={idx} style={{ textAlign: 'center', maxWidth: '60px' }}>
+                            <p style={{ margin: 0, fontSize: '6px', fontWeight: '600', color: form.body_color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sig.name}</p>
+                            <p style={{ margin: 0, fontSize: '5px', color: form.body_color, opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sig.title}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {form.show_qr_code && (
+                      <div style={{
+                        position: 'absolute', bottom: '8px',
+                        [form.qr_position === 'bottom-left' ? 'left' : 'right']: '8px',
+                        width: '20px', height: '20px',
+                        background: '#f0f0f0', borderRadius: '3px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <QrCode size={12} color="#333" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <button onClick={handleSaveTemplate} style={{ ...styles.btnPrimary, width: '100%', padding: '14px', fontSize: '15px' }}>
+                  <Save size={18} />
+                  Sauvegarder le Template
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Preview Tab */}
+          {activeTab === 'preview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
+              <p style={{ color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center' }}>
+                Aperçu du certificat avec le template "{form.name || 'sélectionné'}"
+              </p>
+              {/* Full Preview */}
+              <div style={{
+                width: '100%', maxWidth: '700px', aspectRatio: '1.414/1',
+                background: form.background_image ? `url(${form.background_image}) center/cover` : form.background_color,
+                border: form.border_style !== 'none' ? `${form.border_width}px ${form.border_style === 'double' ? 'double' : 'solid'} ${form.border_color}` : 'none',
+                borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                position: 'relative', textAlign: 'center',
+                overflow: 'hidden'
+              }}>
+                {/* Decorative background bubbles */}
+                <div style={{ position: 'absolute', top: '-50px', left: '-50px', width: '200px', height: '200px', borderRadius: '50%', background: `${form.border_color}10`, pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', bottom: '-80px', right: '-80px', width: '250px', height: '250px', borderRadius: '50%', background: `${form.title_color}08`, pointerEvents: 'none' }} />
+
+                {/* Multiple Logos */}
+                {form.logos.map((logo, idx) => (
+                  <img key={idx} src={logo.url} alt={`logo-${idx}`} style={{
+                    position: 'absolute', top: '25px',
+                    [logo.position === 'top-left' ? 'left' : logo.position === 'top-right' ? 'right' : 'left']: logo.position === 'top-center' ? '50%' : '25px',
+                    transform: logo.position === 'top-center' ? 'translateX(-50%)' : 'none',
+                    height: `${logo.width / 2}px`, maxHeight: '60px', objectFit: 'contain'
+                  }} />
+                ))}
+                <div style={{ marginTop: form.logos.length > 0 ? '50px' : '20px' }}>
+                  <Award size={40} color={form.title_color} style={{ marginBottom: '12px', opacity: 0.6 }} />
+                </div>
+                <h1 style={{ margin: 0, fontSize: `${form.title_size / 1.5}px`, fontFamily: form.title_font, color: form.title_color, fontWeight: '700', letterSpacing: '2px' }}>
+                  {form.title_text}
+                </h1>
+                <p style={{ margin: '16px 0 6px', fontSize: '13px', color: form.body_color, fontFamily: form.body_font }}>
+                  Ce certificat est décerné à
+                </p>
+                <h2 style={{ margin: '0 0 16px', fontSize: '26px', color: form.title_color, fontFamily: form.body_font, fontWeight: '700' }}>
+                  Jean-Pierre Exemple
+                </h2>
+                <div style={{ width: '120px', height: '2px', background: form.border_color, margin: '0 auto 16px', borderRadius: '1px' }} />
+                <p style={{ margin: 0, fontSize: '13px', color: form.body_color, fontFamily: form.body_font, maxWidth: '80%' }}>
+                  Pour avoir complété avec succès la formation<br />
+                  <strong style={{ color: form.title_color }}>"Introduction à l'Approche One Health"</strong>
+                </p>
+                {form.show_score && (
+                  <div style={{ marginTop: '14px', padding: '8px 20px', background: `${colors.success}10`, borderRadius: '20px', display: 'inline-block' }}>
+                    <span style={{ fontSize: '14px', color: form.body_color, fontFamily: form.body_font }}>
+                      Score final: <strong style={{ color: colors.success }}>95%</strong>
+                    </span>
+                  </div>
+                )}
+                {form.show_date && (
+                  <p style={{ margin: '10px 0 0', fontSize: '11px', color: form.body_color, fontFamily: form.body_font, opacity: 0.7 }}>
+                    Délivré le {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                )}
+                {/* Multiple Signatories */}
+                {form.signatories.length > 0 && form.show_signature && (
+                  <div style={{
+                    position: 'absolute', bottom: '35px', left: 0, right: 0,
+                    display: 'flex',
+                    justifyContent: form.signatories.length === 1 ? 'center' :
+                                   form.signatories.length === 2 ? 'space-around' : 'space-between',
+                    padding: '0 50px'
+                  }}>
+                    {form.signatories.slice(0, 3).map((sig, idx) => (
+                      <div key={idx} style={{ textAlign: 'center', minWidth: '120px' }}>
+                        <div style={{ width: '80px', height: '1px', background: form.body_color, opacity: 0.3, margin: '0 auto 6px' }} />
+                        <p style={{ margin: 0, fontSize: '12px', fontWeight: '600', color: form.body_color }}>{sig.name || 'Signataire'}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: form.body_color, opacity: 0.7 }}>{sig.title}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {form.show_qr_code && (
+                  <div style={{
+                    position: 'absolute', bottom: '25px',
+                    [form.qr_position === 'bottom-left' ? 'left' : 'right']: '25px',
+                    width: '55px', height: '55px',
+                    background: 'white', borderRadius: '8px', padding: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <QrCode size={47} color="#333" />
+                  </div>
+                )}
+              </div>
+              <button onClick={handleSaveTemplate} style={{ ...styles.btnPrimary, padding: '14px 32px', fontSize: '15px' }}>
+                <Save size={18} />
+                Sauvegarder ce Template
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -17343,8 +18769,6 @@ const OHELearningPage = ({ isDark, token }) => {
       {showLessonModal && <LessonModal />}
       {showPathModal && <PathModal />}
       {showCategoryModal && <CategoryModal />}
-      {showQuestionModal && <QuestionModal />}
-      {showQuizModal && <QuizModal />}
       {showQuizQuestionsModal && <QuizQuestionsModal />}
 
       {/* Header */}

@@ -19,6 +19,37 @@ const { auth, authorize, optionalAuth } = require('../middleware/auth');
 const slugify = require('slugify');
 const { v4: uuidv4 } = require('uuid');
 const { generateCertificatePDF } = require('../services/certificateService');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configuration multer pour les images de certificats
+const certificateStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../uploads/certificates');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const uploadCertificateImage = multer({
+  storage: certificateStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non autorisé'), false);
+    }
+  }
+});
 
 // ============================================
 // HELPERS
@@ -2758,7 +2789,19 @@ router.post('/attempts/:id/submit', auth, async (req, res) => {
           break;
 
         case 'fill_blank':
-          isCorrect = (correctAnswer || '').toLowerCase().trim() === (userAnswer || '').toLowerCase().trim();
+          // Support pour plusieurs trous - correctAnswer et userAnswer sont des arrays
+          if (Array.isArray(correctAnswer) && Array.isArray(userAnswer)) {
+            if (correctAnswer.length !== userAnswer.length) {
+              isCorrect = false;
+            } else {
+              isCorrect = correctAnswer.every((correct, idx) =>
+                (correct || '').toLowerCase().trim() === (userAnswer[idx] || '').toLowerCase().trim()
+              );
+            }
+          } else {
+            // Fallback pour un seul trou
+            isCorrect = (correctAnswer || '').toLowerCase().trim() === (userAnswer || '').toLowerCase().trim();
+          }
           break;
 
         case 'matching':
@@ -3358,6 +3401,224 @@ router.get('/certificates/:id/download', auth, async (req, res) => {
   } catch (error) {
     console.error('Download certificate error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// CERTIFICATE TEMPLATES
+// ============================================
+
+// Get all certificate templates
+router.get('/certificate-templates', auth, async (req, res) => {
+  try {
+    const [templates] = await db.query(`
+      SELECT * FROM certificate_templates
+      WHERE is_active = TRUE
+      ORDER BY is_default DESC, name ASC
+    `);
+    res.json({ success: true, data: templates });
+  } catch (error) {
+    console.error('Error fetching certificate templates:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Get single template
+router.get('/certificate-templates/:id', auth, async (req, res) => {
+  try {
+    const [templates] = await db.query('SELECT * FROM certificate_templates WHERE id = ?', [req.params.id]);
+    if (templates.length === 0) {
+      return res.status(404).json({ success: false, message: 'Template non trouvé' });
+    }
+    res.json({ success: true, data: templates[0] });
+  } catch (error) {
+    console.error('Error fetching certificate template:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Create certificate template (admin only)
+router.post('/certificate-templates', auth, async (req, res) => {
+  try {
+    const {
+      name, slug, description,
+      background_image, background_color,
+      logo_url, logo_position, logo_width,
+      title_text, title_font, title_size, title_color,
+      body_font, body_color,
+      border_style, border_color, border_width,
+      signatory_name, signatory_title, signatory_signature, show_signature,
+      show_qr_code, qr_position,
+      show_score, show_date, show_hours,
+      is_default, custom_css
+    } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Le nom est requis' });
+    }
+
+    const templateSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    // Si ce template devient le défaut, enlever le défaut des autres
+    if (is_default) {
+      await db.query('UPDATE certificate_templates SET is_default = FALSE');
+    }
+
+    const [result] = await db.query(`
+      INSERT INTO certificate_templates (
+        name, slug, description,
+        background_image, background_color,
+        logo_url, logo_position, logo_width,
+        title_text, title_font, title_size, title_color,
+        body_font, body_color,
+        border_style, border_color, border_width,
+        signatory_name, signatory_title, signatory_signature, show_signature,
+        show_qr_code, qr_position,
+        show_score, show_date, show_hours,
+        is_default, custom_css, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      name, templateSlug, description,
+      background_image, background_color || '#ffffff',
+      logo_url, logo_position || 'top-center', logo_width || 150,
+      title_text || 'CERTIFICAT DE RÉUSSITE', title_font || 'serif', title_size || 36, title_color || '#1a365d',
+      body_font || 'sans-serif', body_color || '#2d3748',
+      border_style || 'ornate', border_color || '#c5a572', border_width || 10,
+      signatory_name, signatory_title, signatory_signature, show_signature !== false,
+      show_qr_code !== false, qr_position || 'bottom-right',
+      show_score !== false, show_date !== false, show_hours !== false,
+      is_default || false, custom_css, req.user.id
+    ]);
+
+    res.json({ success: true, message: 'Template créé', data: { id: result.insertId } });
+  } catch (error) {
+    console.error('Error creating certificate template:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Update certificate template
+router.put('/certificate-templates/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Si ce template devient le défaut, enlever le défaut des autres
+    if (updates.is_default) {
+      await db.query('UPDATE certificate_templates SET is_default = FALSE WHERE id != ?', [id]);
+    }
+
+    const allowedFields = [
+      'name', 'description',
+      'background_image', 'background_color',
+      'logo_url', 'logo_position', 'logo_width',
+      'title_text', 'title_font', 'title_size', 'title_color',
+      'body_font', 'body_color',
+      'border_style', 'border_color', 'border_width',
+      'signatory_name', 'signatory_title', 'signatory_signature', 'show_signature',
+      'show_qr_code', 'qr_position',
+      'show_score', 'show_date', 'show_hours',
+      'is_default', 'is_active', 'custom_css'
+    ];
+
+    const setClauses = [];
+    const values = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        setClauses.push(`${key} = ?`);
+        values.push(value);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json({ success: false, message: 'Aucun champ à mettre à jour' });
+    }
+
+    values.push(id);
+    await db.query(`UPDATE certificate_templates SET ${setClauses.join(', ')} WHERE id = ?`, values);
+
+    res.json({ success: true, message: 'Template mis à jour' });
+  } catch (error) {
+    console.error('Error updating certificate template:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Delete certificate template
+router.delete('/certificate-templates/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Vérifier que ce n'est pas le template par défaut
+    const [template] = await db.query('SELECT is_default FROM certificate_templates WHERE id = ?', [id]);
+    if (template.length > 0 && template[0].is_default) {
+      return res.status(400).json({ success: false, message: 'Impossible de supprimer le template par défaut' });
+    }
+
+    await db.query('DELETE FROM certificate_templates WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Template supprimé' });
+  } catch (error) {
+    console.error('Error deleting certificate template:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Upload template background image
+router.post('/certificate-templates/upload-background', auth, uploadCertificateImage.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Aucune image fournie' });
+    }
+
+    const imageUrl = `/uploads/certificates/${req.file.filename}`;
+    res.json({ success: true, data: { url: imageUrl } });
+  } catch (error) {
+    console.error('Error uploading background:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/certificate-templates/:templateId/preview - Générer un certificat de test
+router.get('/certificate-templates/:templateId/preview', auth, async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    const lang = req.query.lang || 'fr';
+
+    // Créer un certificat fictif pour le test
+    const testCertificate = {
+      id: 0,
+      certificate_number: 'TEST-' + Date.now().toString(36).toUpperCase(),
+      recipient_name: 'Jean-Paul Exemple',
+      recipient_email: 'test@example.com',
+      title_fr: 'Formation One Health - Approche Intégrée',
+      title_en: 'One Health Training - Integrated Approach',
+      course_title_fr: 'Formation One Health - Approche Intégrée',
+      course_title_en: 'One Health Training - Integrated Approach',
+      enrollable_type: 'course',
+      final_score: 92,
+      total_hours: 24,
+      issue_date: new Date().toISOString(),
+      expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      verification_code: 'VERIF-TEST-' + Date.now().toString(36).toUpperCase(),
+      status: 'active',
+      template_id: templateId
+    };
+
+    // Générer le PDF avec le template spécifié
+    const pdfBuffer = await generateCertificatePDF(testCertificate, lang === 'en' ? 'en' : 'fr');
+
+    // Définir les headers pour le téléchargement
+    const filename = `certificat_test_${templateId}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    // Envoyer le PDF
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Preview certificate error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la génération du PDF: ' + error.message });
   }
 });
 
