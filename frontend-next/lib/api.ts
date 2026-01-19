@@ -157,9 +157,18 @@ export async function subscribeNewsletter(data: {
 export function getImageUrl(path?: string): string {
   if (!path) return '/images/placeholder.jpg';
   if (path.startsWith('http')) return path;
-  // Use relative URLs for uploads - they'll be proxied by Next.js rewrites
-  // This works in both Docker (via internal network) and local dev
-  return path.startsWith('/') ? path : `/${path}`;
+
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+  // For uploads, always use absolute URLs so Next.js Image can fetch them
+  // In production, use the internal backend URL for server-side rendering
+  // In development, use localhost
+  if (cleanPath.startsWith('/uploads')) {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000';
+    return `${backendUrl}${cleanPath}`;
+  }
+
+  return cleanPath;
 }
 
 // === MENUS ===

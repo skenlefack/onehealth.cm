@@ -10,6 +10,8 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    loader: 'custom',
+    loaderFile: './lib/imageLoader.js',
     remotePatterns: [
       {
         protocol: 'http',
@@ -27,6 +29,11 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'backend',
         port: '5000',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'backend',
         pathname: '/uploads/**',
       },
       {
