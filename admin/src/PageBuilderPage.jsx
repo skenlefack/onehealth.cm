@@ -5,7 +5,16 @@ import {
   Upload, FolderOpen, Search, Grid, List
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api';
+// Use relative URL for production (nginx proxies to backend)
+const API_URL = '/api';
+
+// Helper to get image URL (works in both dev and production)
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  // In production, nginx proxies /uploads/ to backend
+  return path.startsWith('/uploads') ? path : `/uploads${path.startsWith('/') ? '' : '/'}${path}`;
+};
 
 const safeJson = async (res) => {
   try {
@@ -139,7 +148,7 @@ const MediaPickerModal = ({ onClose, onSelect, token, isDark }) => {
   const getImageUrl = (path) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `http://localhost:5000${path}`;
+    return `${path}`;
   };
 
   return (
@@ -317,8 +326,8 @@ const ImageField = ({ label, value, onChange, isDark, token }) => {
   const getImageUrl = (path) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    if (path.startsWith('/images/')) return `http://localhost:3002${path}`; // Frontend public images
-    return `http://localhost:5000${path}`; // Backend uploads
+    if (path.startsWith('/images/')) return `${path}`; // Frontend public images
+    return `${path}`; // Backend uploads
   };
 
   const handleSelect = (path) => {
@@ -643,6 +652,80 @@ const SectionEditorModal = ({ section, onClose, onSave, isDark, token }) => {
     }));
   };
 
+  // ====== MINISTRIES HANDLERS ======
+
+  // Handle ministry item change
+  const handleMinistryItemChange = (index, field, newValue) => {
+    const currentMinistriesFr = [...(editData.content_fr.ministries || [])];
+    const currentMinistriesEn = [...(editData.content_en.ministries || [])];
+
+    currentMinistriesFr[index] = { ...currentMinistriesFr[index], [field]: newValue };
+    currentMinistriesEn[index] = { ...currentMinistriesEn[index], [field]: newValue };
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, ministries: currentMinistriesFr },
+      content_en: { ...prev.content_en, ministries: currentMinistriesEn }
+    }));
+  };
+
+  // Add new ministry
+  const addMinistry = () => {
+    const newMinistry = {
+      icon: '🏛️',
+      color: '#007A33',
+      name_fr: 'Nouveau Ministère',
+      name_en: 'New Ministry',
+      abbreviation: '',
+      description_fr: '',
+      description_en: ''
+    };
+
+    const currentMinistriesFr = [...(editData.content_fr.ministries || []), newMinistry];
+    const currentMinistriesEn = [...(editData.content_en.ministries || []), { ...newMinistry }];
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, ministries: currentMinistriesFr },
+      content_en: { ...prev.content_en, ministries: currentMinistriesEn }
+    }));
+  };
+
+  // Remove ministry
+  const removeMinistry = (index) => {
+    if (!window.confirm('Supprimer ce ministère ?')) return;
+
+    const currentMinistriesFr = [...(editData.content_fr.ministries || [])];
+    const currentMinistriesEn = [...(editData.content_en.ministries || [])];
+
+    currentMinistriesFr.splice(index, 1);
+    currentMinistriesEn.splice(index, 1);
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, ministries: currentMinistriesFr },
+      content_en: { ...prev.content_en, ministries: currentMinistriesEn }
+    }));
+  };
+
+  // Move ministry up/down
+  const moveMinistry = (index, direction) => {
+    const newIndex = index + direction;
+    const currentMinistriesFr = [...(editData.content_fr.ministries || [])];
+    const currentMinistriesEn = [...(editData.content_en.ministries || [])];
+
+    if (newIndex < 0 || newIndex >= currentMinistriesFr.length) return;
+
+    [currentMinistriesFr[index], currentMinistriesFr[newIndex]] = [currentMinistriesFr[newIndex], currentMinistriesFr[index]];
+    [currentMinistriesEn[index], currentMinistriesEn[newIndex]] = [currentMinistriesEn[newIndex], currentMinistriesEn[index]];
+
+    setEditData(prev => ({
+      ...prev,
+      content_fr: { ...prev.content_fr, ministries: currentMinistriesFr },
+      content_en: { ...prev.content_en, ministries: currentMinistriesEn }
+    }));
+  };
+
   // Render fields based on content structure
   const renderFields = () => {
     if (!currentContent) return null;
@@ -826,7 +909,7 @@ const SectionEditorModal = ({ section, onClose, onSave, isDark, token }) => {
                           overflow: 'hidden', flexShrink: 0
                         }}>
                           <img
-                            src={item.logo.startsWith('/images/') ? `http://localhost:3002${item.logo}` : `http://localhost:5000${item.logo}`}
+                            src={item.logo.startsWith('/images/') ? `${item.logo}` : `${item.logo}`}
                             alt={item.name}
                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                             onError={(e) => { e.target.style.display = 'none'; }}
@@ -1085,6 +1168,113 @@ const SectionEditorModal = ({ section, onClose, onSave, isDark, token }) => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // Array of objects (ministries)
+      if (key === 'ministries' && Array.isArray(value)) {
+        const ministries = editData.content_fr.ministries || [];
+        return (
+          <div key={key} style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <label style={{ fontWeight: '600', color: isDark ? '#e2e8f0' : '#374151', fontSize: '14px' }}>
+                🏛️ Ministères ({ministries.length})
+              </label>
+              <button
+                type="button"
+                onClick={addMinistry}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px',
+                  background: `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`,
+                  color: 'white', border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+              >
+                <Plus size={16} /> Nouveau Ministère
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '500px', overflowY: 'auto' }}>
+              {ministries.map((ministry, index) => (
+                <div key={index} style={{
+                  padding: '16px', borderRadius: '12px',
+                  background: isDark ? '#0f172a' : '#f8fafc',
+                  border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
+                  borderLeft: `4px solid ${ministry.color || '#007A33'}`
+                }}>
+                  {/* Header with controls */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{
+                      fontWeight: '700', fontSize: '13px',
+                      color: ministry.color || colors.cameroonGreen,
+                      background: `${ministry.color || colors.cameroonGreen}20`,
+                      padding: '4px 10px', borderRadius: '8px'
+                    }}>
+                      #{index + 1} {ministry.abbreviation || ministry[`name_${activeLang}`]?.slice(0, 20) || 'Ministère'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button type="button" onClick={() => moveMinistry(index, -1)} disabled={index === 0}
+                        style={{ padding: '6px 10px', borderRadius: '6px', background: index === 0 ? (isDark ? '#1e293b' : '#e2e8f0') : (isDark ? '#334155' : '#e2e8f0'),
+                          border: 'none', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.5 : 1, fontSize: '14px' }}
+                        title="Monter">⬆️</button>
+                      <button type="button" onClick={() => moveMinistry(index, 1)} disabled={index === ministries.length - 1}
+                        style={{ padding: '6px 10px', borderRadius: '6px', background: index === ministries.length - 1 ? (isDark ? '#1e293b' : '#e2e8f0') : (isDark ? '#334155' : '#e2e8f0'),
+                          border: 'none', cursor: index === ministries.length - 1 ? 'not-allowed' : 'pointer', opacity: index === ministries.length - 1 ? 0.5 : 1, fontSize: '14px' }}
+                        title="Descendre">⬇️</button>
+                      <button type="button" onClick={() => removeMinistry(index)}
+                        style={{ padding: '6px 10px', borderRadius: '6px', background: isDark ? '#7f1d1d' : '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '14px' }}
+                        title="Supprimer">🗑️</button>
+                    </div>
+                  </div>
+
+                  {/* Row 1: Icon, Color, Abbreviation */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '60px 60px 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>Icône</label>
+                      <input type="text" value={ministry.icon || ''} onChange={(e) => handleMinistryItemChange(index, 'icon', e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                          background: isDark ? '#1e293b' : '#ffffff', color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '16px', textAlign: 'center' }}
+                        placeholder="🏛️" />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>Couleur</label>
+                      <input type="color" value={ministry.color || '#007A33'} onChange={(e) => handleMinistryItemChange(index, 'color', e.target.value)}
+                        style={{ width: '100%', height: '36px', border: 'none', borderRadius: '6px', cursor: 'pointer' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>Abréviation</label>
+                      <input type="text" value={ministry.abbreviation || ''} onChange={(e) => handleMinistryItemChange(index, 'abbreviation', e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                          background: isDark ? '#1e293b' : '#ffffff', color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '13px' }}
+                        placeholder="MINSANTE" />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Name */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      Nom du Ministère ({activeLang.toUpperCase()})
+                    </label>
+                    <input type="text" value={ministry[`name_${activeLang}`] || ''} onChange={(e) => handleMinistryItemChange(index, `name_${activeLang}`, e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                        background: isDark ? '#1e293b' : '#ffffff', color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '13px' }}
+                      placeholder="Ministre de la Santé Publique" />
+                  </div>
+
+                  {/* Row 3: Description (optional) */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      Description ({activeLang.toUpperCase()}) - Optionnel
+                    </label>
+                    <textarea value={ministry[`description_${activeLang}`] || ''} onChange={(e) => handleMinistryItemChange(index, `description_${activeLang}`, e.target.value)}
+                      rows={2}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${isDark ? '#475569' : '#d1d5db'}`,
+                        background: isDark ? '#1e293b' : '#ffffff', color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '12px', resize: 'vertical' }}
+                      placeholder="Description courte du rôle..." />
                   </div>
                 </div>
               ))}

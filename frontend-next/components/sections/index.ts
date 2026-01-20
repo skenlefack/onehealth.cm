@@ -9,4 +9,5 @@ export { FeaturedSliderSection } from './FeaturedSliderSection';
 export { EditorNoteSection } from './EditorNoteSection';
 export { ImplementationStrategySection } from './ImplementationStrategySection';
 export { PartnersCarouselSection } from './PartnersCarouselSection';
+export { MinistriesSection } from './MinistriesSection';
 export { PageSectionRenderer } from './PageSectionRenderer';

@@ -1240,7 +1240,7 @@ const ImagePicker = ({ value, onChange, isDark, token }) => {
     formData.append('files', file); // Backend expects 'files'
 
     try {
-      const response = await fetch('http://localhost:5000/api/media/upload', {
+      const response = await fetch('/api/media/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -1283,7 +1283,7 @@ const ImagePicker = ({ value, onChange, isDark, token }) => {
         }}
       >
         {value ? (
-          <img src={value.startsWith('http') ? value : `http://localhost:5000${value}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={value.startsWith('http') ? value : `${value}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <>
             <ImageIcon size={32} color={isDark ? '#64748b' : '#94a3b8'} />
@@ -1408,7 +1408,7 @@ const ImagePicker = ({ value, onChange, isDark, token }) => {
                       }}
                     >
                       <img
-                        src={`http://localhost:5000${item.url}`}
+                        src={`${item.url}`}
                         alt={item.alt_text || item.filename}
                         style={{
                           position: 'absolute',
@@ -1649,7 +1649,7 @@ const RichEditor = ({ value, onChange, isDark, height = '400px', token }) => {
     formData.append('files', file); // Le backend attend 'files'
 
     try {
-      const res = await fetch('http://localhost:5000/api/media/upload', {
+      const res = await fetch('/api/media/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -1658,7 +1658,7 @@ const RichEditor = ({ value, onChange, isDark, height = '400px', token }) => {
       const data = text ? JSON.parse(text) : { success: false };
       // data.data est un tableau
       if (data.success && data.data && data.data.length > 0) {
-        const imgUrl = `http://localhost:5000${data.data[0].url}`;
+        const imgUrl = `${data.data[0].url}`;
         // Insérer l'image dans l'éditeur
         const img = `<img src="${imgUrl}" alt="" style="max-width: 100%; height: auto;" />`;
         document.execCommand('insertHTML', false, img);
@@ -1766,7 +1766,7 @@ const RichEditor = ({ value, onChange, isDark, height = '400px', token }) => {
         const formData = new FormData();
         formData.append('files', file); // Le backend attend 'files'
 
-        const res = await fetch('http://localhost:5000/api/media/upload', {
+        const res = await fetch('/api/media/upload', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -1775,7 +1775,7 @@ const RichEditor = ({ value, onChange, isDark, height = '400px', token }) => {
         const data = text ? JSON.parse(text) : { success: false };
 
         if (data.success && data.data && data.data.length > 0) {
-          const imgUrl = `http://localhost:5000${data.data[0].url}`;
+          const imgUrl = `${data.data[0].url}`;
           html = html.replace(fullMatch, `<img src="${imgUrl}" style="max-width: 100%; height: auto;" />`);
         }
       } catch (error) {
@@ -2767,7 +2767,7 @@ const PostsPage = ({ isDark, token, hasPermission = () => true }) => {
                 <td style={styles.td}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {post.featured_image && (
-                      <img src={`http://localhost:5000${post.featured_image}`} alt="" style={{ width: '50px', height: '50px', borderRadius: '8px', objectFit: 'cover' }} />
+                      <img src={`${post.featured_image}`} alt="" style={{ width: '50px', height: '50px', borderRadius: '8px', objectFit: 'cover' }} />
                     )}
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontWeight: '600' }}>{post.title_fr || post.title}</p>
@@ -4601,7 +4601,7 @@ const PageBuilder = ({ page, onSave, isDark, token, onClose }) => {
                                   border: `2px solid ${isDark ? '#334155' : '#ffffff'}`
                                 }}>
                                   <img
-                                    src={imgSrc.startsWith('http') ? imgSrc : `http://localhost:5000${imgSrc}`}
+                                    src={imgSrc.startsWith('http') ? imgSrc : `${imgSrc}`}
                                     alt=""
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                   />
@@ -6428,7 +6428,7 @@ const ImagePickerSection = ({
           position: 'relative'
         }}>
           <img
-            src={getImageSrc().startsWith('http') ? getImageSrc() : `http://localhost:5000${getImageSrc()}`}
+            src={getImageSrc().startsWith('http') ? getImageSrc() : `${getImageSrc()}`}
             alt=""
             style={{
               width: '100%',
@@ -6779,7 +6779,7 @@ const ImagePickerSection = ({
                     >
                       <div style={{ height: '100px', position: 'relative' }}>
                         <img
-                          src={`http://localhost:5000${item.url}`}
+                          src={`${item.url}`}
                           alt={item.filename}
                           style={{
                             width: '100%',
@@ -8976,7 +8976,7 @@ const BlockPreview = ({ section, isDark, lang }) => {
                     maxWidth: '600px'
                   }}>
                     <img
-                      src={imageSrc.startsWith('http') ? imageSrc : `http://localhost:5000${imageSrc}`}
+                      src={imageSrc.startsWith('http') ? imageSrc : `${imageSrc}`}
                       alt={imageAlt}
                       style={{
                         width: '100%',
@@ -9077,7 +9077,7 @@ const BlockPreview = ({ section, isDark, lang }) => {
                     zIndex: -1
                   }}></div>
                   <img
-                    src={imageSrc.startsWith('http') ? imageSrc : `http://localhost:5000${imageSrc}`}
+                    src={imageSrc.startsWith('http') ? imageSrc : `${imageSrc}`}
                     alt={imageAlt}
                     style={{
                       width: '100%',
@@ -11205,7 +11205,7 @@ const SlidersPage = ({ isDark, token }) => {
                 <div key={slide.id} style={{ ...styles.cardHover, padding: '0', overflow: 'hidden' }}>
                   <div style={{ height: '160px', background: isDark ? '#0f172a' : '#f1f5f9', position: 'relative' }}>
                     {slide.image ? (
-                      <img src={slide.image.startsWith('http') ? slide.image : `http://localhost:5000${slide.image}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={slide.image.startsWith('http') ? slide.image : `${slide.image}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                         <ImageIcon size={48} color={isDark ? '#334155' : '#cbd5e1'} />
@@ -11522,7 +11522,7 @@ const MediaPage = ({ isDark, token, hasPermission = () => true }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = (url) => {
-    const fullUrl = `http://localhost:5000${url}`;
+    const fullUrl = `${url}`;
     navigator.clipboard.writeText(fullUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -11635,7 +11635,7 @@ const MediaPage = ({ isDark, token, hasPermission = () => true }) => {
             <div key={item.id} style={{ ...styles.cardHover, padding: '0', overflow: 'hidden', cursor: 'pointer' }} onClick={() => item.mime_type?.startsWith('image') && setPreviewImage(item)}>
               <div style={{ height: '70px', background: isDark ? '#0f172a' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {item.mime_type?.startsWith('image') ? (
-                  <img src={`http://localhost:5000${item.url}`} alt={item.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={`${item.url}`} alt={item.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <FileText size={32} color={isDark ? '#64748b' : '#94a3b8'} />
                 )}
@@ -11670,7 +11670,7 @@ const MediaPage = ({ isDark, token, hasPermission = () => true }) => {
                   <td style={styles.td}>
                     <div style={styles.flex}>
                       {item.mime_type?.startsWith('image') ? (
-                        <img src={`http://localhost:5000${item.url}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
+                        <img src={`${item.url}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
                       ) : (
                         <FileText size={24} color={isDark ? '#64748b' : '#94a3b8'} />
                       )}
@@ -11717,14 +11717,14 @@ const MediaPage = ({ isDark, token, hasPermission = () => true }) => {
               <button onClick={() => setPreviewImage(null)} style={{ ...styles.btnIcon, padding: '8px' }}><X size={20} /></button>
             </div>
             <div style={{ padding: '20px', display: 'flex', justifyContent: 'center', background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <img src={`http://localhost:5000${previewImage.url}`} alt={previewImage.filename} style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }} />
+              <img src={`${previewImage.url}`} alt={previewImage.filename} style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }} />
             </div>
             <div style={{ padding: '16px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <input
                   type="text"
                   readOnly
-                  value={`http://localhost:5000${previewImage.url}`}
+                  value={`${previewImage.url}`}
                   style={{ ...styles.input, flex: 1, fontSize: '13px' }}
                 />
                 <button
@@ -12464,7 +12464,7 @@ const OHWRMappingPage = ({ isDark, token }) => {
       const result = await api.upload(endpoint, formData, token);
 
       if (result.success && result.data) {
-        const url = `http://localhost:5000${result.data.url}`;
+        const url = `${result.data.url}`;
         setForm({ ...form, [fieldName]: url });
         setToast({ message: 'Fichier uploadé avec succès', type: 'success' });
       } else {
@@ -15334,7 +15334,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 }}>
                   <div style={{
                     width: '40px', height: '40px', borderRadius: '8px',
-                    background: course.thumbnail ? `url(http://localhost:5000${course.thumbnail}) center/cover` : `${colors.primary}20`,
+                    background: course.thumbnail ? `url(${course.thumbnail}) center/cover` : `${colors.primary}20`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
                     {!course.thumbnail && <BookOpen size={18} color={colors.primary} />}
@@ -15421,7 +15421,7 @@ const OHELearningPage = ({ isDark, token }) => {
               <div style={{
                 height: '160px',
                 background: course.thumbnail
-                  ? `url(http://localhost:5000${course.thumbnail}) center/cover`
+                  ? `url(${course.thumbnail}) center/cover`
                   : `linear-gradient(135deg, ${colors.primary}30 0%, ${colors.purple}30 100%)`,
                 margin: '-20px -20px 16px -20px',
                 position: 'relative'
@@ -15506,7 +15506,7 @@ const OHELearningPage = ({ isDark, token }) => {
               <div style={{
                 width: '80px', height: '80px', borderRadius: '12px',
                 background: selectedCourse.thumbnail
-                  ? `url(http://localhost:5000${selectedCourse.thumbnail}) center/cover`
+                  ? `url(${selectedCourse.thumbnail}) center/cover`
                   : `${colors.primary}30`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
@@ -16926,7 +16926,7 @@ const OHELearningPage = ({ isDark, token }) => {
       formData.append('file', file);
 
       try {
-        const response = await fetch('http://localhost:5000/api/upload/elearning/thumbnail', {
+        const response = await fetch('/api/upload/elearning/thumbnail', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -16951,7 +16951,7 @@ const OHELearningPage = ({ isDark, token }) => {
             <div style={{
               width: '100%', height: '180px', borderRadius: '12px',
               border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-              background: form.thumbnail ? `url(http://localhost:5000${form.thumbnail}) center/cover` : (isDark ? '#0f172a' : '#f8fafc'),
+              background: form.thumbnail ? `url(${form.thumbnail}) center/cover` : (isDark ? '#0f172a' : '#f8fafc'),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', position: 'relative', overflow: 'hidden'
             }} onClick={() => document.getElementById('course-thumbnail-input').click()}>
@@ -17127,7 +17127,7 @@ const OHELearningPage = ({ isDark, token }) => {
       const formData = new FormData();
       formData.append('file', file);
       try {
-        const response = await fetch('http://localhost:5000/api/upload/elearning/video', {
+        const response = await fetch('/api/upload/elearning/video', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -17150,7 +17150,7 @@ const OHELearningPage = ({ isDark, token }) => {
       const formData = new FormData();
       formData.append('file', file);
       try {
-        const response = await fetch('http://localhost:5000/api/upload/elearning/pdf', {
+        const response = await fetch('/api/upload/elearning/pdf', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -19476,7 +19476,7 @@ const ProfilePage = ({ isDark, token, user, setUser }) => {
               <div style={{
                 width: '140px', height: '140px', borderRadius: '50%',
                 background: user?.avatar
-                  ? `url(http://localhost:5000${user.avatar}) center/cover`
+                  ? `url(${user.avatar}) center/cover`
                   : `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontSize: '48px', fontWeight: '700',
@@ -20015,7 +20015,7 @@ const UsersPage = ({ isDark, token, hasPermission = () => true }) => {
                       <div style={{
                         width: '44px', height: '44px', borderRadius: '12px',
                         background: user.avatar
-                          ? `url(http://localhost:5000${user.avatar}) center/cover`
+                          ? `url(${user.avatar}) center/cover`
                           : `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: 'white', fontWeight: '700', fontSize: '16px'
@@ -21743,7 +21743,7 @@ export default function AdminApp() {
               <div style={{
                 width: '42px', height: '42px', borderRadius: '12px',
                 background: user.avatar
-                  ? `url(http://localhost:5000${user.avatar}) center/cover`
+                  ? `url(${user.avatar}) center/cover`
                   : `linear-gradient(135deg, ${colors.cameroonGreen} 0%, ${colors.teal} 100%)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontWeight: '700', fontSize: '15px',

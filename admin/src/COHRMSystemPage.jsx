@@ -9,7 +9,7 @@ import {
   Leaf, Home, FileText, Copy, ExternalLink, Siren, MapPinned
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // ============== API HELPER ==============
 const api = {

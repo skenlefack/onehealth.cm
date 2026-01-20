@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import {
   HeroSection,
   PillarsSection,
+  MinistriesSection,
   ZoonosesSection,
   PlatformsSection,
   FeaturedSliderSection,
@@ -94,16 +95,19 @@ export default async function HomePage({ params }: PageProps) {
       {/* Section 3: Notre Approche / Les Quatre Piliers */}
       <PillarsSection t={t} content={getSection('pillars')?.content} lang={lang} />
 
-      {/* Section 4: Stratégie de Mise en Oeuvre */}
+      {/* Section 4: Ministères Sectoriels du Programme */}
+      <MinistriesSection t={t} content={getSection('ministries')?.content} lang={lang} />
+
+      {/* Section 5: Stratégie de Mise en Oeuvre */}
       <ImplementationStrategySection lang={lang as Language} t={t} content={getSection('implementation')?.content} />
 
-      {/* Section 5: Zoonoses Prioritaires */}
+      {/* Section 6: Zoonoses Prioritaires */}
       <ZoonosesSection t={t} lang={lang as Language} content={getSection('zoonoses')?.content} />
 
-      {/* Section 6: Nos Partenaires (Carousel) */}
+      {/* Section 7: Nos Partenaires (Carousel) */}
       <PartnersCarouselSection lang={lang as Language} t={t} content={getSection('partners')?.content} />
 
-      {/* Section 7: Nos Plateformes */}
+      {/* Section 8: Nos Plateformes */}
       <PlatformsSection lang={lang as Language} t={t} />
     </>
   );
