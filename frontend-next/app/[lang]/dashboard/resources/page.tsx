@@ -169,11 +169,11 @@ const translations = {
       restricted: 'Restreint',
     },
     expertCategories: {
-      expert: 'Expert',
-      researcher: 'Chercheur',
-      practitioner: 'Praticien',
-      consultant: 'Consultant',
-      trainer: 'Formateur',
+      health_human: 'Santé Humaine',
+      health_animal: 'Santé Animale',
+      environment: 'Environnement',
+      laboratory: 'Laboratoire',
+      coordination: 'Coordination',
     },
   },
   en: {
@@ -294,11 +294,11 @@ const translations = {
       restricted: 'Restricted',
     },
     expertCategories: {
-      expert: 'Expert',
-      researcher: 'Researcher',
-      practitioner: 'Practitioner',
-      consultant: 'Consultant',
-      trainer: 'Trainer',
+      health_human: 'Human Health',
+      health_animal: 'Animal Health',
+      environment: 'Environment',
+      laboratory: 'Laboratory',
+      coordination: 'Coordination',
     },
   },
 };
