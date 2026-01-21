@@ -2257,7 +2257,11 @@ const PostsPage = ({ isDark, token, hasPermission = () => true }) => {
   const categoryDropdownRef = React.useRef(null);
 
   const fetchPosts = async (status = null) => {
-    const params = status && status !== 'all' ? `?status=${status}` : '';
+    // Get all posts with high limit for client-side filtering/pagination
+    let params = '?limit=1000';
+    if (status && status !== 'all') {
+      params += `&status=${status}`;
+    }
     const res = await api.get(`/posts${params}`, token);
     if (res.success) setPosts(res.data);
     setLoading(false);
