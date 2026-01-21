@@ -5,6 +5,14 @@ const slugify = require('slugify');
 const db = require('../config/db');
 const { auth, authorize, optionalAuth } = require('../middleware/auth');
 
+// Helper function to convert ISO 8601 date to MySQL datetime format
+const toMySQLDateTime = (isoDate) => {
+  if (!isoDate) return null;
+  const date = new Date(isoDate);
+  if (isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+};
+
 // @route   GET /api/posts
 // @desc    Get all posts with filters
 // @access  Public
@@ -228,8 +236,8 @@ router.post('/', auth, authorize('admin', 'editor', 'author'), async (req, res) 
        type, status, visibility, password, featured, allow_comments,
        finalMetaTitleFr, finalMetaTitleFr, finalMetaTitleEn, finalMetaDescFr, finalMetaDescFr, finalMetaDescEn,
        meta_keywords,
-       status === 'published' ? (published_at || new Date()) : null,
-       status === 'scheduled' ? scheduled_at : null]
+       status === 'published' ? toMySQLDateTime(published_at || new Date()) : null,
+       status === 'scheduled' ? toMySQLDateTime(scheduled_at) : null]
     );
 
     // Add tags
@@ -346,7 +354,7 @@ router.put('/:id', auth, authorize('admin', 'editor', 'author'), async (req, res
        featured_image, finalCategoryId, finalAuthorId, type, status, visibility, password, featured, allow_comments,
        finalMetaTitleFr, finalMetaTitleFr, finalMetaTitleEn,
        finalMetaDescFr, finalMetaDescFr, finalMetaDescEn,
-       meta_keywords, status, published_at, scheduled_at, id]
+       meta_keywords, status, toMySQLDateTime(published_at), toMySQLDateTime(scheduled_at), id]
     );
 
     // Update tags

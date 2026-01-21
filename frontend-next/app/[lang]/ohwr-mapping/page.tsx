@@ -68,6 +68,12 @@ export default function OHWRMappingPage({ params }: PageProps) {
   const [detailData, setDetailData] = useState<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const ITEMS_PER_PAGE = 12;
+
   // Trending/Recent searches
   const trendingSearches = lang === 'fr'
     ? ['Épidémiologie', 'Laboratoire', 'Zoonoses', 'FAO', 'OMS', 'Vaccination']
@@ -94,8 +100,14 @@ export default function OHWRMappingPage({ params }: PageProps) {
     if (regionsRes.success) setRegions(regionsRes.data);
   };
 
-  const performSearch = useCallback(async () => {
-    if (!searchQuery.trim() && !selectedRegion && !selectedCategory) {
+  const performSearch = useCallback(async (page: number = 1, forceType?: ResourceType) => {
+    const activeType = forceType || searchType;
+
+    // Allow search if there's a query, filters, OR if a specific type is selected (not 'all')
+    const hasFilters = searchQuery.trim() || selectedRegion || selectedCategory;
+    const isTypeSelected = activeType !== 'all';
+
+    if (!hasFilters && !isTypeSelected) {
       setSearchResults([]);
       setHasSearched(false);
       return;
@@ -103,20 +115,27 @@ export default function OHWRMappingPage({ params }: PageProps) {
 
     setIsSearching(true);
     setHasSearched(true);
+    setCurrentPage(page);
 
     const results: SearchResult[] = [];
-    const searchLower = searchQuery.toLowerCase();
+    let total = 0;
 
     try {
       // Search Experts
-      if (searchType === 'all' || searchType === 'expert') {
+      if (activeType === 'all' || activeType === 'expert') {
         const expertsRes = await getOHWRExperts({
           search: searchQuery,
           region: selectedRegion,
           category: selectedCategory,
-          limit: 20
+          limit: activeType === 'expert' ? ITEMS_PER_PAGE : 20,
+          page: activeType === 'expert' ? page : 1
         });
         if (expertsRes.success && expertsRes.data) {
+          if (activeType === 'expert' && expertsRes.pagination) {
+            total = expertsRes.pagination.total;
+            setTotalPages(expertsRes.pagination.pages);
+            setTotalResults(total);
+          }
           expertsRes.data.forEach((expert: OHWRExpert) => {
             results.push({
               id: expert.id,
@@ -134,14 +153,20 @@ export default function OHWRMappingPage({ params }: PageProps) {
       }
 
       // Search Organizations
-      if (searchType === 'all' || searchType === 'organization') {
+      if (activeType === 'all' || activeType === 'organization') {
         const orgsRes = await getOHWROrganizations({
           search: searchQuery,
           region: selectedRegion,
           type: selectedCategory,
-          limit: 20
+          limit: activeType === 'organization' ? ITEMS_PER_PAGE : 20,
+          page: activeType === 'organization' ? page : 1
         });
         if (orgsRes.success && orgsRes.data) {
+          if (activeType === 'organization' && orgsRes.pagination) {
+            total = orgsRes.pagination.total;
+            setTotalPages(orgsRes.pagination.pages);
+            setTotalResults(total);
+          }
           orgsRes.data.forEach((org: OHWROrganization) => {
             results.push({
               id: org.id,
@@ -159,14 +184,20 @@ export default function OHWRMappingPage({ params }: PageProps) {
       }
 
       // Search Materials
-      if (searchType === 'all' || searchType === 'material') {
+      if (activeType === 'all' || activeType === 'material') {
         const materialsRes = await getOHWRMaterials({
           search: searchQuery,
           region: selectedRegion,
           type: selectedCategory,
-          limit: 20
+          limit: activeType === 'material' ? ITEMS_PER_PAGE : 20,
+          page: activeType === 'material' ? page : 1
         });
         if (materialsRes.success && materialsRes.data) {
+          if (activeType === 'material' && materialsRes.pagination) {
+            total = materialsRes.pagination.total;
+            setTotalPages(materialsRes.pagination.pages);
+            setTotalResults(total);
+          }
           materialsRes.data.forEach((mat: OHWRMaterial) => {
             results.push({
               id: mat.id,
@@ -183,14 +214,20 @@ export default function OHWRMappingPage({ params }: PageProps) {
       }
 
       // Search Documents
-      if (searchType === 'all' || searchType === 'document') {
+      if (activeType === 'all' || activeType === 'document') {
         const docsRes = await getOHWRDocuments({
           search: searchQuery,
           type: selectedCategory,
           language: lang,
-          limit: 20
+          limit: activeType === 'document' ? ITEMS_PER_PAGE : 20,
+          page: activeType === 'document' ? page : 1
         });
         if (docsRes.success && docsRes.data) {
+          if (activeType === 'document' && docsRes.pagination) {
+            total = docsRes.pagination.total;
+            setTotalPages(docsRes.pagination.pages);
+            setTotalResults(total);
+          }
           docsRes.data.forEach((doc: OHWRDocument) => {
             results.push({
               id: doc.id,
@@ -206,6 +243,12 @@ export default function OHWRMappingPage({ params }: PageProps) {
         }
       }
 
+      // For 'all' type, calculate totals differently
+      if (activeType === 'all') {
+        setTotalResults(results.length);
+        setTotalPages(1);
+      }
+
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
@@ -217,16 +260,29 @@ export default function OHWRMappingPage({ params }: PageProps) {
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.trim() || selectedRegion || selectedCategory) {
-        performSearch();
+      if (searchQuery.trim() || selectedRegion || selectedCategory || searchType !== 'all') {
+        performSearch(1);
       }
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, searchType, selectedRegion, selectedCategory, performSearch]);
 
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    performSearch(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    performSearch();
+    performSearch(1);
+  };
+
+  // Handle card click - show all items of that type
+  const handleCardClick = (type: ResourceType) => {
+    setSearchType(type);
+    setCurrentPage(1);
+    performSearch(1, type);
   };
 
   const handleQuickSearch = (term: string) => {
@@ -467,17 +523,14 @@ export default function OHWRMappingPage({ params }: PageProps) {
           {!hasSearched && stats && (
             <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
               {[
-                { label: 'Experts', count: stats.human_resources?.total || 0, color: COLORS.human, icon: Users },
-                { label: 'Organisations', count: stats.organizations?.total || 0, color: COLORS.organization, icon: Building2 },
-                { label: lang === 'fr' ? 'Matériels' : 'Materials', count: stats.material_resources?.total || 0, color: COLORS.material, icon: FlaskConical },
-                { label: 'Documents', count: stats.documents?.total || 0, color: COLORS.document, icon: FileText },
+                { label: 'Experts', type: 'expert' as ResourceType, count: stats.human_resources?.total || 0, color: COLORS.human, icon: Users },
+                { label: 'Organisations', type: 'organization' as ResourceType, count: stats.organizations?.total || 0, color: COLORS.organization, icon: Building2 },
+                { label: lang === 'fr' ? 'Matériels' : 'Materials', type: 'material' as ResourceType, count: stats.material_resources?.total || 0, color: COLORS.material, icon: FlaskConical },
+                { label: 'Documents', type: 'document' as ResourceType, count: stats.documents?.total || 0, color: COLORS.document, icon: FileText },
               ].map((stat) => (
                 <button
                   key={stat.label}
-                  onClick={() => { setSearchType(stat.label.toLowerCase().includes('expert') ? 'expert' :
-                                                 stat.label.toLowerCase().includes('organ') ? 'organization' :
-                                                 stat.label.toLowerCase().includes('mat') ? 'material' : 'document');
-                                  performSearch(); }}
+                  onClick={() => handleCardClick(stat.type)}
                   className="bg-white rounded-2xl p-5 border-2 border-gray-100 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100/50 transition-all group"
                 >
                   <div
@@ -733,6 +786,75 @@ export default function OHWRMappingPage({ params }: PageProps) {
                 );
               })}
             </div>
+          )}
+
+          {/* Pagination */}
+          {searchResults.length > 0 && totalPages > 1 && searchType !== 'all' && (
+            <div className="mt-8 flex items-center justify-center gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={cn(
+                  "px-4 py-2 rounded-lg font-medium transition-all",
+                  currentPage === 1
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                )}
+              >
+                {lang === 'fr' ? 'Précédent' : 'Previous'}
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={cn(
+                        "w-10 h-10 rounded-lg font-medium transition-all",
+                        currentPage === pageNum
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      )}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={cn(
+                  "px-4 py-2 rounded-lg font-medium transition-all",
+                  currentPage === totalPages
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                )}
+              >
+                {lang === 'fr' ? 'Suivant' : 'Next'}
+              </button>
+            </div>
+          )}
+
+          {/* Results info */}
+          {searchResults.length > 0 && searchType !== 'all' && (
+            <p className="mt-4 text-center text-sm text-gray-500">
+              {lang === 'fr'
+                ? `Page ${currentPage} sur ${totalPages} (${totalResults} résultats)`
+                : `Page ${currentPage} of ${totalPages} (${totalResults} results)`}
+            </p>
           )}
         </div>
       )}

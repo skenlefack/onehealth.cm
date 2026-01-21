@@ -129,9 +129,9 @@ router.post('/upload', auth, authorize('admin', 'editor', 'author'), upload.arra
       const url = `/uploads/${folder}/${file.filename}`;
       
       const [result] = await db.query(
-        `INSERT INTO media (filename, original_name, mime_type, size, path, url, folder, uploaded_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [file.filename, file.originalname, file.mimetype, file.size, file.path, url, folder, req.user.id]
+        `INSERT INTO media (filename, original_name, mime_type, size, path, file_path, url, folder, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [file.filename, file.originalname, file.mimetype, file.size, file.path, file.path, url, folder, req.user.id]
       );
 
       const [newMedia] = await db.query('SELECT * FROM media WHERE id = ?', [result.insertId]);

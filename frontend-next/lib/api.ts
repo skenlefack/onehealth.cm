@@ -160,14 +160,8 @@ export function getImageUrl(path?: string): string {
 
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
-  // For uploads, always use absolute URLs so Next.js Image can fetch them
-  // In production, use the internal backend URL for server-side rendering
-  // In development, use localhost
-  if (cleanPath.startsWith('/uploads')) {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000';
-    return `${backendUrl}${cleanPath}`;
-  }
-
+  // For uploads, return relative path - nginx/Next.js rewrites will proxy to backend
+  // This ensures the URL works both server-side and client-side
   return cleanPath;
 }
 
