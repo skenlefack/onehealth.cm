@@ -515,7 +515,8 @@ router.post('/courses', auth, authorize('admin', 'editor'), async (req, res) => 
       is_free, price,
       instructor_id, category_id,
       learning_objectives, prerequisites, target_audience, what_you_will_learn, requirements,
-      tags, status, is_featured
+      tags, status, is_featured,
+      final_quiz_id, final_quiz_weight, module_quizzes_weight
     } = req.body;
 
     if (!title_fr) {
@@ -536,8 +537,9 @@ router.post('/courses', auth, authorize('admin', 'editor'), async (req, res) => 
         instructor_id, category_id,
         learning_objectives, prerequisites, target_audience, what_you_will_learn, requirements,
         tags, status, is_featured,
-        published_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published_at,
+        final_quiz_id, final_quiz_weight, module_quizzes_weight
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title_fr, title_en, slug,
       description_fr, description_en,
@@ -555,7 +557,10 @@ router.post('/courses', auth, authorize('admin', 'editor'), async (req, res) => 
       JSON.stringify(tags || []),
       status || 'draft',
       is_featured || false,
-      status === 'published' ? new Date() : null
+      status === 'published' ? new Date() : null,
+      final_quiz_id || null,
+      final_quiz_weight || 1.00,
+      module_quizzes_weight || 1.00
     ]);
 
     const [newCourse] = await db.query('SELECT * FROM courses WHERE id = ?', [result.insertId]);
@@ -592,7 +597,8 @@ router.put('/courses/:id', auth, authorize('admin', 'editor'), async (req, res) 
       'level', 'duration_hours', 'estimated_weeks',
       'min_passing_score', 'max_attempts', 'sequential_modules',
       'is_free', 'price', 'instructor_id', 'category_id',
-      'status', 'is_featured', 'sort_order'
+      'status', 'is_featured', 'sort_order',
+      'final_quiz_id', 'final_quiz_weight', 'module_quizzes_weight'
     ];
 
     const jsonFields = ['learning_objectives', 'prerequisites', 'target_audience', 'what_you_will_learn', 'requirements', 'tags'];
@@ -682,7 +688,7 @@ router.post('/modules', auth, authorize('admin', 'editor'), async (req, res) => 
       description_fr, description_en,
       thumbnail, duration_minutes, sort_order,
       sequential_lessons, has_quiz, quiz_id, min_quiz_score,
-      status
+      status, quiz_weight
     } = req.body;
 
     if (!course_id || !title_fr) {
@@ -711,14 +717,14 @@ router.post('/modules', auth, authorize('admin', 'editor'), async (req, res) => 
         description_fr, description_en,
         thumbnail, duration_minutes, sort_order,
         sequential_lessons, has_quiz, quiz_id, min_quiz_score,
-        status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        status, quiz_weight
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       course_id, title_fr, title_en,
       description_fr, description_en,
       thumbnail, duration_minutes || 0, order,
       sequential_lessons !== false, has_quiz || false, quiz_id, min_quiz_score || 70,
-      status || 'draft'
+      status || 'draft', quiz_weight || 1.00
     ]);
 
     const [newModule] = await db.query('SELECT * FROM course_modules WHERE id = ?', [result.insertId]);
@@ -738,7 +744,7 @@ router.put('/modules/:id', auth, authorize('admin', 'editor'), async (req, res) 
       title_fr, title_en, description_fr, description_en,
       thumbnail, duration_minutes, sort_order,
       sequential_lessons, has_quiz, quiz_id, min_quiz_score,
-      status, is_active
+      status, is_active, quiz_weight
     } = req.body;
 
     const [existing] = await db.query('SELECT * FROM course_modules WHERE id = ?', [id]);
@@ -760,13 +766,14 @@ router.put('/modules/:id', auth, authorize('admin', 'editor'), async (req, res) 
         quiz_id = ?,
         min_quiz_score = COALESCE(?, min_quiz_score),
         status = COALESCE(?, status),
-        is_active = COALESCE(?, is_active)
+        is_active = COALESCE(?, is_active),
+        quiz_weight = COALESCE(?, quiz_weight)
       WHERE id = ?
     `, [
       title_fr, title_en, description_fr, description_en,
       thumbnail, duration_minutes, sort_order,
       sequential_lessons, has_quiz, quiz_id, min_quiz_score,
-      status, is_active, id
+      status, is_active, quiz_weight, id
     ]);
 
     const [updated] = await db.query('SELECT * FROM course_modules WHERE id = ?', [id]);
@@ -907,7 +914,7 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
       content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
       pdf_url, attachments, resources,
       duration_minutes, sort_order, is_preview, is_required, is_downloadable,
-      has_quiz, quiz_id, quiz_position,
+      has_quiz, quiz_id, quiz_position, quiz_weight,
       completion_type, min_video_watch_percent, min_time_spent_seconds,
       status
     } = req.body;
@@ -939,17 +946,17 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
         content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
         pdf_url, attachments, resources,
         duration_minutes, sort_order, is_preview, is_required, is_downloadable,
-        has_quiz, quiz_id, quiz_position,
+        has_quiz, quiz_id, quiz_position, quiz_weight,
         completion_type, min_video_watch_percent, min_time_spent_seconds,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       module_id, title_fr, title_en,
       content_fr, content_en, summary_fr, summary_en,
       content_type || 'text', video_url, video_duration_seconds || 0, video_provider || 'upload', video_thumbnail,
       pdf_url, JSON.stringify(attachments || []), JSON.stringify(resources || []),
       duration_minutes || 0, order, is_preview || false, is_required !== false, is_downloadable || false,
-      has_quiz || false, quiz_id, quiz_position || 'end',
+      has_quiz || false, quiz_id, quiz_position || 'end', quiz_weight || 1.00,
       completion_type || 'view', min_video_watch_percent || 80, min_time_spent_seconds || 0,
       status || 'draft'
     ]);
@@ -985,7 +992,7 @@ router.put('/lessons/:id', auth, authorize('admin', 'editor'), async (req, res) 
       'title_fr', 'title_en', 'content_fr', 'content_en', 'summary_fr', 'summary_en',
       'content_type', 'video_url', 'video_duration_seconds', 'video_provider', 'video_thumbnail',
       'pdf_url', 'duration_minutes', 'sort_order', 'is_preview', 'is_required', 'is_downloadable',
-      'has_quiz', 'quiz_id', 'quiz_position',
+      'has_quiz', 'quiz_id', 'quiz_position', 'quiz_weight',
       'completion_type', 'min_video_watch_percent', 'min_time_spent_seconds',
       'status', 'is_active'
     ];
@@ -1664,7 +1671,8 @@ router.post('/paths', auth, authorize('admin'), async (req, res) => {
       certificate_enabled, certificate_template, certificate_validity_months,
       instructor_id, category_id,
       tags, learning_outcomes, target_audience,
-      status, is_featured
+      status, is_featured,
+      final_quiz_weight, courses_quizzes_weight
     } = req.body;
 
     if (!title_fr) {
@@ -1685,8 +1693,9 @@ router.post('/paths', auth, authorize('admin'), async (req, res) => {
         instructor_id, category_id,
         tags, learning_outcomes, target_audience,
         status, is_featured,
-        published_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published_at,
+        final_quiz_weight, courses_quizzes_weight
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title_fr, title_en, slug,
       description_fr, description_en,
@@ -1700,7 +1709,9 @@ router.post('/paths', auth, authorize('admin'), async (req, res) => {
       JSON.stringify(learning_outcomes || []),
       JSON.stringify(target_audience || []),
       status || 'draft', is_featured || false,
-      status === 'published' ? new Date() : null
+      status === 'published' ? new Date() : null,
+      final_quiz_weight || 1.00,
+      courses_quizzes_weight || 1.00
     ]);
 
     const [newPath] = await db.query('SELECT * FROM learning_paths WHERE id = ?', [result.insertId]);
@@ -1729,7 +1740,8 @@ router.put('/paths/:id', auth, authorize('admin'), async (req, res) => {
       'thumbnail', 'cover_image', 'level', 'duration_hours',
       'min_passing_score', 'require_all_courses', 'require_final_exam', 'final_exam_id',
       'certificate_enabled', 'certificate_template', 'certificate_validity_months',
-      'instructor_id', 'category_id', 'status', 'is_featured', 'sort_order'
+      'instructor_id', 'category_id', 'status', 'is_featured', 'sort_order',
+      'final_quiz_weight', 'courses_quizzes_weight'
     ];
 
     const jsonFields = ['tags', 'learning_outcomes', 'target_audience'];
@@ -1783,7 +1795,7 @@ router.delete('/paths/:id', auth, authorize('admin'), async (req, res) => {
 router.post('/paths/:id/courses', auth, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { course_id, sort_order, is_required } = req.body;
+    const { course_id, sort_order, is_required, course_weight } = req.body;
 
     // Vérifier que le parcours existe
     const [path] = await db.query('SELECT id FROM learning_paths WHERE id = ?', [id]);
@@ -1808,10 +1820,10 @@ router.post('/paths/:id/courses', auth, authorize('admin'), async (req, res) => 
     }
 
     await db.query(`
-      INSERT INTO learning_path_courses (learning_path_id, course_id, sort_order, is_required)
-      VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE sort_order = ?, is_required = ?
-    `, [id, course_id, order, is_required !== false, order, is_required !== false]);
+      INSERT INTO learning_path_courses (learning_path_id, course_id, sort_order, is_required, course_weight)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE sort_order = ?, is_required = ?, course_weight = ?
+    `, [id, course_id, order, is_required !== false, course_weight || 1.00, order, is_required !== false, course_weight || 1.00]);
 
     res.json({ success: true, message: 'Cours ajouté au parcours' });
   } catch (error) {
@@ -2252,7 +2264,9 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
       require_passing_to_proceed,
       negative_marking,
       negative_marking_percent,
-      status
+      status,
+      contributes_to_grade,
+      grade_weight
     } = req.body;
 
     if (!title_fr) {
@@ -2276,8 +2290,10 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
         allow_review,
         allow_retake,
         status,
-        created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_by,
+        contributes_to_grade,
+        grade_weight
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title_fr, title_en,
       description_fr, description_en,
@@ -2294,7 +2310,9 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
       allow_review !== false,
       allow_retake !== false,
       status || 'draft',
-      req.user.id
+      req.user.id,
+      contributes_to_grade !== false,
+      grade_weight || 1.00
     ]);
 
     const [newQuiz] = await db.query('SELECT * FROM quizzes WHERE id = ?', [result.insertId]);
@@ -2336,7 +2354,9 @@ router.put('/quizzes/:id', auth, authorize('admin', 'editor'), async (req, res) 
       'negative_marking',
       'negative_marking_percent',
       'status',
-      'is_active'
+      'is_active',
+      'contributes_to_grade',
+      'grade_weight'
     ];
 
     const setClauses = [];
@@ -3621,5 +3641,544 @@ router.get('/certificate-templates/:templateId/preview', auth, async (req, res) 
     res.status(500).json({ success: false, message: 'Erreur lors de la génération du PDF: ' + error.message });
   }
 });
+
+// ============================================
+// CALCUL DES NOTES PONDEREES
+// ============================================
+
+// GET /api/elearning/courses/:id/calculate-grade/:userId - Calculer la note pondérée d'un cours
+router.get('/courses/:id/calculate-grade/:userId', auth, async (req, res) => {
+  try {
+    const { id: courseId, userId } = req.params;
+
+    // Vérifier les permissions (admin ou l'utilisateur lui-même)
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ success: false, message: 'Accès non autorisé' });
+    }
+
+    // Récupérer les infos du cours
+    const [courses] = await db.query(`
+      SELECT id, title_fr, min_passing_score, final_quiz_id, final_quiz_weight, module_quizzes_weight
+      FROM courses WHERE id = ?
+    `, [courseId]);
+
+    if (courses.length === 0) {
+      return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+    }
+
+    const course = courses[0];
+
+    // Récupérer tous les quiz des modules avec leurs poids
+    const [moduleQuizzes] = await db.query(`
+      SELECT
+        cm.id as module_id,
+        cm.title_fr as module_title,
+        cm.quiz_id,
+        cm.quiz_weight,
+        q.contributes_to_grade,
+        q.grade_weight as quiz_grade_weight,
+        qa.score,
+        qa.passed
+      FROM course_modules cm
+      LEFT JOIN quizzes q ON cm.quiz_id = q.id
+      LEFT JOIN quiz_attempts qa ON (
+        qa.quiz_id = cm.quiz_id
+        AND qa.user_id = ?
+        AND qa.status = 'completed'
+        AND qa.score = (
+          SELECT MAX(score) FROM quiz_attempts
+          WHERE quiz_id = cm.quiz_id AND user_id = ? AND status = 'completed'
+        )
+      )
+      WHERE cm.course_id = ? AND cm.has_quiz = 1 AND cm.is_active = 1
+      ORDER BY cm.sort_order
+    `, [userId, userId, courseId]);
+
+    // Récupérer les quiz des leçons avec leurs poids
+    const [lessonQuizzes] = await db.query(`
+      SELECT
+        l.id as lesson_id,
+        l.title_fr as lesson_title,
+        l.quiz_id,
+        l.quiz_weight,
+        cm.id as module_id,
+        q.contributes_to_grade,
+        q.grade_weight as quiz_grade_weight,
+        qa.score,
+        qa.passed
+      FROM lessons l
+      INNER JOIN course_modules cm ON l.module_id = cm.id
+      LEFT JOIN quizzes q ON l.quiz_id = q.id
+      LEFT JOIN quiz_attempts qa ON (
+        qa.quiz_id = l.quiz_id
+        AND qa.user_id = ?
+        AND qa.status = 'completed'
+        AND qa.score = (
+          SELECT MAX(score) FROM quiz_attempts
+          WHERE quiz_id = l.quiz_id AND user_id = ? AND status = 'completed'
+        )
+      )
+      WHERE cm.course_id = ? AND l.has_quiz = 1 AND l.is_active = 1
+      ORDER BY cm.sort_order, l.sort_order
+    `, [userId, userId, courseId]);
+
+    // Récupérer le score du quiz final du cours (si existant)
+    let finalQuizScore = null;
+    if (course.final_quiz_id) {
+      const [finalQuizAttempts] = await db.query(`
+        SELECT score, passed FROM quiz_attempts
+        WHERE quiz_id = ? AND user_id = ? AND status = 'completed'
+        ORDER BY score DESC LIMIT 1
+      `, [course.final_quiz_id, userId]);
+
+      if (finalQuizAttempts.length > 0) {
+        finalQuizScore = finalQuizAttempts[0].score;
+      }
+    }
+
+    // Calculer la moyenne pondérée des quiz de modules et leçons
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+    const quizDetails = [];
+
+    // Quiz des modules
+    for (const mq of moduleQuizzes) {
+      if (mq.quiz_id && mq.contributes_to_grade !== false) {
+        const effectiveWeight = (mq.quiz_weight || 1) * (mq.quiz_grade_weight || 1);
+        if (mq.score !== null) {
+          totalWeightedScore += mq.score * effectiveWeight;
+          totalWeight += effectiveWeight;
+        }
+        quizDetails.push({
+          type: 'module',
+          module_id: mq.module_id,
+          module_title: mq.module_title,
+          score: mq.score,
+          weight: effectiveWeight,
+          contributes: mq.contributes_to_grade !== false
+        });
+      }
+    }
+
+    // Quiz des leçons
+    for (const lq of lessonQuizzes) {
+      if (lq.quiz_id && lq.contributes_to_grade !== false) {
+        const effectiveWeight = (lq.quiz_weight || 1) * (lq.quiz_grade_weight || 1);
+        if (lq.score !== null) {
+          totalWeightedScore += lq.score * effectiveWeight;
+          totalWeight += effectiveWeight;
+        }
+        quizDetails.push({
+          type: 'lesson',
+          lesson_id: lq.lesson_id,
+          lesson_title: lq.lesson_title,
+          module_id: lq.module_id,
+          score: lq.score,
+          weight: effectiveWeight,
+          contributes: lq.contributes_to_grade !== false
+        });
+      }
+    }
+
+    // Calculer la moyenne des quiz de modules/leçons
+    const moduleQuizzesAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : null;
+
+    // Calculer la note finale du cours
+    let weightedScore = null;
+    const finalQuizWeight = course.final_quiz_weight || 1;
+    const moduleQuizzesWeight = course.module_quizzes_weight || 1;
+
+    if (course.final_quiz_id && finalQuizScore !== null && moduleQuizzesAverage !== null) {
+      // Moyenne pondérée entre quiz final et moyenne des modules
+      weightedScore = (finalQuizScore * finalQuizWeight + moduleQuizzesAverage * moduleQuizzesWeight)
+                      / (finalQuizWeight + moduleQuizzesWeight);
+    } else if (course.final_quiz_id && finalQuizScore !== null) {
+      // Seulement le quiz final
+      weightedScore = finalQuizScore;
+    } else if (moduleQuizzesAverage !== null) {
+      // Seulement les quiz de modules
+      weightedScore = moduleQuizzesAverage;
+    }
+
+    // Arrondir à 2 décimales
+    if (weightedScore !== null) {
+      weightedScore = Math.round(weightedScore * 100) / 100;
+    }
+
+    // Déterminer l'éligibilité au certificat
+    const certificateEligible = weightedScore !== null && weightedScore >= (course.min_passing_score || 70);
+
+    // Mettre à jour l'enrollment avec le score calculé
+    await db.query(`
+      UPDATE enrollments
+      SET weighted_score = ?,
+          quiz_average = ?,
+          certificate_eligible = ?
+      WHERE user_id = ? AND course_id = ?
+    `, [weightedScore, moduleQuizzesAverage, certificateEligible, userId, courseId]);
+
+    res.json({
+      success: true,
+      data: {
+        course_id: courseId,
+        user_id: userId,
+        module_quizzes_average: moduleQuizzesAverage,
+        final_quiz_score: finalQuizScore,
+        weighted_score: weightedScore,
+        min_passing_score: course.min_passing_score || 70,
+        certificate_eligible: certificateEligible,
+        weights: {
+          final_quiz_weight: finalQuizWeight,
+          module_quizzes_weight: moduleQuizzesWeight
+        },
+        quiz_details: quizDetails
+      }
+    });
+  } catch (error) {
+    console.error('Calculate course grade error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/paths/:id/calculate-grade/:userId - Calculer la note pondérée d'un parcours
+router.get('/paths/:id/calculate-grade/:userId', auth, async (req, res) => {
+  try {
+    const { id: pathId, userId } = req.params;
+
+    // Vérifier les permissions
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ success: false, message: 'Accès non autorisé' });
+    }
+
+    // Récupérer les infos du parcours
+    const [paths] = await db.query(`
+      SELECT id, title_fr, min_passing_score, final_exam_id, final_quiz_weight, courses_quizzes_weight
+      FROM learning_paths WHERE id = ?
+    `, [pathId]);
+
+    if (paths.length === 0) {
+      return res.status(404).json({ success: false, message: 'Parcours non trouvé' });
+    }
+
+    const path = paths[0];
+
+    // Récupérer tous les cours du parcours avec leurs poids et scores
+    const [pathCourses] = await db.query(`
+      SELECT
+        lpc.course_id,
+        lpc.course_weight,
+        lpc.is_required,
+        c.title_fr as course_title,
+        c.min_passing_score as course_passing_score,
+        e.weighted_score as course_score,
+        e.certificate_eligible as course_passed
+      FROM learning_path_courses lpc
+      INNER JOIN courses c ON lpc.course_id = c.id
+      LEFT JOIN enrollments e ON (e.course_id = lpc.course_id AND e.user_id = ?)
+      WHERE lpc.learning_path_id = ?
+      ORDER BY lpc.sort_order
+    `, [userId, pathId]);
+
+    // Récupérer le score du quiz final du parcours (si existant)
+    let finalExamScore = null;
+    if (path.final_exam_id) {
+      const [finalExamAttempts] = await db.query(`
+        SELECT score, passed FROM quiz_attempts
+        WHERE quiz_id = ? AND user_id = ? AND status = 'completed'
+        ORDER BY score DESC LIMIT 1
+      `, [path.final_exam_id, userId]);
+
+      if (finalExamAttempts.length > 0) {
+        finalExamScore = finalExamAttempts[0].score;
+      }
+    }
+
+    // Calculer la moyenne pondérée des cours
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+    const courseDetails = [];
+
+    for (const pc of pathCourses) {
+      const weight = pc.course_weight || 1;
+      if (pc.course_score !== null) {
+        totalWeightedScore += pc.course_score * weight;
+        totalWeight += weight;
+      }
+      courseDetails.push({
+        course_id: pc.course_id,
+        course_title: pc.course_title,
+        score: pc.course_score,
+        weight: weight,
+        is_required: pc.is_required,
+        passed: pc.course_passed
+      });
+    }
+
+    const coursesAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : null;
+
+    // Calculer la note finale du parcours
+    let weightedScore = null;
+    const finalQuizWeight = path.final_quiz_weight || 1;
+    const coursesQuizzesWeight = path.courses_quizzes_weight || 1;
+
+    if (path.final_exam_id && finalExamScore !== null && coursesAverage !== null) {
+      // Moyenne pondérée entre quiz final et moyenne des cours
+      weightedScore = (finalExamScore * finalQuizWeight + coursesAverage * coursesQuizzesWeight)
+                      / (finalQuizWeight + coursesQuizzesWeight);
+    } else if (path.final_exam_id && finalExamScore !== null) {
+      // Seulement le quiz final
+      weightedScore = finalExamScore;
+    } else if (coursesAverage !== null) {
+      // Seulement les cours
+      weightedScore = coursesAverage;
+    }
+
+    // Arrondir à 2 décimales
+    if (weightedScore !== null) {
+      weightedScore = Math.round(weightedScore * 100) / 100;
+    }
+
+    // Déterminer l'éligibilité au certificat
+    const certificateEligible = weightedScore !== null && weightedScore >= (path.min_passing_score || 70);
+
+    // Mettre à jour l'enrollment du parcours avec le score calculé
+    await db.query(`
+      UPDATE enrollments
+      SET weighted_score = ?,
+          quiz_average = ?,
+          certificate_eligible = ?
+      WHERE user_id = ? AND learning_path_id = ?
+    `, [weightedScore, coursesAverage, certificateEligible, userId, pathId]);
+
+    res.json({
+      success: true,
+      data: {
+        path_id: pathId,
+        user_id: userId,
+        courses_average: coursesAverage,
+        final_exam_score: finalExamScore,
+        weighted_score: weightedScore,
+        min_passing_score: path.min_passing_score || 70,
+        certificate_eligible: certificateEligible,
+        weights: {
+          final_quiz_weight: finalQuizWeight,
+          courses_quizzes_weight: coursesQuizzesWeight
+        },
+        course_details: courseDetails
+      }
+    });
+  } catch (error) {
+    console.error('Calculate path grade error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/elearning/quizzes/:id/submit - Hook pour recalculer les notes après soumission de quiz
+// Cette route est appelée après la soumission d'un quiz pour mettre à jour les notes
+router.post('/quizzes/:id/recalculate-grades', auth, async (req, res) => {
+  try {
+    const { id: quizId } = req.params;
+    const userId = req.user.id;
+
+    // Trouver à quel cours/module/leçon ce quiz est attaché
+    const [moduleWithQuiz] = await db.query(`
+      SELECT cm.course_id FROM course_modules cm WHERE cm.quiz_id = ?
+    `, [quizId]);
+
+    const [lessonWithQuiz] = await db.query(`
+      SELECT cm.course_id FROM lessons l
+      INNER JOIN course_modules cm ON l.module_id = cm.id
+      WHERE l.quiz_id = ?
+    `, [quizId]);
+
+    const [courseWithQuiz] = await db.query(`
+      SELECT id as course_id FROM courses WHERE final_quiz_id = ?
+    `, [quizId]);
+
+    const [pathWithQuiz] = await db.query(`
+      SELECT id as path_id FROM learning_paths WHERE final_exam_id = ?
+    `, [quizId]);
+
+    // Recalculer les notes pour les cours concernés
+    const courseIds = new Set();
+
+    if (moduleWithQuiz.length > 0) courseIds.add(moduleWithQuiz[0].course_id);
+    if (lessonWithQuiz.length > 0) courseIds.add(lessonWithQuiz[0].course_id);
+    if (courseWithQuiz.length > 0) courseIds.add(courseWithQuiz[0].course_id);
+
+    // Recalculer pour chaque cours
+    for (const courseId of courseIds) {
+      // Appeler la logique de calcul (même code que calculate-grade)
+      await recalculateCourseGrade(courseId, userId, db);
+    }
+
+    // Si c'est un quiz final de parcours, recalculer le parcours
+    if (pathWithQuiz.length > 0) {
+      await recalculatePathGrade(pathWithQuiz[0].path_id, userId, db);
+    }
+
+    res.json({ success: true, message: 'Notes recalculées' });
+  } catch (error) {
+    console.error('Recalculate grades error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Fonction utilitaire pour recalculer la note d'un cours
+async function recalculateCourseGrade(courseId, userId, db) {
+  const [courses] = await db.query(`
+    SELECT id, min_passing_score, final_quiz_id, final_quiz_weight, module_quizzes_weight
+    FROM courses WHERE id = ?
+  `, [courseId]);
+
+  if (courses.length === 0) return;
+
+  const course = courses[0];
+
+  // Quiz des modules
+  const [moduleQuizzes] = await db.query(`
+    SELECT cm.quiz_id, cm.quiz_weight, q.contributes_to_grade, q.grade_weight,
+           (SELECT MAX(score) FROM quiz_attempts WHERE quiz_id = cm.quiz_id AND user_id = ? AND status = 'completed') as score
+    FROM course_modules cm
+    LEFT JOIN quizzes q ON cm.quiz_id = q.id
+    WHERE cm.course_id = ? AND cm.has_quiz = 1 AND cm.is_active = 1
+  `, [userId, courseId]);
+
+  // Quiz des leçons
+  const [lessonQuizzes] = await db.query(`
+    SELECT l.quiz_id, l.quiz_weight, q.contributes_to_grade, q.grade_weight,
+           (SELECT MAX(score) FROM quiz_attempts WHERE quiz_id = l.quiz_id AND user_id = ? AND status = 'completed') as score
+    FROM lessons l
+    INNER JOIN course_modules cm ON l.module_id = cm.id
+    LEFT JOIN quizzes q ON l.quiz_id = q.id
+    WHERE cm.course_id = ? AND l.has_quiz = 1 AND l.is_active = 1
+  `, [userId, courseId]);
+
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  for (const mq of moduleQuizzes) {
+    if (mq.quiz_id && mq.contributes_to_grade !== false && mq.score !== null) {
+      const effectiveWeight = (mq.quiz_weight || 1) * (mq.grade_weight || 1);
+      totalWeightedScore += mq.score * effectiveWeight;
+      totalWeight += effectiveWeight;
+    }
+  }
+
+  for (const lq of lessonQuizzes) {
+    if (lq.quiz_id && lq.contributes_to_grade !== false && lq.score !== null) {
+      const effectiveWeight = (lq.quiz_weight || 1) * (lq.grade_weight || 1);
+      totalWeightedScore += lq.score * effectiveWeight;
+      totalWeight += effectiveWeight;
+    }
+  }
+
+  const moduleQuizzesAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : null;
+
+  // Quiz final
+  let finalQuizScore = null;
+  if (course.final_quiz_id) {
+    const [finalAttempts] = await db.query(`
+      SELECT MAX(score) as score FROM quiz_attempts
+      WHERE quiz_id = ? AND user_id = ? AND status = 'completed'
+    `, [course.final_quiz_id, userId]);
+    if (finalAttempts.length > 0) finalQuizScore = finalAttempts[0].score;
+  }
+
+  // Calculer note finale
+  let weightedScore = null;
+  const finalQuizWeight = course.final_quiz_weight || 1;
+  const moduleQuizzesWeight = course.module_quizzes_weight || 1;
+
+  if (course.final_quiz_id && finalQuizScore !== null && moduleQuizzesAverage !== null) {
+    weightedScore = (finalQuizScore * finalQuizWeight + moduleQuizzesAverage * moduleQuizzesWeight)
+                    / (finalQuizWeight + moduleQuizzesWeight);
+  } else if (course.final_quiz_id && finalQuizScore !== null) {
+    weightedScore = finalQuizScore;
+  } else if (moduleQuizzesAverage !== null) {
+    weightedScore = moduleQuizzesAverage;
+  }
+
+  if (weightedScore !== null) {
+    weightedScore = Math.round(weightedScore * 100) / 100;
+  }
+
+  const certificateEligible = weightedScore !== null && weightedScore >= (course.min_passing_score || 70);
+
+  await db.query(`
+    UPDATE enrollments
+    SET weighted_score = ?, quiz_average = ?, certificate_eligible = ?
+    WHERE user_id = ? AND course_id = ?
+  `, [weightedScore, moduleQuizzesAverage, certificateEligible, userId, courseId]);
+}
+
+// Fonction utilitaire pour recalculer la note d'un parcours
+async function recalculatePathGrade(pathId, userId, db) {
+  const [paths] = await db.query(`
+    SELECT id, min_passing_score, final_exam_id, final_quiz_weight, courses_quizzes_weight
+    FROM learning_paths WHERE id = ?
+  `, [pathId]);
+
+  if (paths.length === 0) return;
+
+  const path = paths[0];
+
+  // Cours du parcours
+  const [pathCourses] = await db.query(`
+    SELECT lpc.course_id, lpc.course_weight, e.weighted_score
+    FROM learning_path_courses lpc
+    LEFT JOIN enrollments e ON (e.course_id = lpc.course_id AND e.user_id = ?)
+    WHERE lpc.learning_path_id = ?
+  `, [userId, pathId]);
+
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  for (const pc of pathCourses) {
+    const weight = pc.course_weight || 1;
+    if (pc.weighted_score !== null) {
+      totalWeightedScore += pc.weighted_score * weight;
+      totalWeight += weight;
+    }
+  }
+
+  const coursesAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : null;
+
+  // Quiz final du parcours
+  let finalExamScore = null;
+  if (path.final_exam_id) {
+    const [finalAttempts] = await db.query(`
+      SELECT MAX(score) as score FROM quiz_attempts
+      WHERE quiz_id = ? AND user_id = ? AND status = 'completed'
+    `, [path.final_exam_id, userId]);
+    if (finalAttempts.length > 0) finalExamScore = finalAttempts[0].score;
+  }
+
+  // Calculer note finale
+  let weightedScore = null;
+  const finalQuizWeight = path.final_quiz_weight || 1;
+  const coursesQuizzesWeight = path.courses_quizzes_weight || 1;
+
+  if (path.final_exam_id && finalExamScore !== null && coursesAverage !== null) {
+    weightedScore = (finalExamScore * finalQuizWeight + coursesAverage * coursesQuizzesWeight)
+                    / (finalQuizWeight + coursesQuizzesWeight);
+  } else if (path.final_exam_id && finalExamScore !== null) {
+    weightedScore = finalExamScore;
+  } else if (coursesAverage !== null) {
+    weightedScore = coursesAverage;
+  }
+
+  if (weightedScore !== null) {
+    weightedScore = Math.round(weightedScore * 100) / 100;
+  }
+
+  const certificateEligible = weightedScore !== null && weightedScore >= (path.min_passing_score || 70);
+
+  await db.query(`
+    UPDATE enrollments
+    SET weighted_score = ?, quiz_average = ?, certificate_eligible = ?
+    WHERE user_id = ? AND learning_path_id = ?
+  `, [weightedScore, coursesAverage, certificateEligible, userId, pathId]);
+}
 
 module.exports = router;

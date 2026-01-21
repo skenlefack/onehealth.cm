@@ -16916,7 +16916,11 @@ const OHELearningPage = ({ isDark, token }) => {
       duration_hours: editingCourse?.duration_hours || 0,
       category_id: editingCourse?.category_id || '',
       status: editingCourse?.status || 'draft',
-      is_featured: editingCourse?.is_featured || false
+      is_featured: editingCourse?.is_featured || false,
+      min_passing_score: editingCourse?.min_passing_score || 70,
+      final_quiz_id: editingCourse?.final_quiz_id || null,
+      final_quiz_weight: editingCourse?.final_quiz_weight || 1.00,
+      module_quizzes_weight: editingCourse?.module_quizzes_weight || 1.00
     });
 
     const [uploading, setUploading] = useState(false);
@@ -17043,6 +17047,82 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           </div>
 
+          {/* Grade settings */}
+          <div style={{
+            background: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: '10px',
+            padding: '16px',
+            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Award size={16} color={colors.warning} />
+                Paramètres de notation
+              </span>
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={styles.label}>Score minimum pour réussir (%)</label>
+                <input
+                  type="number"
+                  value={form.min_passing_score}
+                  onChange={e => setForm({ ...form, min_passing_score: parseInt(e.target.value) || 70 })}
+                  style={styles.input}
+                  min="0"
+                  max="100"
+                />
+              </div>
+              <div>
+                <label style={styles.label}>Quiz final du cours</label>
+                <select
+                  value={form.final_quiz_id || ''}
+                  onChange={e => setForm({ ...form, final_quiz_id: e.target.value ? parseInt(e.target.value) : null })}
+                  style={styles.select}
+                >
+                  <option value="">Aucun quiz final</option>
+                  {quizzes.filter(q => q.quiz_type === 'final_exam' && q.status === 'published').map(quiz => (
+                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={styles.label}>Poids quiz final</label>
+                <input
+                  type="number"
+                  value={form.final_quiz_weight}
+                  onChange={e => setForm({ ...form, final_quiz_weight: parseFloat(e.target.value) || 1 })}
+                  style={styles.input}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                  disabled={!form.final_quiz_id}
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Coefficient du quiz final dans la note
+                </p>
+              </div>
+              <div>
+                <label style={styles.label}>Poids quiz des modules</label>
+                <input
+                  type="number"
+                  value={form.module_quizzes_weight}
+                  onChange={e => setForm({ ...form, module_quizzes_weight: parseFloat(e.target.value) || 1 })}
+                  style={styles.input}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Coefficient de la moyenne des modules
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Actions */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
             <button onClick={() => setShowCourseModal(false)} style={styles.btnSecondary}>Annuler</button>
@@ -17062,11 +17142,15 @@ const OHELearningPage = ({ isDark, token }) => {
       title_en: editingModule?.title_en || '',
       description_fr: editingModule?.description_fr || '',
       duration_minutes: editingModule?.duration_minutes || 0,
-      status: editingModule?.status || 'draft'
+      status: editingModule?.status || 'draft',
+      has_quiz: editingModule?.has_quiz || false,
+      quiz_id: editingModule?.quiz_id || null,
+      quiz_weight: editingModule?.quiz_weight || 1.00,
+      min_quiz_score: editingModule?.min_quiz_score || 70
     });
 
     return (
-      <Modal isOpen={showModuleModal} onClose={() => setShowModuleModal(false)} title={editingModule ? 'Modifier le Module' : 'Nouveau Module'} isDark={isDark} width="550px">
+      <Modal isOpen={showModuleModal} onClose={() => setShowModuleModal(false)} title={editingModule ? 'Modifier le Module' : 'Nouveau Module'} isDark={isDark} width="600px">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label style={styles.label}>Titre (Français) *</label>
@@ -17097,6 +17181,75 @@ const OHELearningPage = ({ isDark, token }) => {
               </select>
             </div>
           </div>
+
+          {/* Quiz settings for module */}
+          <div style={{
+            background: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: '10px',
+            padding: '16px',
+            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              marginBottom: form.has_quiz ? '16px' : '0'
+            }}>
+              <input
+                type="checkbox"
+                checked={form.has_quiz}
+                onChange={e => setForm({ ...form, has_quiz: e.target.checked, quiz_id: e.target.checked ? form.quiz_id : null })}
+                style={{ accentColor: colors.primary }}
+              />
+              <span style={{ fontWeight: '600', fontSize: '14px' }}>
+                <FileQuestion size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                Ce module a un quiz
+              </span>
+            </label>
+
+            {form.has_quiz && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={styles.label}>Quiz</label>
+                  <select
+                    value={form.quiz_id || ''}
+                    onChange={e => setForm({ ...form, quiz_id: e.target.value ? parseInt(e.target.value) : null })}
+                    style={styles.select}
+                  >
+                    <option value="">Sélectionner un quiz</option>
+                    {quizzes.filter(q => q.status === 'published').map(quiz => (
+                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Score min. (%)</label>
+                  <input
+                    type="number"
+                    value={form.min_quiz_score}
+                    onChange={e => setForm({ ...form, min_quiz_score: parseInt(e.target.value) || 70 })}
+                    style={styles.input}
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                <div>
+                  <label style={styles.label}>Poids du quiz</label>
+                  <input
+                    type="number"
+                    value={form.quiz_weight}
+                    onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
+                    style={styles.input}
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                  />
+                  <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Coefficient pour la note du cours
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
             <button onClick={() => setShowModuleModal(false)} style={styles.btnSecondary}>Annuler</button>
             <button onClick={() => handleSaveModule(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
@@ -17297,7 +17450,11 @@ const OHELearningPage = ({ isDark, token }) => {
       duration_hours: editingPath?.duration_hours || 0,
       min_passing_score: editingPath?.min_passing_score || 70,
       certificate_enabled: editingPath?.certificate_enabled !== false,
-      status: editingPath?.status || 'draft'
+      status: editingPath?.status || 'draft',
+      require_final_exam: editingPath?.require_final_exam || false,
+      final_exam_id: editingPath?.final_exam_id || null,
+      final_quiz_weight: editingPath?.final_quiz_weight || 1.00,
+      courses_quizzes_weight: editingPath?.courses_quizzes_weight || 1.00
     });
 
     return (
@@ -17353,6 +17510,82 @@ const OHELearningPage = ({ isDark, token }) => {
               </label>
             </div>
           </div>
+
+          {/* Grade settings for path */}
+          <div style={{
+            background: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: '10px',
+            padding: '16px',
+            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Award size={16} color={colors.warning} />
+                Pondération des notes
+              </span>
+            </label>
+
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              marginBottom: form.require_final_exam ? '16px' : '0'
+            }}>
+              <input
+                type="checkbox"
+                checked={form.require_final_exam}
+                onChange={e => setForm({ ...form, require_final_exam: e.target.checked, final_exam_id: e.target.checked ? form.final_exam_id : null })}
+                style={{ accentColor: colors.primary }}
+              />
+              <span style={{ fontWeight: '600', fontSize: '13px' }}>Quiz final obligatoire pour le parcours</span>
+            </label>
+
+            {form.require_final_exam && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={styles.label}>Quiz final du parcours</label>
+                  <select
+                    value={form.final_exam_id || ''}
+                    onChange={e => setForm({ ...form, final_exam_id: e.target.value ? parseInt(e.target.value) : null })}
+                    style={styles.select}
+                  >
+                    <option value="">Sélectionner un quiz</option>
+                    {quizzes.filter(q => q.quiz_type === 'final_exam' && q.status === 'published').map(quiz => (
+                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Poids quiz final</label>
+                  <input
+                    type="number"
+                    value={form.final_quiz_weight}
+                    onChange={e => setForm({ ...form, final_quiz_weight: parseFloat(e.target.value) || 1 })}
+                    style={styles.input}
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    disabled={!form.final_exam_id}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label style={styles.label}>Poids moyenne des cours</label>
+              <input
+                type="number"
+                value={form.courses_quizzes_weight}
+                onChange={e => setForm({ ...form, courses_quizzes_weight: parseFloat(e.target.value) || 1 })}
+                style={styles.input}
+                min="0.1"
+                max="10"
+                step="0.1"
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Coefficient de la moyenne des notes de cours dans la note finale du parcours
+              </p>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
             <button onClick={() => setShowPathModal(false)} style={styles.btnSecondary}>Annuler</button>
             <button onClick={() => handleSavePath(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
@@ -17903,7 +18136,9 @@ const OHELearningPage = ({ isDark, token }) => {
       show_correct_answers: editingQuiz?.show_correct_answers !== false,
       show_explanation: editingQuiz?.show_explanation !== false,
       allow_retake: editingQuiz?.allow_retake !== false,
-      status: editingQuiz?.status || 'draft'
+      status: editingQuiz?.status || 'draft',
+      contributes_to_grade: editingQuiz?.contributes_to_grade !== false,
+      grade_weight: editingQuiz?.grade_weight || 1.00
     });
 
     return (
@@ -18045,6 +18280,53 @@ const OHELearningPage = ({ isDark, token }) => {
                 min="1"
                 max="10"
               />
+            </div>
+          </div>
+
+          {/* Grade weighting settings */}
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc', padding: '16px' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Award size={16} color={colors.warning} />
+                Pondération de la Note
+              </span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.contributes_to_grade ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.contributes_to_grade ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input
+                  type="checkbox"
+                  checked={form.contributes_to_grade}
+                  onChange={e => setForm({ ...form, contributes_to_grade: e.target.checked })}
+                  style={{ accentColor: colors.success }}
+                />
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Compte dans la note finale</span>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Ce quiz sera inclus dans le calcul de la moyenne
+                  </p>
+                </div>
+              </label>
+              <div>
+                <label style={styles.label}>Coefficient (poids)</label>
+                <input
+                  type="number"
+                  value={form.grade_weight}
+                  onChange={e => setForm({ ...form, grade_weight: parseFloat(e.target.value) || 1 })}
+                  style={styles.input}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                  disabled={!form.contributes_to_grade}
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Ex: 2.0 = compte double dans la moyenne
+                </p>
+              </div>
             </div>
           </div>
 
