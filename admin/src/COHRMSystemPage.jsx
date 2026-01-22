@@ -11,17 +11,11 @@ import {
   ClipboardCheck, Building, Layers, Activity, ChevronDown, ChevronUp,
   Crosshair, PenTool, Pentagon, Circle
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { GoogleMap, useJsApiLoader, Marker as GoogleMarker, Polyline as GooglePolyline, Polygon as GooglePolygon, Autocomplete } from '@react-google-maps/api';
 
-// Fix Leaflet default marker icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+// Google Maps API Key - à mettre dans .env en production
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'AIzaSyBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+const GOOGLE_MAPS_LIBRARIES = ['places', 'drawing'];
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 
@@ -378,32 +372,35 @@ const COHRMSystemPage = ({ isDark, token }) => {
     })
   };
 
-  // ============== MAP MODAL COMPONENT ==============
+  // ============== MAP MODAL COMPONENT (Google Maps) ==============
   const MapModal = ({ isOpen, onClose, onConfirm, initialPosition, initialGeometryType, initialGeometryData }) => {
     const [drawMode, setDrawMode] = useState(initialGeometryType || 'point');
     const [markerPosition, setMarkerPosition] = useState(initialPosition || null);
     const [polylinePoints, setPolylinePoints] = useState(initialGeometryData && initialGeometryType === 'line' ? initialGeometryData : []);
     const [polygonPoints, setPolygonPoints] = useState(initialGeometryData && initialGeometryType === 'polygon' ? initialGeometryData : []);
     const [mapCenter, setMapCenter] = useState(
-      initialPosition ? [initialPosition.lat, initialPosition.lng] : [6.0, 12.0] // Cameroon center
+      initialPosition ? { lat: initialPosition.lat, lng: initialPosition.lng } : { lat: 6.0, lng: 12.0 }
     );
+    const [searchBox, setSearchBox] = useState(null);
+    const [map, setMap] = useState(null);
 
-    // Component to handle map clicks
-    const MapClickHandler = () => {
-      useMapEvents({
-        click: (e) => {
-          const { lat, lng } = e.latlng;
-          if (drawMode === 'point') {
-            setMarkerPosition({ lat, lng });
-          } else if (drawMode === 'line') {
-            setPolylinePoints(prev => [...prev, [lat, lng]]);
-          } else if (drawMode === 'polygon') {
-            setPolygonPoints(prev => [...prev, [lat, lng]]);
-          }
-        }
-      });
-      return null;
-    };
+    const { isLoaded, loadError } = useJsApiLoader({
+      googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+      libraries: GOOGLE_MAPS_LIBRARIES
+    });
+
+    const handleMapClick = useCallback((e) => {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+
+      if (drawMode === 'point') {
+        setMarkerPosition({ lat, lng });
+      } else if (drawMode === 'line') {
+        setPolylinePoints(prev => [...prev, { lat, lng }]);
+      } else if (drawMode === 'polygon') {
+        setPolygonPoints(prev => [...prev, { lat, lng }]);
+      }
+    }, [drawMode]);
 
     const handleClear = () => {
       setMarkerPosition(null);
@@ -423,14 +420,14 @@ const COHRMSystemPage = ({ isDark, token }) => {
         result.latitude = markerPosition.lat.toFixed(6);
         result.longitude = markerPosition.lng.toFixed(6);
       } else if (drawMode === 'line' && polylinePoints.length > 1) {
-        result.geometry_data = polylinePoints;
-        result.latitude = polylinePoints[0][0].toFixed(6);
-        result.longitude = polylinePoints[0][1].toFixed(6);
+        result.geometry_data = polylinePoints.map(p => [p.lat, p.lng]);
+        result.latitude = polylinePoints[0].lat.toFixed(6);
+        result.longitude = polylinePoints[0].lng.toFixed(6);
       } else if (drawMode === 'polygon' && polygonPoints.length > 2) {
-        result.geometry_data = polygonPoints;
-        const center = polygonPoints.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
-        result.latitude = (center[0] / polygonPoints.length).toFixed(6);
-        result.longitude = (center[1] / polygonPoints.length).toFixed(6);
+        result.geometry_data = polygonPoints.map(p => [p.lat, p.lng]);
+        const center = polygonPoints.reduce((acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }), { lat: 0, lng: 0 });
+        result.latitude = (center.lat / polygonPoints.length).toFixed(6);
+        result.longitude = (center.lng / polygonPoints.length).toFixed(6);
       }
 
       onConfirm(result);
@@ -442,6 +439,24 @@ const COHRMSystemPage = ({ isDark, token }) => {
         setPolylinePoints(prev => prev.slice(0, -1));
       } else if (drawMode === 'polygon' && polygonPoints.length > 0) {
         setPolygonPoints(prev => prev.slice(0, -1));
+      }
+    };
+
+    const onPlaceSelected = () => {
+      if (searchBox) {
+        const place = searchBox.getPlace();
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          setMapCenter({ lat, lng });
+          if (map) {
+            map.panTo({ lat, lng });
+            map.setZoom(15);
+          }
+          if (drawMode === 'point') {
+            setMarkerPosition({ lat, lng });
+          }
+        }
       }
     };
 
@@ -492,7 +507,8 @@ const COHRMSystemPage = ({ isDark, token }) => {
       },
       mapContainer: {
         flex: 1,
-        minHeight: '400px'
+        minHeight: '400px',
+        position: 'relative'
       },
       toolbar: {
         padding: '12px 20px',
@@ -514,7 +530,22 @@ const COHRMSystemPage = ({ isDark, token }) => {
         gap: '8px',
         fontSize: '13px',
         fontWeight: active ? '600' : '400'
-      })
+      }),
+      searchInput: {
+        padding: '10px 14px',
+        borderRadius: '8px',
+        border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#ffffff',
+        color: isDark ? '#e2e8f0' : '#1e293b',
+        fontSize: '14px',
+        width: '300px',
+        outline: 'none'
+      }
+    };
+
+    const mapContainerStyle = {
+      width: '100%',
+      height: '100%'
     };
 
     return (
@@ -534,6 +565,26 @@ const COHRMSystemPage = ({ isDark, token }) => {
           </div>
 
           <div style={modalStyles.body}>
+            {/* Search Bar */}
+            <div style={{ padding: '12px 20px', background: isDark ? '#0f172a' : '#f8fafc', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Search size={18} color={isDark ? '#64748b' : '#94a3b8'} />
+                {isLoaded && (
+                  <Autocomplete
+                    onLoad={setSearchBox}
+                    onPlaceChanged={onPlaceSelected}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Rechercher un lieu..."
+                      style={modalStyles.searchInput}
+                    />
+                  </Autocomplete>
+                )}
+              </div>
+            </div>
+
+            {/* Toolbar */}
             <div style={modalStyles.toolbar}>
               <span style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', marginRight: '8px' }}>Type:</span>
               <button
@@ -558,74 +609,115 @@ const COHRMSystemPage = ({ isDark, token }) => {
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
                 {(drawMode === 'line' || drawMode === 'polygon') && (
                   <button style={{ ...styles.btnSecondary, padding: '8px 12px' }} onClick={undoLastPoint}>
-                    <ChevronLeft size={16} /> Annuler point
+                    <ChevronLeft size={16} /> Annuler
                   </button>
                 )}
                 <button style={{ ...styles.btnSecondary, padding: '8px 12px' }} onClick={handleClear}>
-                  <Trash2 size={16} /> Effacer tout
+                  <Trash2 size={16} /> Effacer
                 </button>
               </div>
             </div>
 
+            {/* Map */}
             <div style={modalStyles.mapContainer}>
-              <MapContainer
-                center={mapCenter}
-                zoom={6}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <MapClickHandler />
+              {loadError && (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#E74C3C' }}>
+                  <AlertCircle size={48} style={{ marginBottom: '16px' }} />
+                  <p>Erreur de chargement de Google Maps</p>
+                  <p style={{ fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Vérifiez votre clé API Google Maps
+                  </p>
+                </div>
+              )}
+              {!isLoaded && !loadError && (
+                <div style={{ padding: '40px', textAlign: 'center' }}>
+                  <Loader size={32} style={{ animation: 'spin 1s linear infinite' }} color="#E74C3C" />
+                  <p style={{ marginTop: '16px', color: isDark ? '#64748b' : '#94a3b8' }}>Chargement de la carte...</p>
+                </div>
+              )}
+              {isLoaded && (
+                <GoogleMap
+                  mapContainerStyle={mapContainerStyle}
+                  center={mapCenter}
+                  zoom={6}
+                  onClick={handleMapClick}
+                  onLoad={setMap}
+                  options={{
+                    streetViewControl: false,
+                    mapTypeControl: true,
+                    fullscreenControl: false
+                  }}
+                >
+                  {/* Point marker */}
+                  {drawMode === 'point' && markerPosition && (
+                    <GoogleMarker position={markerPosition} />
+                  )}
 
-                {/* Point marker */}
-                {drawMode === 'point' && markerPosition && (
-                  <Marker position={[markerPosition.lat, markerPosition.lng]}>
-                    <Popup>
-                      Lat: {markerPosition.lat.toFixed(6)}<br />
-                      Lng: {markerPosition.lng.toFixed(6)}
-                    </Popup>
-                  </Marker>
-                )}
+                  {/* Polyline */}
+                  {drawMode === 'line' && polylinePoints.length > 0 && (
+                    <>
+                      <GooglePolyline
+                        path={polylinePoints}
+                        options={{
+                          strokeColor: '#E74C3C',
+                          strokeWeight: 3
+                        }}
+                      />
+                      {polylinePoints.map((point, idx) => (
+                        <GoogleMarker
+                          key={idx}
+                          position={point}
+                          label={{
+                            text: String(idx + 1),
+                            color: 'white',
+                            fontWeight: 'bold'
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
 
-                {/* Polyline */}
-                {drawMode === 'line' && polylinePoints.length > 0 && (
-                  <>
-                    <Polyline positions={polylinePoints} color="#E74C3C" weight={3} />
-                    {polylinePoints.map((point, idx) => (
-                      <Marker key={idx} position={point} icon={L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div style="background:#E74C3C;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${idx + 1}</div>`,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                      })} />
-                    ))}
-                  </>
-                )}
-
-                {/* Polygon */}
-                {drawMode === 'polygon' && polygonPoints.length > 0 && (
-                  <>
-                    {polygonPoints.length > 2 && (
-                      <LeafletPolygon positions={polygonPoints} color="#E74C3C" fillColor="#E74C3C" fillOpacity={0.2} />
-                    )}
-                    {polygonPoints.length <= 2 && polygonPoints.length > 1 && (
-                      <Polyline positions={polygonPoints} color="#E74C3C" weight={2} dashArray="5,5" />
-                    )}
-                    {polygonPoints.map((point, idx) => (
-                      <Marker key={idx} position={point} icon={L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div style="background:#27AE60;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${idx + 1}</div>`,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                      })} />
-                    ))}
-                  </>
-                )}
-              </MapContainer>
+                  {/* Polygon */}
+                  {drawMode === 'polygon' && polygonPoints.length > 0 && (
+                    <>
+                      {polygonPoints.length > 2 ? (
+                        <GooglePolygon
+                          paths={polygonPoints}
+                          options={{
+                            strokeColor: '#27AE60',
+                            strokeWeight: 2,
+                            fillColor: '#27AE60',
+                            fillOpacity: 0.2
+                          }}
+                        />
+                      ) : (
+                        <GooglePolyline
+                          path={polygonPoints}
+                          options={{
+                            strokeColor: '#27AE60',
+                            strokeWeight: 2,
+                            strokeOpacity: 0.8
+                          }}
+                        />
+                      )}
+                      {polygonPoints.map((point, idx) => (
+                        <GoogleMarker
+                          key={idx}
+                          position={point}
+                          label={{
+                            text: String(idx + 1),
+                            color: 'white',
+                            fontWeight: 'bold'
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+                </GoogleMap>
+              )}
             </div>
 
+            {/* Status bar */}
             <div style={{ padding: '12px 20px', background: isDark ? '#0f172a' : '#f8fafc', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
               {drawMode === 'point' && (
                 markerPosition
@@ -650,7 +742,14 @@ const COHRMSystemPage = ({ isDark, token }) => {
               Annuler
             </button>
             <button
-              style={styles.btnPrimary}
+              style={{
+                ...styles.btnPrimary,
+                opacity: (
+                  (drawMode === 'point' && !markerPosition) ||
+                  (drawMode === 'line' && polylinePoints.length < 2) ||
+                  (drawMode === 'polygon' && polygonPoints.length < 3)
+                ) ? 0.5 : 1
+              }}
               onClick={handleConfirm}
               disabled={
                 (drawMode === 'point' && !markerPosition) ||
