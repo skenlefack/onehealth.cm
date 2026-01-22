@@ -1997,7 +1997,7 @@ router.post('/questions', auth, authorize('admin', 'editor'), async (req, res) =
       hint_fr, hint_en,
       image_url, audio_url, video_url,
       JSON.stringify(options || []),
-      JSON.stringify(correct_answer || null),
+      JSON.stringify(correct_answer !== undefined ? correct_answer : null),
       JSON.stringify({
         correct_fr: feedback_correct_fr || null,
         correct_en: feedback_correct_en || null,
