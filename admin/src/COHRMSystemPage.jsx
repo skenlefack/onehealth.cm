@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Radar, AlertTriangle, Megaphone, Send, MessageCircle, Hash, Search, Filter,
   Plus, Edit2, Trash2, Eye, Check, X, Clock, MapPin, User, Phone, Mail,
@@ -6,8 +6,22 @@ import {
   Globe, Wifi, Signal, Database, TrendingUp, TrendingDown, BarChart3,
   Calendar, Target, CheckCircle, XCircle, AlertCircle, Loader, Save,
   Share2, QrCode, Smartphone, Radio, Bug, Skull, ThermometerSun, Heart,
-  Leaf, Home, FileText, Copy, ExternalLink, Siren, MapPinned
+  Leaf, Home, FileText, Copy, ExternalLink, Siren, MapPinned, Map,
+  Users, Shield, GitBranch, ArrowUpRight, ArrowRight, MessageSquare,
+  ClipboardCheck, Building, Layers, Activity, ChevronDown, ChevronUp,
+  Crosshair, PenTool, Pentagon, Circle
 } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 
@@ -80,15 +94,70 @@ const RUMOR_PRIORITIES = [
   { value: 'critical', label: 'Critique', color: '#E74C3C' }
 ];
 
+// Catégories selon le document officiel "Fiche de collecte des rumeurs"
 const RUMOR_CATEGORIES = [
-  { value: 'epidemic', label: 'Épidémie', icon: Bug, color: '#E74C3C' },
-  { value: 'zoonosis', label: 'Zoonose', icon: Bug, color: '#9B59B6' },
-  { value: 'food_safety', label: 'Sécurité alimentaire', icon: ThermometerSun, color: '#E67E22' },
-  { value: 'water_contamination', label: 'Contamination eau', icon: Leaf, color: '#3498DB' },
-  { value: 'animal_disease', label: 'Maladie animale', icon: Heart, color: '#27AE60' },
-  { value: 'environmental', label: 'Environnemental', icon: Globe, color: '#1ABC9C' },
-  { value: 'unknown_disease', label: 'Maladie inconnue', icon: Skull, color: '#34495e' },
+  { value: 'human_health', label: 'Santé humaine', icon: Heart, color: '#E74C3C' },
+  { value: 'safety', label: 'Sécurité', icon: AlertTriangle, color: '#E67E22' },
+  { value: 'animal_health', label: 'Santé Animale', icon: Bug, color: '#9B59B6' },
+  { value: 'disaster', label: 'Catastrophe', icon: Siren, color: '#3498DB' },
+  { value: 'environmental', label: 'Santé Environnement', icon: Leaf, color: '#27AE60' },
   { value: 'other', label: 'Autre', icon: AlertCircle, color: '#95a5a6' }
+];
+
+// Niveaux de validation selon l'atelier COHRM (5 niveaux)
+const VALIDATION_LEVELS = [
+  { level: 1, label: 'Acteur Communautaire', description: 'Collecte initiale', color: '#3498DB' },
+  { level: 2, label: 'Vérificateur', description: 'Triage et vérification', color: '#9B59B6' },
+  { level: 3, label: 'Évaluateur de Risques', description: 'Évaluation et riposte', color: '#E67E22' },
+  { level: 4, label: 'Coordonnateur Régional', description: 'Coordination régionale', color: '#E74C3C' },
+  { level: 5, label: 'Superviseur Central', description: 'Supervision nationale', color: '#27AE60' }
+];
+
+// Niveaux de risque
+const RISK_LEVELS = [
+  { value: 'unknown', label: 'Non évalué', color: '#95a5a6' },
+  { value: 'low', label: 'Faible', color: '#27AE60' },
+  { value: 'moderate', label: 'Modéré', color: '#F39C12' },
+  { value: 'high', label: 'Élevé', color: '#E67E22' },
+  { value: 'very_high', label: 'Très élevé', color: '#E74C3C' }
+];
+
+// Thèmes de rumeurs (Section 5 du formulaire officiel)
+const RUMOR_THEMES = [
+  { code: 'suspect_case_human', label: 'Cas suspect / Personne malade', category: 'human_health' },
+  { code: 'human_death', label: 'Décès humain', category: 'human_health' },
+  { code: 'quarantine', label: 'Confinement ou quarantaine', category: 'human_health' },
+  { code: 'disease_denial', label: 'Déni de la maladie/virus', category: 'human_health' },
+  { code: 'case_estimates', label: 'Estimation de chiffres (cas surestimés ou cachés)', category: 'human_health' },
+  { code: 'prevention_reluctance', label: 'Réticence aux mesures de prévention', category: 'human_health' },
+  { code: 'vaccine_reluctance', label: 'Réticence aux vaccins', category: 'human_health' },
+  { code: 'perceived_severity', label: 'Peur/gravité perçue de la maladie', category: 'human_health' },
+  { code: 'transmission_mode', label: 'Mode de transmission', category: 'human_health' },
+  { code: 'risky_beliefs', label: 'Croyances et pratiques à risque', category: 'human_health' },
+  { code: 'suspect_case_animal', label: 'Cas suspect / Animal malade', category: 'animal_health' },
+  { code: 'animal_death', label: 'Mort d\'animal', category: 'animal_health' },
+  { code: 'sick_animal_consumption', label: 'Consommation d\'animaux malades ou morts', category: 'animal_health' },
+  { code: 'sick_animal_handling', label: 'Manipulation d\'animaux malades', category: 'animal_health' },
+  { code: 'animal_bites', label: 'Morsures d\'animaux', category: 'animal_health' },
+  { code: 'stigmatization', label: 'Stigmatisation', category: 'social' },
+  { code: 'conspiracy_theory', label: 'Théorie du complot', category: 'social' },
+  { code: 'natural_disasters', label: 'Catastrophes naturelles', category: 'environmental' },
+  { code: 'traffic_accidents', label: 'Accident de la voie publique', category: 'other' },
+  { code: 'violence_conflict', label: 'Violence et conflit', category: 'social' }
+];
+
+// Types de sources selon le formulaire officiel
+const SOURCE_TYPES = [
+  { value: 'community', label: 'Dans la communauté', icon: Home },
+  { value: 'social_network', label: 'Réseaux sociaux', icon: Share2 },
+  { value: 'hotline', label: 'Ligne verte', icon: Phone },
+  { value: 'call_center', label: 'Centre d\'appel', icon: Phone },
+  { value: 'media', label: 'Médias', icon: Radio },
+  { value: 'sms', label: 'SMS', icon: Phone },
+  { value: 'mobile_app', label: 'Application mobile', icon: Smartphone },
+  { value: 'web_scan', label: 'Scanner web', icon: Globe },
+  { value: 'direct', label: 'Déclaration directe', icon: Megaphone },
+  { value: 'other', label: 'Autre', icon: AlertCircle }
 ];
 
 const RUMOR_SOURCES = [
@@ -145,13 +214,25 @@ const COHRMSystemPage = ({ isDark, token }) => {
     status: '', priority: '', category: '', source: '', region: '', search: '', dateFrom: '', dateTo: ''
   });
 
-  // Form states
+  // Form states (extended with official document fields)
   const [rumorForm, setRumorForm] = useState({
-    title: '', description: '', category: 'other', priority: 'medium', source: 'direct',
-    region: '', district: '', locality: '', latitude: '', longitude: '',
-    reporter_name: '', reporter_phone: '', reporter_email: '',
-    affected_count: '', symptoms: '', animals_involved: '', actions_taken: ''
+    title: '', description: '', message_received: '',
+    category: 'human_health', priority: 'medium', source: 'direct', source_type: 'direct',
+    category_other: '', source_type_other: '', reporter_type_other: '',
+    themes: [],
+    date_detection: '', date_circulation_start: '',
+    region: '', department: '', arrondissement: '', commune: '',
+    district: '', aire_sante: '', location: '',
+    latitude: '', longitude: '',
+    geometry_type: 'point', // 'point', 'line', 'polygon'
+    geometry_data: null, // Array of coordinates for line/polygon
+    reporter_name: '', reporter_phone: '', reporter_type: 'anonymous',
+    affected_count: '', dead_count: '', symptoms: '', species: '',
+    gravity_comment: '', verification_notes: '', response_actions: ''
   });
+
+  // Map modal state
+  const [showMapModal, setShowMapModal] = useState(false);
 
   // Settings states
   const [settingsTab, setSettingsTab] = useState('sms-codes');
@@ -167,6 +248,32 @@ const COHRMSystemPage = ({ isDark, token }) => {
   const [scanHistory, setScanHistory] = useState([]);
   const [scanHistoryLoading, setScanHistoryLoading] = useState(false);
   const [scanHistoryPagination, setScanHistoryPagination] = useState({ page: 1, limit: 20, total: 0 });
+
+  // Actors states
+  const [actors, setActors] = useState([]);
+  const [actorTypes, setActorTypes] = useState({});
+  const [selectedActor, setSelectedActor] = useState(null);
+  const [actorForm, setActorForm] = useState({
+    user_id: '', actor_level: 1, actor_type: '', region: '', department: '',
+    district: '', organization: '', role_in_org: '', phone: '', email: '',
+    transmission_channel: 'system'
+  });
+  const [actorViewMode, setActorViewMode] = useState('list');
+
+  // Validation workflow states
+  const [pendingValidations, setPendingValidations] = useState([]);
+  const [validationDetail, setValidationDetail] = useState(null);
+  const [validationForm, setValidationForm] = useState({
+    action_type: 'verify', status: 'validated', notes: '', rejection_reason: ''
+  });
+
+  // Feedback states
+  const [feedbackForm, setFeedbackForm] = useState({
+    recipient_type: 'reporter', feedback_type: 'status_update', message: '', channel: 'system'
+  });
+
+  // Dashboard extended stats
+  const [dashboardData, setDashboardData] = useState(null);
 
   // Styles
   const styles = {
@@ -271,6 +378,318 @@ const COHRMSystemPage = ({ isDark, token }) => {
     })
   };
 
+  // ============== MAP MODAL COMPONENT ==============
+  const MapModal = ({ isOpen, onClose, onConfirm, initialPosition, initialGeometryType, initialGeometryData }) => {
+    const [drawMode, setDrawMode] = useState(initialGeometryType || 'point');
+    const [markerPosition, setMarkerPosition] = useState(initialPosition || null);
+    const [polylinePoints, setPolylinePoints] = useState(initialGeometryData && initialGeometryType === 'line' ? initialGeometryData : []);
+    const [polygonPoints, setPolygonPoints] = useState(initialGeometryData && initialGeometryType === 'polygon' ? initialGeometryData : []);
+    const [mapCenter, setMapCenter] = useState(
+      initialPosition ? [initialPosition.lat, initialPosition.lng] : [6.0, 12.0] // Cameroon center
+    );
+
+    // Component to handle map clicks
+    const MapClickHandler = () => {
+      useMapEvents({
+        click: (e) => {
+          const { lat, lng } = e.latlng;
+          if (drawMode === 'point') {
+            setMarkerPosition({ lat, lng });
+          } else if (drawMode === 'line') {
+            setPolylinePoints(prev => [...prev, [lat, lng]]);
+          } else if (drawMode === 'polygon') {
+            setPolygonPoints(prev => [...prev, [lat, lng]]);
+          }
+        }
+      });
+      return null;
+    };
+
+    const handleClear = () => {
+      setMarkerPosition(null);
+      setPolylinePoints([]);
+      setPolygonPoints([]);
+    };
+
+    const handleConfirm = () => {
+      let result = {
+        geometry_type: drawMode,
+        latitude: '',
+        longitude: '',
+        geometry_data: null
+      };
+
+      if (drawMode === 'point' && markerPosition) {
+        result.latitude = markerPosition.lat.toFixed(6);
+        result.longitude = markerPosition.lng.toFixed(6);
+      } else if (drawMode === 'line' && polylinePoints.length > 1) {
+        result.geometry_data = polylinePoints;
+        result.latitude = polylinePoints[0][0].toFixed(6);
+        result.longitude = polylinePoints[0][1].toFixed(6);
+      } else if (drawMode === 'polygon' && polygonPoints.length > 2) {
+        result.geometry_data = polygonPoints;
+        const center = polygonPoints.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
+        result.latitude = (center[0] / polygonPoints.length).toFixed(6);
+        result.longitude = (center[1] / polygonPoints.length).toFixed(6);
+      }
+
+      onConfirm(result);
+      onClose();
+    };
+
+    const undoLastPoint = () => {
+      if (drawMode === 'line' && polylinePoints.length > 0) {
+        setPolylinePoints(prev => prev.slice(0, -1));
+      } else if (drawMode === 'polygon' && polygonPoints.length > 0) {
+        setPolygonPoints(prev => prev.slice(0, -1));
+      }
+    };
+
+    if (!isOpen) return null;
+
+    const modalStyles = {
+      overlay: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      },
+      modal: {
+        background: isDark ? '#1e293b' : '#ffffff',
+        borderRadius: '16px',
+        width: '90%',
+        maxWidth: '900px',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      },
+      header: {
+        padding: '16px 20px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      },
+      body: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0
+      },
+      footer: {
+        padding: '16px 20px',
+        borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      },
+      mapContainer: {
+        flex: 1,
+        minHeight: '400px'
+      },
+      toolbar: {
+        padding: '12px 20px',
+        background: isDark ? '#0f172a' : '#f8fafc',
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        flexWrap: 'wrap'
+      },
+      toolButton: (active) => ({
+        padding: '10px 16px',
+        borderRadius: '8px',
+        border: `2px solid ${active ? '#E74C3C' : (isDark ? '#334155' : '#e2e8f0')}`,
+        background: active ? '#E74C3C20' : 'transparent',
+        color: active ? '#E74C3C' : (isDark ? '#e2e8f0' : '#1e293b'),
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        fontSize: '13px',
+        fontWeight: active ? '600' : '400'
+      })
+    };
+
+    return (
+      <div style={modalStyles.overlay} onClick={onClose}>
+        <div style={modalStyles.modal} onClick={e => e.stopPropagation()}>
+          <div style={modalStyles.header}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+              <Map size={20} style={{ marginRight: '10px', verticalAlign: 'middle', color: '#E74C3C' }} />
+              Sélectionner la localisation
+            </h3>
+            <button
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}
+              onClick={onClose}
+            >
+              <X size={24} color={isDark ? '#94a3b8' : '#64748b'} />
+            </button>
+          </div>
+
+          <div style={modalStyles.body}>
+            <div style={modalStyles.toolbar}>
+              <span style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', marginRight: '8px' }}>Type:</span>
+              <button
+                style={modalStyles.toolButton(drawMode === 'point')}
+                onClick={() => setDrawMode('point')}
+              >
+                <Crosshair size={16} /> Point
+              </button>
+              <button
+                style={modalStyles.toolButton(drawMode === 'line')}
+                onClick={() => setDrawMode('line')}
+              >
+                <PenTool size={16} /> Tracé
+              </button>
+              <button
+                style={modalStyles.toolButton(drawMode === 'polygon')}
+                onClick={() => setDrawMode('polygon')}
+              >
+                <Pentagon size={16} /> Polygone
+              </button>
+
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                {(drawMode === 'line' || drawMode === 'polygon') && (
+                  <button style={{ ...styles.btnSecondary, padding: '8px 12px' }} onClick={undoLastPoint}>
+                    <ChevronLeft size={16} /> Annuler point
+                  </button>
+                )}
+                <button style={{ ...styles.btnSecondary, padding: '8px 12px' }} onClick={handleClear}>
+                  <Trash2 size={16} /> Effacer tout
+                </button>
+              </div>
+            </div>
+
+            <div style={modalStyles.mapContainer}>
+              <MapContainer
+                center={mapCenter}
+                zoom={6}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <MapClickHandler />
+
+                {/* Point marker */}
+                {drawMode === 'point' && markerPosition && (
+                  <Marker position={[markerPosition.lat, markerPosition.lng]}>
+                    <Popup>
+                      Lat: {markerPosition.lat.toFixed(6)}<br />
+                      Lng: {markerPosition.lng.toFixed(6)}
+                    </Popup>
+                  </Marker>
+                )}
+
+                {/* Polyline */}
+                {drawMode === 'line' && polylinePoints.length > 0 && (
+                  <>
+                    <Polyline positions={polylinePoints} color="#E74C3C" weight={3} />
+                    {polylinePoints.map((point, idx) => (
+                      <Marker key={idx} position={point} icon={L.divIcon({
+                        className: 'custom-marker',
+                        html: `<div style="background:#E74C3C;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${idx + 1}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                      })} />
+                    ))}
+                  </>
+                )}
+
+                {/* Polygon */}
+                {drawMode === 'polygon' && polygonPoints.length > 0 && (
+                  <>
+                    {polygonPoints.length > 2 && (
+                      <LeafletPolygon positions={polygonPoints} color="#E74C3C" fillColor="#E74C3C" fillOpacity={0.2} />
+                    )}
+                    {polygonPoints.length <= 2 && polygonPoints.length > 1 && (
+                      <Polyline positions={polygonPoints} color="#E74C3C" weight={2} dashArray="5,5" />
+                    )}
+                    {polygonPoints.map((point, idx) => (
+                      <Marker key={idx} position={point} icon={L.divIcon({
+                        className: 'custom-marker',
+                        html: `<div style="background:#27AE60;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${idx + 1}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                      })} />
+                    ))}
+                  </>
+                )}
+              </MapContainer>
+            </div>
+
+            <div style={{ padding: '12px 20px', background: isDark ? '#0f172a' : '#f8fafc', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+              {drawMode === 'point' && (
+                markerPosition
+                  ? `Point sélectionné: ${markerPosition.lat.toFixed(6)}, ${markerPosition.lng.toFixed(6)}`
+                  : 'Cliquez sur la carte pour placer un point'
+              )}
+              {drawMode === 'line' && (
+                polylinePoints.length > 0
+                  ? `Tracé: ${polylinePoints.length} point(s) - Cliquez pour ajouter des points`
+                  : 'Cliquez sur la carte pour tracer une ligne'
+              )}
+              {drawMode === 'polygon' && (
+                polygonPoints.length > 0
+                  ? `Polygone: ${polygonPoints.length} point(s) - ${polygonPoints.length < 3 ? 'Minimum 3 points requis' : 'Zone définie'}`
+                  : 'Cliquez sur la carte pour dessiner un polygone'
+              )}
+            </div>
+          </div>
+
+          <div style={modalStyles.footer}>
+            <button style={styles.btnSecondary} onClick={onClose}>
+              Annuler
+            </button>
+            <button
+              style={styles.btnPrimary}
+              onClick={handleConfirm}
+              disabled={
+                (drawMode === 'point' && !markerPosition) ||
+                (drawMode === 'line' && polylinePoints.length < 2) ||
+                (drawMode === 'polygon' && polygonPoints.length < 3)
+              }
+            >
+              <Check size={16} /> Confirmer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Handle map data confirmation
+  const handleMapConfirm = (data) => {
+    setRumorForm({
+      ...rumorForm,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geometry_type: data.geometry_type,
+      geometry_data: data.geometry_data
+    });
+    setShowMapModal(false);
+  };
+
+  // Format coordinates for display
+  const formatCoordinates = () => {
+    if (!rumorForm.latitude && !rumorForm.longitude) return '';
+    let display = `${rumorForm.latitude || '0'}, ${rumorForm.longitude || '0'}`;
+    if (rumorForm.geometry_type === 'line' && rumorForm.geometry_data) {
+      display += ` (Tracé: ${rumorForm.geometry_data.length} points)`;
+    } else if (rumorForm.geometry_type === 'polygon' && rumorForm.geometry_data) {
+      display += ` (Polygone: ${rumorForm.geometry_data.length} points)`;
+    }
+    return display;
+  };
+
   // Toast effect
   useEffect(() => {
     if (toast) {
@@ -333,16 +752,117 @@ const COHRMSystemPage = ({ isDark, token }) => {
     setLoading(false);
   };
 
-  // Save rumor
+  // Fetch actors
+  const fetchActors = async () => {
+    setLoading(true);
+    const res = await api.get('/cohrm/actors', token);
+    if (res.success) {
+      setActors(res.data || []);
+    }
+    // Fetch actor types
+    const typesRes = await api.get('/cohrm/actor-types', token);
+    if (typesRes.success) {
+      setActorTypes(typesRes.data || {});
+    }
+    setLoading(false);
+  };
+
+  // Save actor
+  const handleSaveActor = async () => {
+    if (!actorForm.actor_type || !actorForm.actor_level) {
+      setToast({ type: 'error', message: 'Niveau et type d\'acteur requis' });
+      return;
+    }
+    setLoading(true);
+    const res = selectedActor
+      ? await api.put(`/cohrm/actors/${selectedActor.id}`, actorForm, token)
+      : await api.post('/cohrm/actors', actorForm, token);
+
+    if (res.success) {
+      setToast({ type: 'success', message: selectedActor ? 'Acteur mis à jour' : 'Acteur créé' });
+      setActorViewMode('list');
+      setSelectedActor(null);
+      fetchActors();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
+  };
+
+  // Fetch pending validations
+  const fetchPendingValidations = async () => {
+    setLoading(true);
+    const res = await api.get('/cohrm/dashboard', token);
+    if (res.success && res.data) {
+      setDashboardData(res.data);
+      setPendingValidations(res.data.pendingValidation || []);
+    }
+    setLoading(false);
+  };
+
+  // Fetch rumor detail for validation
+  const fetchRumorForValidation = async (id) => {
+    setLoading(true);
+    const res = await api.get(`/cohrm/rumors/${id}`, token);
+    if (res.success) {
+      setValidationDetail(res.data);
+    }
+    setLoading(false);
+  };
+
+  // Submit validation
+  const handleValidation = async () => {
+    if (!validationDetail) return;
+    setLoading(true);
+    const res = await api.post(`/cohrm/rumors/${validationDetail.id}/validate`, validationForm, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Validation enregistrée' });
+      setValidationDetail(null);
+      fetchPendingValidations();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
+  };
+
+  // Submit risk assessment
+  const handleRiskAssessment = async (riskData) => {
+    if (!validationDetail) return;
+    setLoading(true);
+    const res = await api.post(`/cohrm/rumors/${validationDetail.id}/risk-assessment`, riskData, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Évaluation des risques enregistrée' });
+      fetchRumorForValidation(validationDetail.id);
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
+  };
+
+  // Send feedback
+  const handleSendFeedback = async () => {
+    if (!validationDetail || !feedbackForm.message) return;
+    setLoading(true);
+    const res = await api.post(`/cohrm/rumors/${validationDetail.id}/feedback`, feedbackForm, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Rétro-information envoyée' });
+      setFeedbackForm({ recipient_type: 'reporter', feedback_type: 'status_update', message: '', channel: 'system' });
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
+  };
+
+  // Save rumor (using extended endpoint)
   const handleSaveRumor = async () => {
-    if (!rumorForm.title || !rumorForm.description) {
-      setToast({ type: 'error', message: 'Titre et description requis' });
+    if (!rumorForm.title || !rumorForm.region) {
+      setToast({ type: 'error', message: 'Titre et région requis' });
       return;
     }
     setLoading(true);
     const res = selectedRumor
-      ? await api.put(`/cohrm/rumors/${selectedRumor.id}`, rumorForm, token)
-      : await api.post('/cohrm/rumors', rumorForm, token);
+      ? await api.put(`/cohrm/rumors/${selectedRumor.id}/extended`, rumorForm, token)
+      : await api.post('/cohrm/rumors/extended', rumorForm, token);
 
     if (res.success) {
       setToast({ type: 'success', message: selectedRumor ? 'Rumeur mise à jour' : 'Rumeur enregistrée' });
@@ -381,10 +901,19 @@ const COHRMSystemPage = ({ isDark, token }) => {
   // Reset form
   const resetForm = () => {
     setRumorForm({
-      title: '', description: '', category: 'other', priority: 'medium', source: 'direct',
-      region: '', district: '', locality: '', latitude: '', longitude: '',
-      reporter_name: '', reporter_phone: '', reporter_email: '',
-      affected_count: '', symptoms: '', animals_involved: '', actions_taken: ''
+      title: '', description: '', message_received: '',
+      category: 'human_health', priority: 'medium', source: 'direct', source_type: 'direct',
+      category_other: '', source_type_other: '', reporter_type_other: '',
+      themes: [],
+      date_detection: '', date_circulation_start: '',
+      region: '', department: '', arrondissement: '', commune: '',
+      district: '', aire_sante: '', location: '',
+      latitude: '', longitude: '',
+      geometry_type: 'point',
+      geometry_data: null,
+      reporter_name: '', reporter_phone: '', reporter_type: 'anonymous',
+      affected_count: '', dead_count: '', symptoms: '', species: '',
+      gravity_comment: '', verification_notes: '', response_actions: ''
     });
   };
 
@@ -395,21 +924,38 @@ const COHRMSystemPage = ({ isDark, token }) => {
       setRumorForm({
         title: rumor.title || '',
         description: rumor.description || '',
-        category: rumor.category || 'other',
+        message_received: rumor.message_received || '',
+        category: rumor.category || 'human_health',
         priority: rumor.priority || 'medium',
-        source: rumor.source || 'direct_report',
+        source: rumor.source || 'direct',
+        source_type: rumor.source_type || 'direct',
+        category_other: rumor.category_other || '',
+        source_type_other: rumor.source_type_other || '',
+        reporter_type_other: rumor.reporter_type_other || '',
+        themes: rumor.themes ? (typeof rumor.themes === 'string' ? JSON.parse(rumor.themes) : rumor.themes) : [],
+        date_detection: rumor.date_detection || '',
+        date_circulation_start: rumor.date_circulation_start || '',
         region: rumor.region || '',
+        department: rumor.department || '',
+        arrondissement: rumor.arrondissement || '',
+        commune: rumor.commune || '',
         district: rumor.district || '',
-        locality: rumor.locality || '',
+        aire_sante: rumor.aire_sante || '',
+        location: rumor.location || '',
         latitude: rumor.latitude || '',
         longitude: rumor.longitude || '',
+        geometry_type: rumor.geometry_type || 'point',
+        geometry_data: rumor.geometry_data ? (typeof rumor.geometry_data === 'string' ? JSON.parse(rumor.geometry_data) : rumor.geometry_data) : null,
         reporter_name: rumor.reporter_name || '',
         reporter_phone: rumor.reporter_phone || '',
-        reporter_email: rumor.reporter_email || '',
+        reporter_type: rumor.reporter_type || 'anonymous',
         affected_count: rumor.affected_count || '',
+        dead_count: rumor.dead_count || '',
         symptoms: rumor.symptoms || '',
-        animals_involved: rumor.animals_involved || '',
-        actions_taken: rumor.actions_taken || ''
+        species: rumor.species || '',
+        gravity_comment: rumor.gravity_comment || '',
+        verification_notes: rumor.verification_notes || '',
+        response_actions: rumor.response_actions || ''
       });
     } else {
       setSelectedRumor(null);
@@ -761,183 +1307,344 @@ const COHRMSystemPage = ({ isDark, token }) => {
     </div>
   );
 
-  // Render Rumor Form
-  const renderRumorForm = () => (
-    <div style={styles.card}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
-          <AlertTriangle size={22} style={{ marginRight: '10px', color: '#E74C3C', verticalAlign: 'middle' }} />
-          {selectedRumor ? 'Modifier la rumeur' : 'Signaler une rumeur'}
-        </h3>
-        <button style={styles.btnSecondary} onClick={() => { setViewMode('list'); setSelectedRumor(null); resetForm(); }}>
-          <ChevronLeft size={18} /> Retour
-        </button>
-      </div>
+  // Render Rumor Form (Extended - based on official "Fiche de collecte des rumeurs")
+  const renderRumorForm = () => {
+    // Helper to toggle theme selection
+    const toggleTheme = (themeCode) => {
+      const currentThemes = rumorForm.themes || [];
+      if (currentThemes.includes(themeCode)) {
+        setRumorForm({ ...rumorForm, themes: currentThemes.filter(t => t !== themeCode) });
+      } else {
+        setRumorForm({ ...rumorForm, themes: [...currentThemes, themeCode] });
+      }
+    };
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {/* Left Column */}
-        <div>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={styles.label}>Titre de la rumeur *</label>
-            <input
-              style={styles.input}
-              value={rumorForm.title}
-              onChange={e => setRumorForm({ ...rumorForm, title: e.target.value })}
-              placeholder="Ex: Cas suspects de choléra dans le village..."
-            />
-          </div>
+    return (
+      <div style={styles.card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+            <AlertTriangle size={22} style={{ marginRight: '10px', color: '#E74C3C', verticalAlign: 'middle' }} />
+            {selectedRumor ? 'Modifier la rumeur' : 'Fiche de collecte des rumeurs'}
+          </h3>
+          <button style={styles.btnSecondary} onClick={() => { setViewMode('list'); setSelectedRumor(null); resetForm(); }}>
+            <ChevronLeft size={18} /> Retour
+          </button>
+        </div>
 
-          <div style={{ marginBottom: '16px' }}>
-            <label style={styles.label}>Description détaillée *</label>
-            <textarea
-              style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
-              value={rumorForm.description}
-              onChange={e => setRumorForm({ ...rumorForm, description: e.target.value })}
-              placeholder="Décrivez la situation en détail..."
-            />
-          </div>
-
+        {/* Section 1: Localisation */}
+        <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '20px', borderLeft: '4px solid #3498DB' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#3498DB' }}>
+            <MapPin size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Section 1: Localisation de la rumeur
+          </h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <label style={styles.label}>Catégorie</label>
-              <select style={styles.select} value={rumorForm.category} onChange={e => setRumorForm({ ...rumorForm, category: e.target.value })}>
-                {RUMOR_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              <label style={styles.label}>Date de détection</label>
+              <input type="date" style={styles.input} value={rumorForm.date_detection} onChange={e => setRumorForm({ ...rumorForm, date_detection: e.target.value })} />
+            </div>
+            <div>
+              <label style={styles.label}>Date de début de circulation</label>
+              <input type="date" style={styles.input} value={rumorForm.date_circulation_start} onChange={e => setRumorForm({ ...rumorForm, date_circulation_start: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <label style={styles.label}>Région *</label>
+              <select style={styles.select} value={rumorForm.region} onChange={e => setRumorForm({ ...rumorForm, region: e.target.value })}>
+                <option value="">-- Sélectionner --</option>
+                {REGIONS_CAMEROON.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
+              <label style={styles.label}>Département</label>
+              <input style={styles.input} value={rumorForm.department} onChange={e => setRumorForm({ ...rumorForm, department: e.target.value })} />
+            </div>
+            <div>
+              <label style={styles.label}>Arrondissement</label>
+              <input style={styles.input} value={rumorForm.arrondissement} onChange={e => setRumorForm({ ...rumorForm, arrondissement: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <label style={styles.label}>Commune</label>
+              <input style={styles.input} value={rumorForm.commune} onChange={e => setRumorForm({ ...rumorForm, commune: e.target.value })} />
+            </div>
+            <div>
+              <label style={styles.label}>District de santé</label>
+              <input style={styles.input} value={rumorForm.district} onChange={e => setRumorForm({ ...rumorForm, district: e.target.value })} />
+            </div>
+            <div>
+              <label style={styles.label}>Aire de santé</label>
+              <input style={styles.input} value={rumorForm.aire_sante} onChange={e => setRumorForm({ ...rumorForm, aire_sante: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={styles.label}>Localité précise</label>
+              <input style={styles.input} value={rumorForm.location} onChange={e => setRumorForm({ ...rumorForm, location: e.target.value })} placeholder="Village, quartier..." />
+            </div>
+            <div>
+              <label style={styles.label}>Coordonnées GPS</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  style={{ ...styles.input, flex: 1 }}
+                  value={formatCoordinates()}
+                  readOnly
+                  placeholder="Latitude, Longitude"
+                />
+                <button
+                  style={{ ...styles.btnSecondary, padding: '12px', whiteSpace: 'nowrap' }}
+                  onClick={getCurrentPosition}
+                  title="Obtenir ma position actuelle"
+                >
+                  <Crosshair size={18} /> Position
+                </button>
+                <button
+                  style={{ ...styles.btnPrimary, padding: '12px', whiteSpace: 'nowrap' }}
+                  onClick={() => setShowMapModal(true)}
+                  title="Ouvrir la carte"
+                >
+                  <Map size={18} /> Carte
+                </button>
+              </div>
+              {rumorForm.geometry_type && rumorForm.geometry_type !== 'point' && (
+                <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#27AE60' }}>
+                  <CheckCircle size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                  {rumorForm.geometry_type === 'line' ? 'Tracé' : 'Polygone'} défini avec {rumorForm.geometry_data?.length || 0} points
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Source */}
+        <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '20px', borderLeft: '4px solid #9B59B6' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#9B59B6' }}>
+            <Radio size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Section 2: Source de la rumeur
+          </h4>
+          <p style={{ margin: '0 0 12px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>Où avez-vous entendu cette rumeur?</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {SOURCE_TYPES.map(src => {
+              const isSelected = rumorForm.source_type === src.value;
+              const SrcIcon = src.icon;
+              return (
+                <button
+                  key={src.value}
+                  type="button"
+                  style={{
+                    padding: '10px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
+                    background: isSelected ? '#9B59B620' : (isDark ? '#1e293b' : '#ffffff'),
+                    border: `2px solid ${isSelected ? '#9B59B6' : (isDark ? '#334155' : '#e2e8f0')}`,
+                    color: isSelected ? '#9B59B6' : (isDark ? '#e2e8f0' : '#1e293b'),
+                    cursor: 'pointer', fontSize: '13px', fontWeight: isSelected ? '600' : '400'
+                  }}
+                  onClick={() => setRumorForm({ ...rumorForm, source_type: src.value, source_type_other: src.value === 'other' ? rumorForm.source_type_other : '' })}
+                >
+                  <SrcIcon size={16} /> {src.label}
+                </button>
+              );
+            })}
+          </div>
+          {/* Input for "Autre" source */}
+          {rumorForm.source_type === 'other' && (
+            <div style={{ marginTop: '12px' }}>
+              <label style={styles.label}>Précisez la source</label>
+              <input
+                style={styles.input}
+                value={rumorForm.source_type_other}
+                onChange={e => setRumorForm({ ...rumorForm, source_type_other: e.target.value })}
+                placeholder="Décrivez la source de la rumeur..."
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Section 3: Message */}
+        <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '20px', borderLeft: '4px solid #E67E22' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#E67E22' }}>
+            <MessageCircle size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Section 3: Message porté dans la rumeur
+          </h4>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={styles.label}>Titre / Résumé de la rumeur *</label>
+            <input style={styles.input} value={rumorForm.title} onChange={e => setRumorForm({ ...rumorForm, title: e.target.value })} placeholder="Résumé court de la rumeur..." />
+          </div>
+          <div>
+            <label style={styles.label}>Message reçu (texte original)</label>
+            <textarea style={{ ...styles.input, minHeight: '100px' }} value={rumorForm.message_received} onChange={e => setRumorForm({ ...rumorForm, message_received: e.target.value })} placeholder="Reproduire le message tel que reçu..." />
+          </div>
+          <div style={{ marginTop: '16px' }}>
+            <label style={styles.label}>Description / Analyse</label>
+            <textarea style={{ ...styles.input, minHeight: '80px' }} value={rumorForm.description} onChange={e => setRumorForm({ ...rumorForm, description: e.target.value })} placeholder="Analyse et contexte de la rumeur..." />
+          </div>
+        </div>
+
+        {/* Section 4: Catégorie */}
+        <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '20px', borderLeft: '4px solid #E74C3C' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#E74C3C' }}>
+            <Target size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Section 4: Catégorie de la rumeur
+          </h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {RUMOR_CATEGORIES.map(cat => {
+              const isSelected = rumorForm.category === cat.value;
+              const CatIcon = cat.icon;
+              return (
+                <button
+                  key={cat.value}
+                  type="button"
+                  style={{
+                    padding: '12px 20px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px',
+                    background: isSelected ? `${cat.color}20` : (isDark ? '#1e293b' : '#ffffff'),
+                    border: `2px solid ${isSelected ? cat.color : (isDark ? '#334155' : '#e2e8f0')}`,
+                    color: isSelected ? cat.color : (isDark ? '#e2e8f0' : '#1e293b'),
+                    cursor: 'pointer', fontSize: '14px', fontWeight: isSelected ? '600' : '400'
+                  }}
+                  onClick={() => setRumorForm({ ...rumorForm, category: cat.value, category_other: cat.value === 'other' ? rumorForm.category_other : '' })}
+                >
+                  <CatIcon size={18} /> {cat.label}
+                </button>
+              );
+            })}
+          </div>
+          {/* Input for "Autre" category */}
+          {rumorForm.category === 'other' && (
+            <div style={{ marginTop: '12px' }}>
+              <label style={styles.label}>Précisez la catégorie</label>
+              <input
+                style={styles.input}
+                value={rumorForm.category_other}
+                onChange={e => setRumorForm({ ...rumorForm, category_other: e.target.value })}
+                placeholder="Décrivez la catégorie de la rumeur..."
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Section 5: Thèmes (Multiple selection) */}
+        <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '20px', borderLeft: '4px solid #27AE60' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#27AE60' }}>
+            <FileText size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Section 5: Thèmes / Sujets (sélection multiple)
+          </h4>
+          <p style={{ margin: '0 0 12px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>Ce message concerne-t-il les thèmes suivants?</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '8px' }}>
+            {RUMOR_THEMES.map(theme => {
+              const isSelected = (rumorForm.themes || []).includes(theme.code);
+              return (
+                <label
+                  key={theme.code}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
+                    background: isSelected ? '#27AE6015' : (isDark ? '#1e293b' : '#ffffff'),
+                    border: `1px solid ${isSelected ? '#27AE60' : (isDark ? '#334155' : '#e2e8f0')}`
+                  }}
+                >
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleTheme(theme.code)} style={{ width: '16px', height: '16px', accentColor: '#27AE60' }} />
+                  <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>{theme.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Additional Information */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+          {/* Health Data */}
+          <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+            <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+              <Activity size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Données sanitaires
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={styles.label}>Nombre affectés</label>
+                <input type="number" style={styles.input} value={rumorForm.affected_count} onChange={e => setRumorForm({ ...rumorForm, affected_count: e.target.value })} />
+              </div>
+              <div>
+                <label style={styles.label}>Nombre de décès</label>
+                <input type="number" style={styles.input} value={rumorForm.dead_count} onChange={e => setRumorForm({ ...rumorForm, dead_count: e.target.value })} />
+              </div>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Espèce concernée</label>
+              <input style={styles.input} value={rumorForm.species} onChange={e => setRumorForm({ ...rumorForm, species: e.target.value })} placeholder="Humain, Bovin, Volaille..." />
+            </div>
+            <div>
+              <label style={styles.label}>Symptômes observés</label>
+              <textarea style={{ ...styles.input, minHeight: '60px' }} value={rumorForm.symptoms} onChange={e => setRumorForm({ ...rumorForm, symptoms: e.target.value })} />
+            </div>
+          </div>
+
+          {/* Reporter & Priority */}
+          <div style={{ padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+            <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+              <User size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Informateur & Priorité
+            </h4>
+            <div style={{ marginBottom: '12px' }}>
               <label style={styles.label}>Priorité</label>
               <select style={styles.select} value={rumorForm.priority} onChange={e => setRumorForm({ ...rumorForm, priority: e.target.value })}>
                 {RUMOR_PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={styles.label}>Source du signalement</label>
-            <select style={styles.select} value={rumorForm.source} onChange={e => setRumorForm({ ...rumorForm, source: e.target.value })}>
-              {RUMOR_SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={styles.label}>Symptômes observés</label>
-            <textarea
-              style={{ ...styles.input, minHeight: '80px' }}
-              value={rumorForm.symptoms}
-              onChange={e => setRumorForm({ ...rumorForm, symptoms: e.target.value })}
-              placeholder="Liste des symptômes..."
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Nombre affecté (estimé)</label>
-              <input
-                style={styles.input}
-                type="number"
-                value={rumorForm.affected_count}
-                onChange={e => setRumorForm({ ...rumorForm, affected_count: e.target.value })}
-                placeholder="0"
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={styles.label}>Nom du déclarant</label>
+                <input style={styles.input} value={rumorForm.reporter_name} onChange={e => setRumorForm({ ...rumorForm, reporter_name: e.target.value })} />
+              </div>
+              <div>
+                <label style={styles.label}>Téléphone</label>
+                <input style={styles.input} value={rumorForm.reporter_phone} onChange={e => setRumorForm({ ...rumorForm, reporter_phone: e.target.value })} />
+              </div>
             </div>
             <div>
-              <label style={styles.label}>Animaux impliqués</label>
-              <input
-                style={styles.input}
-                value={rumorForm.animals_involved}
-                onChange={e => setRumorForm({ ...rumorForm, animals_involved: e.target.value })}
-                placeholder="Ex: Volailles, bovins..."
-              />
+              <label style={styles.label}>Type de déclarant</label>
+              <select
+                style={styles.select}
+                value={rumorForm.reporter_type}
+                onChange={e => setRumorForm({ ...rumorForm, reporter_type: e.target.value, reporter_type_other: e.target.value === 'other' ? rumorForm.reporter_type_other : '' })}
+              >
+                <option value="anonymous">Anonyme</option>
+                <option value="community">Membre de la communauté</option>
+                <option value="health_worker">Agent de santé</option>
+                <option value="vet">Vétérinaire</option>
+                <option value="official">Officiel</option>
+                <option value="agent">Agent de terrain</option>
+                <option value="other">Autre</option>
+              </select>
+              {/* Input for "Autre" reporter type */}
+              {rumorForm.reporter_type === 'other' && (
+                <input
+                  style={{ ...styles.input, marginTop: '8px' }}
+                  value={rumorForm.reporter_type_other}
+                  onChange={e => setRumorForm({ ...rumorForm, reporter_type_other: e.target.value })}
+                  placeholder="Précisez le type de déclarant..."
+                />
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div>
-          <div style={{ padding: '16px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
-            <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
-              <MapPin size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-              Localisation
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <div>
-                <label style={styles.label}>Région</label>
-                <select style={styles.select} value={rumorForm.region} onChange={e => setRumorForm({ ...rumorForm, region: e.target.value })}>
-                  <option value="">Sélectionner...</option>
-                  {REGIONS_CAMEROON.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={styles.label}>District</label>
-                <input style={styles.input} value={rumorForm.district} onChange={e => setRumorForm({ ...rumorForm, district: e.target.value })} placeholder="District" />
-              </div>
-              <div>
-                <label style={styles.label}>Localité</label>
-                <input style={styles.input} value={rumorForm.locality} onChange={e => setRumorForm({ ...rumorForm, locality: e.target.value })} placeholder="Village/Quartier" />
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px' }}>
-              <div>
-                <label style={styles.label}>Latitude</label>
-                <input style={styles.input} value={rumorForm.latitude} onChange={e => setRumorForm({ ...rumorForm, latitude: e.target.value })} placeholder="Ex: 5.9631" />
-              </div>
-              <div>
-                <label style={styles.label}>Longitude</label>
-                <input style={styles.input} value={rumorForm.longitude} onChange={e => setRumorForm({ ...rumorForm, longitude: e.target.value })} placeholder="Ex: 10.1591" />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button style={{ ...styles.btnSecondary, padding: '12px' }} onClick={getCurrentPosition} title="Obtenir ma position">
-                  <MapPinned size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Gravity Comment */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={styles.label}>Commentaire sur la gravité de la rumeur</label>
+          <textarea style={{ ...styles.input, minHeight: '80px' }} value={rumorForm.gravity_comment} onChange={e => setRumorForm({ ...rumorForm, gravity_comment: e.target.value })} placeholder="Évaluation de la gravité et des risques potentiels..." />
+        </div>
 
-          <div style={{ padding: '16px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
-            <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
-              <User size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-              Informateur
-            </h4>
-            <div style={{ display: 'grid', gap: '12px' }}>
-              <div>
-                <label style={styles.label}>Nom</label>
-                <input style={styles.input} value={rumorForm.reporter_name} onChange={e => setRumorForm({ ...rumorForm, reporter_name: e.target.value })} placeholder="Nom de l'informateur" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={styles.label}>Téléphone</label>
-                  <input style={styles.input} value={rumorForm.reporter_phone} onChange={e => setRumorForm({ ...rumorForm, reporter_phone: e.target.value })} placeholder="+237..." />
-                </div>
-                <div>
-                  <label style={styles.label}>Email</label>
-                  <input style={styles.input} type="email" value={rumorForm.reporter_email} onChange={e => setRumorForm({ ...rumorForm, reporter_email: e.target.value })} placeholder="email@..." />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={styles.label}>Actions déjà entreprises</label>
-            <textarea
-              style={{ ...styles.input, minHeight: '80px' }}
-              value={rumorForm.actions_taken}
-              onChange={e => setRumorForm({ ...rumorForm, actions_taken: e.target.value })}
-              placeholder="Décrivez les actions déjà prises..."
-            />
-          </div>
+        {/* Submit */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+          <button style={styles.btnSecondary} onClick={() => { setViewMode('list'); setSelectedRumor(null); resetForm(); }}>
+            Annuler
+          </button>
+          <button style={styles.btnPrimary} onClick={handleSaveRumor} disabled={loading}>
+            {loading ? <><Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Enregistrement...</> : <><Save size={16} /> Enregistrer la rumeur</>}
+          </button>
         </div>
       </div>
-
-      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '24px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-        <button style={styles.btnSecondary} onClick={() => { setViewMode('list'); setSelectedRumor(null); resetForm(); }}>
-          Annuler
-        </button>
-        <button style={styles.btnPrimary} onClick={handleSaveRumor} disabled={loading}>
-          {loading ? <><Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Enregistrement...</> : <><Save size={16} /> Enregistrer</>}
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Render SMS Decoder
   const renderSMSDecoder = () => {
@@ -1336,6 +2043,553 @@ const COHRMSystemPage = ({ isDark, token }) => {
     );
   };
 
+  // Render Actors List
+  const renderActorsList = () => (
+    <div style={styles.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+          <Users size={20} style={{ marginRight: '10px', verticalAlign: 'middle', color: '#E74C3C' }} />
+          Acteurs COHRM
+        </h3>
+        <button style={styles.btnPrimary} onClick={() => { setSelectedActor(null); setActorForm({ user_id: '', actor_level: 1, actor_type: '', region: '', department: '', district: '', organization: '', role_in_org: '', phone: '', email: '', transmission_channel: 'system' }); setActorViewMode('form'); }}>
+          <Plus size={18} /> Ajouter un acteur
+        </button>
+      </div>
+
+      {/* Validation Levels Overview */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '24px' }}>
+        {VALIDATION_LEVELS.map(level => {
+          const actorCount = actors.filter(a => a.actor_level === level.level).length;
+          return (
+            <div key={level.level} style={{
+              padding: '16px',
+              borderRadius: '12px',
+              background: isDark ? '#0f172a' : '#f8fafc',
+              border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+              borderTop: `3px solid ${level.color}`
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Layers size={16} color={level.color} />
+                <span style={{ fontSize: '12px', fontWeight: '600', color: level.color }}>Niveau {level.level}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>{level.label}</p>
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>{level.description}</p>
+              <p style={{ margin: '8px 0 0', fontSize: '20px', fontWeight: '700', color: level.color }}>{actorCount}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Actors Table */}
+      {actors.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+          <Users size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
+          <p>Aucun acteur enregistré</p>
+        </div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+              <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>NIVEAU</th>
+              <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>TYPE D'ACTEUR</th>
+              <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>ORGANISATION</th>
+              <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>RÉGION</th>
+              <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>CONTACT</th>
+              <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {actors.map(actor => {
+              const level = VALIDATION_LEVELS.find(l => l.level === actor.actor_level) || VALIDATION_LEVELS[0];
+              return (
+                <tr key={actor.id} style={{ borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px',
+                      background: `${level.color}20`, color: level.color, borderRadius: '6px', fontSize: '12px', fontWeight: '600'
+                    }}>
+                      <Layers size={12} /> Niveau {actor.actor_level}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', fontSize: '14px', color: isDark ? '#e2e8f0' : '#1e293b', fontWeight: '500' }}>
+                    {actor.actor_type}
+                  </td>
+                  <td style={{ padding: '12px', fontSize: '14px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    {actor.organization || '-'}
+                  </td>
+                  <td style={{ padding: '12px', fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                    {actor.region || '-'}
+                  </td>
+                  <td style={{ padding: '12px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                    {actor.phone && <div><Phone size={12} style={{ marginRight: '4px' }} />{actor.phone}</div>}
+                    {actor.email && <div><Mail size={12} style={{ marginRight: '4px' }} />{actor.email}</div>}
+                  </td>
+                  <td style={{ padding: '12px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button style={{ ...styles.btnSecondary, padding: '6px 12px' }} onClick={() => {
+                        setSelectedActor(actor);
+                        setActorForm(actor);
+                        setActorViewMode('form');
+                      }}>
+                        <Edit2 size={14} />
+                      </button>
+                      <button style={{ ...styles.btnSecondary, padding: '6px 12px', color: '#E74C3C' }} onClick={async () => {
+                        if (window.confirm('Désactiver cet acteur ?')) {
+                          await api.delete(`/cohrm/actors/${actor.id}`, token);
+                          fetchActors();
+                        }
+                      }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  // Render Actor Form
+  const renderActorForm = () => (
+    <div style={styles.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+          {selectedActor ? 'Modifier l\'acteur' : 'Nouvel acteur'}
+        </h3>
+        <button style={styles.btnSecondary} onClick={() => { setActorViewMode('list'); setSelectedActor(null); }}>
+          <X size={18} /> Annuler
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Niveau et Type */}
+        <div>
+          <label style={styles.label}>Niveau d'acteur *</label>
+          <select style={styles.select} value={actorForm.actor_level} onChange={e => setActorForm({ ...actorForm, actor_level: parseInt(e.target.value), actor_type: '' })}>
+            {VALIDATION_LEVELS.map(l => (
+              <option key={l.level} value={l.level}>{l.level} - {l.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={styles.label}>Type d'acteur *</label>
+          <select style={styles.select} value={actorForm.actor_type} onChange={e => setActorForm({ ...actorForm, actor_type: e.target.value })}>
+            <option value="">-- Sélectionner --</option>
+            {(actorTypes[actorForm.actor_level] || []).map(t => (
+              <option key={t.code} value={t.label}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Localisation */}
+        <div>
+          <label style={styles.label}>Région</label>
+          <select style={styles.select} value={actorForm.region} onChange={e => setActorForm({ ...actorForm, region: e.target.value })}>
+            <option value="">-- Sélectionner --</option>
+            {REGIONS_CAMEROON.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={styles.label}>Département</label>
+          <input style={styles.input} value={actorForm.department} onChange={e => setActorForm({ ...actorForm, department: e.target.value })} />
+        </div>
+
+        {/* Organisation */}
+        <div>
+          <label style={styles.label}>Organisation / Structure</label>
+          <input style={styles.input} value={actorForm.organization} onChange={e => setActorForm({ ...actorForm, organization: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Rôle dans l'organisation</label>
+          <input style={styles.input} value={actorForm.role_in_org} onChange={e => setActorForm({ ...actorForm, role_in_org: e.target.value })} />
+        </div>
+
+        {/* Contact */}
+        <div>
+          <label style={styles.label}>Téléphone</label>
+          <input style={styles.input} value={actorForm.phone} onChange={e => setActorForm({ ...actorForm, phone: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Email</label>
+          <input style={styles.input} type="email" value={actorForm.email} onChange={e => setActorForm({ ...actorForm, email: e.target.value })} />
+        </div>
+
+        {/* Canal de transmission */}
+        <div>
+          <label style={styles.label}>Canal de transmission</label>
+          <select style={styles.select} value={actorForm.transmission_channel} onChange={e => setActorForm({ ...actorForm, transmission_channel: e.target.value })}>
+            <option value="system">Système</option>
+            <option value="mobile_app">Application mobile</option>
+            <option value="sms">SMS</option>
+            <option value="email">Email</option>
+            <option value="phone">Téléphone</option>
+            <option value="paper">Papier</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <button style={styles.btnSecondary} onClick={() => { setActorViewMode('list'); setSelectedActor(null); }}>
+          Annuler
+        </button>
+        <button style={styles.btnPrimary} onClick={handleSaveActor} disabled={loading}>
+          {loading ? <Loader size={18} className="spin" /> : <Save size={18} />}
+          {selectedActor ? 'Mettre à jour' : 'Créer l\'acteur'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Render Validation List
+  const renderValidationList = () => (
+    <div style={styles.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+          <ClipboardCheck size={20} style={{ marginRight: '10px', verticalAlign: 'middle', color: '#E74C3C' }} />
+          Workflow de Validation
+        </h3>
+        <button style={styles.btnSecondary} onClick={fetchPendingValidations}>
+          <RefreshCw size={18} /> Actualiser
+        </button>
+      </div>
+
+      {/* Validation Levels Progress */}
+      <div style={{ marginBottom: '24px', padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px' }}>
+        <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+          Processus de validation multi-niveaux
+        </h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {VALIDATION_LEVELS.map((level, idx) => (
+            <React.Fragment key={level.level}>
+              <div style={{
+                flex: 1, padding: '12px', borderRadius: '8px', textAlign: 'center',
+                background: `${level.color}20`, border: `1px solid ${level.color}`
+              }}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: level.color, marginBottom: '4px' }}>
+                  Niveau {level.level}
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                  {level.label}
+                </div>
+                <div style={{ fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '4px' }}>
+                  {dashboardData?.byValidationLevel?.find(v => v.validation_level === level.level)?.count || 0} rumeurs
+                </div>
+              </div>
+              {idx < VALIDATION_LEVELS.length - 1 && (
+                <ArrowRight size={20} color={isDark ? '#64748b' : '#94a3b8'} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* Pending Validations */}
+      <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+        <Bell size={16} style={{ marginRight: '8px', verticalAlign: 'middle', color: '#F39C12' }} />
+        Rumeurs en attente de validation
+      </h4>
+
+      {pendingValidations.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+          <CheckCircle size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
+          <p>Aucune rumeur en attente de validation</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {pendingValidations.map(rumor => {
+            const level = VALIDATION_LEVELS.find(l => l.level === rumor.validation_level) || VALIDATION_LEVELS[0];
+            const priority = RUMOR_PRIORITIES.find(p => p.value === rumor.priority);
+            return (
+              <div
+                key={rumor.id}
+                style={{
+                  padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                  background: isDark ? '#0f172a' : '#ffffff',
+                  border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                  borderLeft: `4px solid ${level.color}`
+                }}
+                onClick={() => fetchRumorForValidation(rumor.id)}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8' }}>{rumor.code}</span>
+                      <span style={styles.badge(level.color)}>Niveau {rumor.validation_level}</span>
+                      {priority && <span style={styles.badge(priority.color)}>{priority.label}</span>}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>{rumor.title}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      <MapPin size={12} style={{ marginRight: '4px' }} />{rumor.region} • {new Date(rumor.created_at).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                  <button style={styles.btnPrimary} onClick={(e) => { e.stopPropagation(); fetchRumorForValidation(rumor.id); }}>
+                    <Eye size={16} /> Valider
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  // Render Validation Detail
+  const renderValidationDetail = () => {
+    if (!validationDetail) return null;
+    const level = VALIDATION_LEVELS.find(l => l.level === validationDetail.validation_level) || VALIDATION_LEVELS[0];
+    const nextLevel = VALIDATION_LEVELS.find(l => l.level === validationDetail.validation_level + 1);
+    const riskLevel = RISK_LEVELS.find(r => r.value === validationDetail.risk_level) || RISK_LEVELS[0];
+
+    return (
+      <div>
+        {/* Back button */}
+        <button style={{ ...styles.btnSecondary, marginBottom: '16px' }} onClick={() => setValidationDetail(null)}>
+          <ChevronLeft size={18} /> Retour à la liste
+        </button>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+          {/* Rumor Details */}
+          <div style={styles.card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '12px',
+                background: `${level.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <AlertTriangle size={24} color={level.color} />
+              </div>
+              <div>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: isDark ? '#64748b' : '#94a3b8' }}>{validationDetail.code}</span>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>{validationDetail.title}</h3>
+              </div>
+            </div>
+
+            {/* Status badges */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <span style={styles.badge(level.color)}>Niveau {validationDetail.validation_level}: {level.label}</span>
+              <span style={styles.badge(RUMOR_STATUSES.find(s => s.value === validationDetail.status)?.color || '#64748b')}>
+                {RUMOR_STATUSES.find(s => s.value === validationDetail.status)?.label || validationDetail.status}
+              </span>
+              <span style={styles.badge(RUMOR_PRIORITIES.find(p => p.value === validationDetail.priority)?.color || '#64748b')}>
+                {RUMOR_PRIORITIES.find(p => p.value === validationDetail.priority)?.label || validationDetail.priority}
+              </span>
+              <span style={styles.badge(riskLevel.color)}>
+                Risque: {riskLevel.label}
+              </span>
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>Description</h4>
+              <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b', lineHeight: '1.6' }}>
+                {validationDetail.description || 'Pas de description'}
+              </p>
+            </div>
+
+            {/* Location */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                <MapPin size={14} style={{ marginRight: '6px' }} />Localisation
+              </h4>
+              <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                {[validationDetail.location, validationDetail.district, validationDetail.department, validationDetail.region].filter(Boolean).join(', ') || 'Non spécifiée'}
+              </p>
+            </div>
+
+            {/* Reporter */}
+            {validationDetail.reporter_name && (
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                  <User size={14} style={{ marginRight: '6px' }} />Déclarant
+                </h4>
+                <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                  {validationDetail.reporter_name} {validationDetail.reporter_phone && `(${validationDetail.reporter_phone})`}
+                </p>
+              </div>
+            )}
+
+            {/* History */}
+            {validationDetail.history && validationDetail.history.length > 0 && (
+              <div>
+                <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                  <Activity size={14} style={{ marginRight: '6px' }} />Historique
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {validationDetail.history.slice(0, 5).map((h, idx) => (
+                    <div key={idx} style={{ padding: '8px 12px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '8px', fontSize: '13px' }}>
+                      <span style={{ color: isDark ? '#e2e8f0' : '#1e293b', fontWeight: '500' }}>{h.action}</span>
+                      <span style={{ color: isDark ? '#64748b' : '#94a3b8', marginLeft: '8px' }}>{h.details}</span>
+                      <span style={{ color: isDark ? '#475569' : '#94a3b8', marginLeft: '8px', fontSize: '11px' }}>
+                        {new Date(h.created_at).toLocaleString('fr-FR')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Actions Panel */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Validation Action */}
+            <div style={styles.card}>
+              <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                <ClipboardCheck size={16} style={{ marginRight: '8px', color: '#27AE60' }} />
+                Action de validation
+              </h4>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Type d'action</label>
+                <select style={styles.select} value={validationForm.action_type} onChange={e => setValidationForm({ ...validationForm, action_type: e.target.value })}>
+                  <option value="triage">Triage</option>
+                  <option value="verify">Vérification</option>
+                  <option value="risk_assess">Évaluation des risques</option>
+                  <option value="coordinate">Coordination</option>
+                  <option value="supervise">Supervision</option>
+                  <option value="escalate">Escalader</option>
+                  <option value="close">Clôturer</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Décision</label>
+                <select style={styles.select} value={validationForm.status} onChange={e => setValidationForm({ ...validationForm, status: e.target.value })}>
+                  <option value="validated">Valider et passer au niveau suivant</option>
+                  <option value="escalated">Escalader immédiatement</option>
+                  <option value="needs_info">Demander plus d'informations</option>
+                  <option value="rejected">Rejeter (fausse alerte)</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Notes</label>
+                <textarea
+                  style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+                  value={validationForm.notes}
+                  onChange={e => setValidationForm({ ...validationForm, notes: e.target.value })}
+                  placeholder="Notes de validation..."
+                />
+              </div>
+
+              {validationForm.status === 'rejected' && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={styles.label}>Raison du rejet</label>
+                  <textarea
+                    style={{ ...styles.input, minHeight: '60px' }}
+                    value={validationForm.rejection_reason}
+                    onChange={e => setValidationForm({ ...validationForm, rejection_reason: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <button style={{ ...styles.btnPrimary, width: '100%', justifyContent: 'center' }} onClick={handleValidation} disabled={loading}>
+                {loading ? <Loader size={18} /> : <CheckCircle size={18} />}
+                Soumettre la validation
+              </button>
+
+              {nextLevel && (
+                <p style={{ margin: '12px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', textAlign: 'center' }}>
+                  Prochain niveau: <strong>{nextLevel.label}</strong>
+                </p>
+              )}
+            </div>
+
+            {/* Risk Assessment (for level 3+) */}
+            {validationDetail.validation_level >= 3 && (
+              <div style={styles.card}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                  <Shield size={16} style={{ marginRight: '8px', color: '#E67E22' }} />
+                  Évaluation des risques
+                </h4>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={styles.label}>Niveau de risque</label>
+                  <select style={styles.select} defaultValue={validationDetail.risk_level}>
+                    {RISK_LEVELS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={styles.label}>Description du danger</label>
+                  <textarea style={{ ...styles.input, minHeight: '60px' }} placeholder="Décrire le danger identifié..." />
+                </div>
+
+                <button
+                  style={{ ...styles.btnSecondary, width: '100%', justifyContent: 'center' }}
+                  onClick={() => handleRiskAssessment({ risk_level: 'moderate', risk_description: 'Test' })}
+                >
+                  <Shield size={16} /> Enregistrer l'évaluation
+                </button>
+              </div>
+            )}
+
+            {/* Feedback / Retro-information */}
+            <div style={styles.card}>
+              <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                <MessageSquare size={16} style={{ marginRight: '8px', color: '#3498DB' }} />
+                Rétro-information
+              </h4>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Destinataire</label>
+                <select style={styles.select} value={feedbackForm.recipient_type} onChange={e => setFeedbackForm({ ...feedbackForm, recipient_type: e.target.value })}>
+                  <option value="reporter">Déclarant original</option>
+                  <option value="community">Communauté</option>
+                  <option value="health_workers">Agents de santé</option>
+                  <option value="authorities">Autorités</option>
+                  <option value="all_actors">Tous les acteurs</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Type de feedback</label>
+                <select style={styles.select} value={feedbackForm.feedback_type} onChange={e => setFeedbackForm({ ...feedbackForm, feedback_type: e.target.value })}>
+                  <option value="acknowledgment">Accusé de réception</option>
+                  <option value="status_update">Mise à jour du statut</option>
+                  <option value="clarification">Demande de clarification</option>
+                  <option value="response_action">Actions de réponse</option>
+                  <option value="alert">Alerte publique</option>
+                  <option value="correction">Correction d'information</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Message</label>
+                <textarea
+                  style={{ ...styles.input, minHeight: '80px' }}
+                  value={feedbackForm.message}
+                  onChange={e => setFeedbackForm({ ...feedbackForm, message: e.target.value })}
+                  placeholder="Message de rétro-information..."
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={styles.label}>Canal</label>
+                <select style={styles.select} value={feedbackForm.channel} onChange={e => setFeedbackForm({ ...feedbackForm, channel: e.target.value })}>
+                  <option value="system">Système (notification interne)</option>
+                  <option value="sms">SMS</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Téléphone</option>
+                </select>
+              </div>
+
+              <button
+                style={{ ...styles.btnSecondary, width: '100%', justifyContent: 'center' }}
+                onClick={handleSendFeedback}
+                disabled={!feedbackForm.message || loading}
+              >
+                <Send size={16} /> Envoyer le feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render Settings
   const renderSettings = () => (
     <div style={styles.card}>
@@ -1641,18 +2895,24 @@ const COHRMSystemPage = ({ isDark, token }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', background: isDark ? '#0f172a' : '#f1f5f9', padding: '6px', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', background: isDark ? '#0f172a' : '#f1f5f9', padding: '6px', borderRadius: '12px', flexWrap: 'wrap' }}>
             <button style={styles.tab(activeTab === 'dashboard')} onClick={() => setActiveTab('dashboard')}>
               <BarChart3 size={16} /> Dashboard
             </button>
             <button style={styles.tab(activeTab === 'rumors')} onClick={() => { setActiveTab('rumors'); setViewMode('list'); }}>
               <AlertTriangle size={16} /> Rumeurs
             </button>
+            <button style={styles.tab(activeTab === 'actors')} onClick={() => { setActiveTab('actors'); fetchActors(); }}>
+              <Users size={16} /> Acteurs
+            </button>
+            <button style={styles.tab(activeTab === 'validation')} onClick={() => { setActiveTab('validation'); fetchPendingValidations(); }}>
+              <ClipboardCheck size={16} /> Validation
+            </button>
             <button style={styles.tab(activeTab === 'sms-decoder')} onClick={() => setActiveTab('sms-decoder')}>
               <Phone size={16} /> SMS
             </button>
             <button style={styles.tab(activeTab === 'scan-history')} onClick={() => { setActiveTab('scan-history'); fetchScanHistory(); }}>
-              <Globe size={16} /> Historique Scans
+              <Globe size={16} /> Scans
             </button>
             <button style={styles.tab(activeTab === 'settings')} onClick={() => setActiveTab('settings')}>
               <Settings size={16} /> Paramètres
@@ -1664,9 +2924,21 @@ const COHRMSystemPage = ({ isDark, token }) => {
       {/* Content */}
       {activeTab === 'dashboard' && renderDashboard()}
       {activeTab === 'rumors' && (viewMode === 'form' ? renderRumorForm() : renderRumorsList())}
+      {activeTab === 'actors' && (actorViewMode === 'form' ? renderActorForm() : renderActorsList())}
+      {activeTab === 'validation' && (validationDetail ? renderValidationDetail() : renderValidationList())}
       {activeTab === 'sms-decoder' && renderSMSDecoder()}
       {activeTab === 'scan-history' && renderScanHistory()}
       {activeTab === 'settings' && renderSettings()}
+
+      {/* Map Modal */}
+      <MapModal
+        isOpen={showMapModal}
+        onClose={() => setShowMapModal(false)}
+        onConfirm={handleMapConfirm}
+        initialPosition={rumorForm.latitude && rumorForm.longitude ? { lat: parseFloat(rumorForm.latitude), lng: parseFloat(rumorForm.longitude) } : null}
+        initialGeometryType={rumorForm.geometry_type}
+        initialGeometryData={rumorForm.geometry_data}
+      />
 
       <style>{`
         @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

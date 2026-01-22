@@ -14627,11 +14627,11 @@ const OHELearningPage = ({ isDark, token }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [certificates, setCertificates] = useState([]);
 
-  // UI states
-  const [showCourseModal, setShowCourseModal] = useState(false);
-  const [showModuleModal, setShowModuleModal] = useState(false);
-  const [showLessonModal, setShowLessonModal] = useState(false);
-  const [showPathModal, setShowPathModal] = useState(false);
+  // UI states - Inline forms (replacing modals)
+  const [showCourseForm, setShowCourseForm] = useState(false);
+  const [showModuleForm, setShowModuleForm] = useState(false);
+  const [showLessonForm, setShowLessonForm] = useState(false);
+  const [showPathForm, setShowPathForm] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
@@ -14763,7 +14763,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
       if (res.success) {
         setToast({ message: editingCourse ? 'Cours mis à jour' : 'Cours créé', type: 'success' });
-        setShowCourseModal(false);
+        setShowCourseForm(false);
         setEditingCourse(null);
         fetchCourses();
         fetchStats();
@@ -14805,7 +14805,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
       if (res.success) {
         setToast({ message: editingModule ? 'Module mis à jour' : 'Module créé', type: 'success' });
-        setShowModuleModal(false);
+        setShowModuleForm(false);
         setEditingModule(null);
         // Refresh course curriculum
         const currRes = await api.get(`/elearning/courses/${selectedCourse.id}/curriculum`, token);
@@ -14852,7 +14852,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
       if (res.success) {
         setToast({ message: editingLesson ? 'Leçon mise à jour' : 'Leçon créée', type: 'success' });
-        setShowLessonModal(false);
+        setShowLessonForm(false);
         setEditingLesson(null);
         // Refresh
         const currRes = await api.get(`/elearning/courses/${selectedCourse.id}/curriculum`, token);
@@ -14903,7 +14903,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
       if (res.success) {
         setToast({ message: editingPath ? 'Parcours mis à jour' : 'Parcours créé', type: 'success' });
-        setShowPathModal(false);
+        setShowPathForm(false);
         setEditingPath(null);
         fetchLearningPaths();
       } else {
@@ -15306,8 +15306,8 @@ const OHELearningPage = ({ isDark, token }) => {
           <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>Actions Rapides</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             {[
-              { icon: Plus, label: 'Nouveau Cours', action: () => { setEditingCourse(null); setShowCourseModal(true); }, color: colors.primary },
-              { icon: Award, label: 'Nouveau Parcours', action: () => { setEditingPath(null); setShowPathModal(true); }, color: colors.purple },
+              { icon: Plus, label: 'Nouveau Cours', action: () => { setEditingCourse(null); setShowCourseForm(true); }, color: colors.primary },
+              { icon: Award, label: 'Nouveau Parcours', action: () => { setEditingPath(null); setShowPathForm(true); }, color: colors.purple },
               { icon: Tag, label: 'Catégorie', action: () => { setEditingCategory(null); setShowCategoryModal(true); }, color: colors.teal },
               { icon: RefreshCw, label: 'Actualiser', action: () => { fetchStats(); fetchCourses(); }, color: colors.success }
             ].map((item, i) => (
@@ -15361,18 +15361,24 @@ const OHELearningPage = ({ isDark, token }) => {
   );
 
   // ============ RENDER COURSES TAB ============
-  const renderCourses = () => (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Gestion des Cours</h2>
-          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredCourses.length} cours</p>
+  const renderCourses = () => {
+    // Show inline form when editing/creating course
+    if (showCourseForm) {
+      return <CourseFormInline />;
+    }
+
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Gestion des Cours</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredCourses.length} cours</p>
+          </div>
+          <button onClick={() => { setEditingCourse(null); setShowCourseForm(true); }} style={styles.btnPrimary}>
+            <Plus size={18} /> Nouveau Cours
+          </button>
         </div>
-        <button onClick={() => { setEditingCourse(null); setShowCourseModal(true); }} style={styles.btnPrimary}>
-          <Plus size={18} /> Nouveau Cours
-        </button>
-      </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -15471,7 +15477,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 <button onClick={() => viewCourseCurriculum(course)} style={{ ...styles.btnSecondary, flex: 1, padding: '10px' }}>
                   <FolderTree size={16} /> Modules
                 </button>
-                <button onClick={() => { setEditingCourse(course); setShowCourseModal(true); }} style={{ ...styles.btnIcon, background: `${colors.primary}15`, color: colors.primary }}>
+                <button onClick={() => { setEditingCourse(course); setShowCourseForm(true); }} style={{ ...styles.btnIcon, background: `${colors.primary}15`, color: colors.primary }}>
                   <Edit3 size={16} />
                 </button>
                 <button onClick={() => handleDeleteCourse(course)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
@@ -15483,10 +15489,21 @@ const OHELearningPage = ({ isDark, token }) => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // ============ RENDER CURRICULUM TAB ============
   const renderCurriculum = () => {
+    // Show inline form when editing/creating module
+    if (showModuleForm) {
+      return <ModuleFormInline />;
+    }
+
+    // Show inline form when editing/creating lesson
+    if (showLessonForm) {
+      return <LessonFormInline />;
+    }
+
     if (!selectedCourse) {
       return (
         <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
@@ -15536,7 +15553,7 @@ const OHELearningPage = ({ isDark, token }) => {
         {/* Add Module Button */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Modules & Leçons</h3>
-          <button onClick={() => { setEditingModule(null); setShowModuleModal(true); }} style={styles.btnPrimary}>
+          <button onClick={() => { setEditingModule(null); setShowModuleForm(true); }} style={styles.btnPrimary}>
             <Plus size={18} /> Ajouter un Module
           </button>
         </div>
@@ -15570,11 +15587,11 @@ const OHELearningPage = ({ isDark, token }) => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => { setSelectedModule(module); setEditingLesson(null); setShowLessonModal(true); }}
+                    <button onClick={() => { setSelectedModule(module); setEditingLesson(null); setShowLessonForm(true); }}
                       style={{ ...styles.btnSecondary, padding: '8px 12px', fontSize: '12px' }}>
                       <Plus size={14} /> Leçon
                     </button>
-                    <button onClick={() => { setEditingModule(module); setShowModuleModal(true); }}
+                    <button onClick={() => { setEditingModule(module); setShowModuleForm(true); }}
                       style={{ ...styles.btnIcon, background: `${colors.primary}15`, color: colors.primary, width: '32px', height: '32px' }}>
                       <Edit3 size={14} />
                     </button>
@@ -15617,7 +15634,7 @@ const OHELearningPage = ({ isDark, token }) => {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => { setSelectedModule(module); setEditingLesson(lesson); setShowLessonModal(true); }}
+                          <button onClick={() => { setSelectedModule(module); setEditingLesson(lesson); setShowLessonForm(true); }}
                             style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.primary}15`, color: colors.primary }}>
                             <Edit3 size={12} />
                           </button>
@@ -15639,18 +15656,24 @@ const OHELearningPage = ({ isDark, token }) => {
   };
 
   // ============ RENDER LEARNING PATHS TAB ============
-  const renderPaths = () => (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Parcours Diplômants</h2>
-          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredPaths.length} parcours</p>
+  const renderPaths = () => {
+    // Show inline form when editing/creating path
+    if (showPathForm) {
+      return <PathFormInline />;
+    }
+
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Parcours Diplômants</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>{filteredPaths.length} parcours</p>
+          </div>
+          <button onClick={() => { setEditingPath(null); setShowPathForm(true); }} style={styles.btnPrimary}>
+            <Plus size={18} /> Nouveau Parcours
+          </button>
         </div>
-        <button onClick={() => { setEditingPath(null); setShowPathModal(true); }} style={styles.btnPrimary}>
-          <Plus size={18} /> Nouveau Parcours
-        </button>
-      </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -15716,7 +15739,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 <button onClick={() => viewPathCourses(path)} style={{ ...styles.btnSecondary, flex: 1 }}>
                   <BookOpen size={16} /> Cours
                 </button>
-                <button onClick={() => { setEditingPath(path); setShowPathModal(true); }} style={styles.btnIcon}>
+                <button onClick={() => { setEditingPath(path); setShowPathForm(true); }} style={styles.btnIcon}>
                   <Edit3 size={16} />
                 </button>
                 <button onClick={() => handleDeletePath(path)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
@@ -15728,7 +15751,8 @@ const OHELearningPage = ({ isDark, token }) => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // Helper functions for Question types
   const getQuestionTypeBadge = (type) => {
@@ -16905,7 +16929,8 @@ const OHELearningPage = ({ isDark, token }) => {
   );
 
   // ============ COURSE MODAL ============
-  const CourseModal = () => {
+  // ============ COURSE FORM INLINE ============
+  const CourseFormInline = () => {
     const [form, setForm] = useState({
       title_fr: editingCourse?.title_fr || '',
       title_en: editingCourse?.title_en || '',
@@ -16951,8 +16976,49 @@ const OHELearningPage = ({ isDark, token }) => {
     };
 
     return (
-      <Modal isOpen={showCourseModal} onClose={() => setShowCourseModal(false)} title={editingCourse ? 'Modifier le Cours' : 'Nouveau Cours'} isDark={isDark} width="700px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header with title and Retour button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `${colors.primary}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <BookOpen size={20} color={colors.primary} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+                {editingCourse ? 'Modifier le Cours' : 'Nouveau Cours'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Configurez les paramètres du cours
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCourseForm(false)}
+            style={{
+              ...styles.btnSecondary,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Retour
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Thumbnail */}
           <div>
             <label style={styles.label}>Image du cours</label>
@@ -16981,18 +17047,18 @@ const OHELearningPage = ({ isDark, token }) => {
             <input type="file" id="course-thumbnail-input" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
           </div>
 
-          {/* Title FR */}
-          <div>
-            <label style={styles.label}>Titre (Français) *</label>
-            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-              style={styles.input} placeholder="Introduction à One Health" />
-          </div>
-
-          {/* Title EN */}
-          <div>
-            <label style={styles.label}>Titre (Anglais)</label>
-            <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
-              style={styles.input} placeholder="Introduction to One Health" />
+          {/* Title FR/EN side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Titre (Français) *</label>
+              <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+                style={styles.input} placeholder="Introduction à One Health" />
+            </div>
+            <div>
+              <label style={styles.label}>Titre (Anglais)</label>
+              <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
+                style={styles.input} placeholder="Introduction to One Health" />
+            </div>
           </div>
 
           {/* Short Description */}
@@ -17003,8 +17069,8 @@ const OHELearningPage = ({ isDark, token }) => {
               placeholder="Une brève description du cours..." />
           </div>
 
-          {/* Row: Level, Duration, Category */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          {/* Row: Level, Duration, Category, Status */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Niveau</label>
               <select value={form.level} onChange={e => setForm({ ...form, level: e.target.value })} style={styles.select}>
@@ -17027,10 +17093,6 @@ const OHELearningPage = ({ isDark, token }) => {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Row: Status, Featured */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Statut</label>
               <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
@@ -17039,13 +17101,19 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="archived">Archivé</option>
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', paddingTop: '28px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} />
-                <span style={{ fontSize: '14px' }}>Mettre en vedette</span>
-              </label>
-            </div>
           </div>
+
+          {/* Featured checkbox */}
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+            padding: '12px', borderRadius: '10px',
+            background: form.is_featured ? `${colors.warning}10` : (isDark ? '#1e293b' : 'white'),
+            border: `1px solid ${form.is_featured ? colors.warning : (isDark ? '#334155' : '#e2e8f0')}`
+          }}>
+            <input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} style={{ accentColor: colors.warning }} />
+            <Star size={16} color={form.is_featured ? colors.warning : (isDark ? '#64748b' : '#94a3b8')} />
+            <span style={{ fontSize: '13px' }}>Mettre en vedette</span>
+          </label>
 
           {/* Grade settings */}
           <div style={{
@@ -17081,8 +17149,8 @@ const OHELearningPage = ({ isDark, token }) => {
                   style={styles.select}
                 >
                   <option value="">Aucun quiz final</option>
-                  {quizzes.filter(q => q.quiz_type === 'final_exam' && q.status === 'published').map(quiz => (
-                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                  {quizzes.filter(q => q.status === 'published').map(quiz => (
+                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr} ({quiz.quiz_type === 'final_exam' ? 'Examen final' : quiz.quiz_type === 'chapter_quiz' ? 'Quiz chapitre' : 'Quiz'})</option>
                   ))}
                 </select>
               </div>
@@ -17124,19 +17192,25 @@ const OHELearningPage = ({ isDark, token }) => {
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowCourseModal(false)} style={styles.btnSecondary}>Annuler</button>
+          <div style={{
+            display: 'flex', gap: '12px', justifyContent: 'flex-end',
+            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <button onClick={() => setShowCourseForm(false)} style={styles.btnSecondary}>
+              Annuler
+            </button>
             <button onClick={() => handleSaveCourse(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingCourse ? 'Enregistrer' : 'Créer le cours'}
+              {editingCourse ? 'Enregistrer les modifications' : 'Créer le cours'}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
     );
   };
 
   // ============ MODULE MODAL ============
-  const ModuleModal = () => {
+  // ============ MODULE FORM INLINE ============
+  const ModuleFormInline = () => {
     const [form, setForm] = useState({
       title_fr: editingModule?.title_fr || '',
       title_en: editingModule?.title_en || '',
@@ -17150,23 +17224,69 @@ const OHELearningPage = ({ isDark, token }) => {
     });
 
     return (
-      <Modal isOpen={showModuleModal} onClose={() => setShowModuleModal(false)} title={editingModule ? 'Modifier le Module' : 'Nouveau Module'} isDark={isDark} width="600px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={styles.label}>Titre (Français) *</label>
-            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-              style={styles.input} placeholder="Module 1: Introduction" />
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header with title and Retour button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `${colors.success}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Layers size={20} color={colors.success} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+                {editingModule ? 'Modifier le Module' : 'Nouveau Module'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                {selectedCourse ? `Cours: ${selectedCourse.title_fr}` : 'Configurez le module'}
+              </p>
+            </div>
           </div>
-          <div>
-            <label style={styles.label}>Titre (Anglais)</label>
-            <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
-              style={styles.input} placeholder="Module 1: Introduction" />
+          <button
+            onClick={() => setShowModuleForm(false)}
+            style={{
+              ...styles.btnSecondary,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Retour
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Title FR/EN side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Titre (Français) *</label>
+              <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+                style={styles.input} placeholder="Module 1: Introduction" />
+            </div>
+            <div>
+              <label style={styles.label}>Titre (Anglais)</label>
+              <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
+                style={styles.input} placeholder="Module 1: Introduction" />
+            </div>
           </div>
+
           <div>
             <label style={styles.label}>Description</label>
             <textarea value={form.description_fr} onChange={e => setForm({ ...form, description_fr: e.target.value })}
               style={{ ...styles.input, minHeight: '80px' }} placeholder="Description du module..." />
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Durée (minutes)</label>
@@ -17250,19 +17370,23 @@ const OHELearningPage = ({ isDark, token }) => {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowModuleModal(false)} style={styles.btnSecondary}>Annuler</button>
+          {/* Actions */}
+          <div style={{
+            display: 'flex', gap: '12px', justifyContent: 'flex-end',
+            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <button onClick={() => setShowModuleForm(false)} style={styles.btnSecondary}>Annuler</button>
             <button onClick={() => handleSaveModule(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingModule ? 'Enregistrer' : 'Créer le module'}
+              {editingModule ? 'Enregistrer les modifications' : 'Créer le module'}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
     );
   };
 
-  // ============ LESSON MODAL ============
-  const LessonModal = () => {
+  // ============ LESSON FORM INLINE ============
+  const LessonFormInline = () => {
     const [form, setForm] = useState({
       title_fr: editingLesson?.title_fr || '',
       title_en: editingLesson?.title_en || '',
@@ -17272,7 +17396,8 @@ const OHELearningPage = ({ isDark, token }) => {
       pdf_url: editingLesson?.pdf_url || '',
       duration_minutes: editingLesson?.duration_minutes || 0,
       is_preview: editingLesson?.is_preview || false,
-      status: editingLesson?.status || 'draft'
+      status: editingLesson?.status || 'draft',
+      quiz_weight: editingLesson?.quiz_weight || 1.00
     });
 
     const [uploading, setUploading] = useState(false);
@@ -17324,15 +17449,56 @@ const OHELearningPage = ({ isDark, token }) => {
     };
 
     return (
-      <Modal isOpen={showLessonModal} onClose={() => setShowLessonModal(false)} title={editingLesson ? 'Modifier la Leçon' : 'Nouvelle Leçon'} isDark={isDark} width="650px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header with title and Retour button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `${colors.success}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <FileText size={20} color={colors.success} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+                {editingLesson ? 'Modifier la Leçon' : 'Nouvelle Leçon'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Configurez le contenu de la leçon
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowLessonForm(false)}
+            style={{
+              ...styles.btnSecondary,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Retour
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label style={styles.label}>Titre (Français) *</label>
             <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
               style={styles.input} placeholder="Leçon 1: Introduction" />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Type de contenu</label>
               <select value={form.content_type} onChange={e => setForm({ ...form, content_type: e.target.value })} style={styles.select}>
@@ -17346,6 +17512,11 @@ const OHELearningPage = ({ isDark, token }) => {
               <label style={styles.label}>Durée (minutes)</label>
               <input type="number" value={form.duration_minutes} onChange={e => setForm({ ...form, duration_minutes: parseInt(e.target.value) || 0 })}
                 style={styles.input} min="0" />
+            </div>
+            <div>
+              <label style={styles.label}>Poids quiz</label>
+              <input type="number" value={form.quiz_weight} onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
+                style={styles.input} min="0.1" max="10" step="0.1" />
             </div>
           </div>
 
@@ -17428,19 +17599,22 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowLessonModal(false)} style={styles.btnSecondary}>Annuler</button>
+          <div style={{
+            display: 'flex', gap: '12px', justifyContent: 'flex-end',
+            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <button onClick={() => setShowLessonForm(false)} style={styles.btnSecondary}>Annuler</button>
             <button onClick={() => handleSaveLesson(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingLesson ? 'Enregistrer' : 'Créer la leçon'}
+              {editingLesson ? 'Enregistrer les modifications' : 'Créer la leçon'}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
     );
   };
 
-  // ============ PATH MODAL ============
-  const PathModal = () => {
+  // ============ PATH FORM INLINE ============
+  const PathFormInline = () => {
     const [form, setForm] = useState({
       title_fr: editingPath?.title_fr || '',
       title_en: editingPath?.title_en || '',
@@ -17458,23 +17632,68 @@ const OHELearningPage = ({ isDark, token }) => {
     });
 
     return (
-      <Modal isOpen={showPathModal} onClose={() => setShowPathModal(false)} title={editingPath ? 'Modifier le Parcours' : 'Nouveau Parcours'} isDark={isDark} width="600px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={styles.label}>Titre (Français) *</label>
-            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-              style={styles.input} placeholder="One Health Leadership" />
+      <div style={{ ...styles.card, padding: '0' }}>
+        {/* Header with title and Retour button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px 24px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          background: isDark ? '#1e293b' : '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: `${colors.warning}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Award size={20} color={colors.warning} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+                {editingPath ? 'Modifier le Parcours' : 'Nouveau Parcours'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Configurez le parcours d'apprentissage
+              </p>
+            </div>
           </div>
-          <div>
-            <label style={styles.label}>Titre (Anglais)</label>
-            <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
-              style={styles.input} />
+          <button
+            onClick={() => setShowPathForm(false)}
+            style={{
+              ...styles.btnSecondary,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Retour
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Titre (Français) *</label>
+              <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+                style={styles.input} placeholder="One Health Leadership" />
+            </div>
+            <div>
+              <label style={styles.label}>Titre (Anglais)</label>
+              <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
+                style={styles.input} />
+            </div>
           </div>
+
           <div>
             <label style={styles.label}>Description courte</label>
             <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
               style={{ ...styles.input, minHeight: '80px' }} placeholder="Description du parcours..." />
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Niveau</label>
@@ -17495,6 +17714,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 style={styles.input} min="0" max="100" />
             </div>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <label style={styles.label}>Statut</label>
@@ -17548,8 +17768,8 @@ const OHELearningPage = ({ isDark, token }) => {
                     style={styles.select}
                   >
                     <option value="">Sélectionner un quiz</option>
-                    {quizzes.filter(q => q.quiz_type === 'final_exam' && q.status === 'published').map(quiz => (
-                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                    {quizzes.filter(q => q.status === 'published').map(quiz => (
+                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr} ({quiz.quiz_type === 'final_exam' ? 'Examen final' : quiz.quiz_type === 'chapter_quiz' ? 'Quiz chapitre' : 'Quiz'})</option>
                     ))}
                   </select>
                 </div>
@@ -17586,14 +17806,17 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowPathModal(false)} style={styles.btnSecondary}>Annuler</button>
+          <div style={{
+            display: 'flex', gap: '12px', justifyContent: 'flex-end',
+            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <button onClick={() => setShowPathForm(false)} style={styles.btnSecondary}>Annuler</button>
             <button onClick={() => handleSavePath(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingPath ? 'Enregistrer' : 'Créer le parcours'}
+              {editingPath ? 'Enregistrer les modifications' : 'Créer le parcours'}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
     );
   };
 
@@ -19459,10 +19682,6 @@ const OHELearningPage = ({ isDark, token }) => {
       )}
 
       {/* Modals */}
-      {showCourseModal && <CourseModal />}
-      {showModuleModal && <ModuleModal />}
-      {showLessonModal && <LessonModal />}
-      {showPathModal && <PathModal />}
       {showCategoryModal && <CategoryModal />}
       {showQuizQuestionsModal && <QuizQuestionsModal />}
 

@@ -178,8 +178,8 @@ router.get('/rumors', auth, async (req, res) => {
 
     let query = `
       SELECT r.*,
-        u.name as assigned_user_name,
-        reporter.name as reporter_name
+        CONCAT(u.first_name, ' ', u.last_name) as assigned_user_name,
+        CONCAT(reporter.first_name, ' ', reporter.last_name) as reported_by_name
       FROM cohrm_rumors r
       LEFT JOIN users u ON r.assigned_to = u.id
       LEFT JOIN users reporter ON r.reported_by = reporter.id
@@ -229,7 +229,7 @@ router.get('/rumors', auth, async (req, res) => {
     }
 
     // Count total
-    const countQuery = query.replace('SELECT r.*, u.name as assigned_user_name, reporter.name as reporter_name', 'SELECT COUNT(*) as total');
+    const countQuery = query.replace("SELECT r.*,\n        CONCAT(u.first_name, ' ', u.last_name) as assigned_user_name,\n        CONCAT(reporter.first_name, ' ', reporter.last_name) as reported_by_name", 'SELECT COUNT(*) as total');
     const [[{ total }]] = await db.query(countQuery, params);
 
     // Pagination
@@ -260,8 +260,8 @@ router.get('/rumors/:id', auth, async (req, res) => {
   try {
     const [rumors] = await db.query(`
       SELECT r.*,
-        u.name as assigned_user_name,
-        reporter.name as reporter_name
+        CONCAT(u.first_name, ' ', u.last_name) as assigned_user_name,
+        CONCAT(reporter.first_name, ' ', reporter.last_name) as reported_by_name
       FROM cohrm_rumors r
       LEFT JOIN users u ON r.assigned_to = u.id
       LEFT JOIN users reporter ON r.reported_by = reporter.id
@@ -274,7 +274,7 @@ router.get('/rumors/:id', auth, async (req, res) => {
 
     // Historique des actions
     const [history] = await db.query(`
-      SELECT h.*, u.name as user_name
+      SELECT h.*, CONCAT(u.first_name, ' ', u.last_name) as user_name
       FROM cohrm_rumor_history h
       LEFT JOIN users u ON h.user_id = u.id
       WHERE h.rumor_id = ?
@@ -283,7 +283,7 @@ router.get('/rumors/:id', auth, async (req, res) => {
 
     // Notes
     const [notes] = await db.query(`
-      SELECT n.*, u.name as user_name
+      SELECT n.*, CONCAT(u.first_name, ' ', u.last_name) as user_name
       FROM cohrm_rumor_notes n
       LEFT JOIN users u ON n.user_id = u.id
       WHERE n.rumor_id = ?
@@ -1010,6 +1010,894 @@ router.post('/scan/run', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Run scan error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// THEMES (Catégories de rumeurs)
+// ============================================
+
+// GET /api/cohrm/themes - Liste des thèmes
+router.get('/themes', auth, async (req, res) => {
+  try {
+    const [themes] = await db.query(`
+      SELECT * FROM cohrm_themes
+      WHERE is_active = 1
+      ORDER BY display_order, label_fr
+    `);
+
+    // Grouper par catégorie
+    const grouped = themes.reduce((acc, theme) => {
+      if (!acc[theme.category]) acc[theme.category] = [];
+      acc[theme.category].push(theme);
+      return acc;
+    }, {});
+
+    res.json({ success: true, data: { themes, grouped } });
+  } catch (error) {
+    console.error('Get themes error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// ACTEURS COHRM (5 niveaux hiérarchiques)
+// ============================================
+
+// GET /api/cohrm/actors - Liste des acteurs
+router.get('/actors', auth, async (req, res) => {
+  try {
+    const { level, region, is_active } = req.query;
+
+    let query = `
+      SELECT a.*, CONCAT(u.first_name, ' ', u.last_name) as user_name, u.email as user_email
+      FROM cohrm_actors a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (level) {
+      query += ' AND a.actor_level = ?';
+      params.push(level);
+    }
+
+    if (region) {
+      query += ' AND a.region = ?';
+      params.push(region);
+    }
+
+    if (is_active !== undefined) {
+      query += ' AND a.is_active = ?';
+      params.push(is_active === 'true' ? 1 : 0);
+    }
+
+    query += ' ORDER BY a.actor_level, a.region, a.organization';
+
+    const [actors] = await db.query(query, params);
+
+    res.json({ success: true, data: actors });
+  } catch (error) {
+    console.error('Get actors error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/actors/:id - Détail d'un acteur
+router.get('/actors/:id', auth, async (req, res) => {
+  try {
+    const [actors] = await db.query(`
+      SELECT a.*, CONCAT(u.first_name, ' ', u.last_name) as user_name, u.email as user_email
+      FROM cohrm_actors a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.id = ?
+    `, [req.params.id]);
+
+    if (actors.length === 0) {
+      return res.status(404).json({ success: false, message: 'Acteur non trouvé' });
+    }
+
+    // Récupérer les validations effectuées par cet acteur
+    const [validations] = await db.query(`
+      SELECT v.*, r.code as rumor_code, r.title as rumor_title
+      FROM cohrm_validations v
+      JOIN cohrm_rumors r ON v.rumor_id = r.id
+      WHERE v.actor_id = ?
+      ORDER BY v.created_at DESC
+      LIMIT 20
+    `, [req.params.id]);
+
+    res.json({
+      success: true,
+      data: {
+        ...actors[0],
+        recent_validations: validations
+      }
+    });
+  } catch (error) {
+    console.error('Get actor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/actors - Créer un acteur
+router.post('/actors', auth, authorize('admin'), async (req, res) => {
+  try {
+    const {
+      user_id,
+      actor_level,
+      actor_type,
+      region,
+      department,
+      district,
+      organization,
+      role_in_org,
+      phone,
+      email,
+      transmission_channel
+    } = req.body;
+
+    if (!actor_level || !actor_type) {
+      return res.status(400).json({
+        success: false,
+        message: 'Niveau et type d\'acteur sont requis'
+      });
+    }
+
+    const [result] = await db.query(`
+      INSERT INTO cohrm_actors (
+        user_id, actor_level, actor_type, region, department, district,
+        organization, role_in_org, phone, email, transmission_channel,
+        is_active, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+    `, [
+      user_id, actor_level, actor_type, region, department, district,
+      organization, role_in_org, phone, email, transmission_channel || 'system'
+    ]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Acteur créé avec succès',
+      data: { id: result.insertId }
+    });
+  } catch (error) {
+    console.error('Create actor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/actors/:id - Mettre à jour un acteur
+router.put('/actors/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      user_id,
+      actor_level,
+      actor_type,
+      region,
+      department,
+      district,
+      organization,
+      role_in_org,
+      phone,
+      email,
+      transmission_channel,
+      is_active
+    } = req.body;
+
+    await db.query(`
+      UPDATE cohrm_actors SET
+        user_id = COALESCE(?, user_id),
+        actor_level = COALESCE(?, actor_level),
+        actor_type = COALESCE(?, actor_type),
+        region = COALESCE(?, region),
+        department = COALESCE(?, department),
+        district = COALESCE(?, district),
+        organization = COALESCE(?, organization),
+        role_in_org = COALESCE(?, role_in_org),
+        phone = COALESCE(?, phone),
+        email = COALESCE(?, email),
+        transmission_channel = COALESCE(?, transmission_channel),
+        is_active = COALESCE(?, is_active),
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      user_id, actor_level, actor_type, region, department, district,
+      organization, role_in_org, phone, email, transmission_channel,
+      is_active !== undefined ? (is_active ? 1 : 0) : null, id
+    ]);
+
+    res.json({ success: true, message: 'Acteur mis à jour' });
+  } catch (error) {
+    console.error('Update actor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/cohrm/actors/:id - Désactiver un acteur
+router.delete('/actors/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    await db.query('UPDATE cohrm_actors SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Acteur désactivé' });
+  } catch (error) {
+    console.error('Delete actor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/actor-types - Types d'acteurs par niveau
+router.get('/actor-types', auth, async (req, res) => {
+  try {
+    const [settings] = await db.query(
+      "SELECT value FROM cohrm_settings WHERE `key` = 'actor_types'"
+    );
+
+    if (settings.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+
+    const actorTypes = JSON.parse(settings[0].value);
+    res.json({ success: true, data: actorTypes });
+  } catch (error) {
+    console.error('Get actor types error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// WORKFLOW DE VALIDATION MULTI-NIVEAUX
+// ============================================
+
+// GET /api/cohrm/rumors/:id/validations - Historique des validations d'une rumeur
+router.get('/rumors/:id/validations', auth, async (req, res) => {
+  try {
+    const [validations] = await db.query(`
+      SELECT v.*,
+        a.actor_type, a.organization,
+        CONCAT(u.first_name, ' ', u.last_name) as user_name
+      FROM cohrm_validations v
+      LEFT JOIN cohrm_actors a ON v.actor_id = a.id
+      LEFT JOIN users u ON v.user_id = u.id
+      WHERE v.rumor_id = ?
+      ORDER BY v.level ASC, v.created_at DESC
+    `, [req.params.id]);
+
+    res.json({ success: true, data: validations });
+  } catch (error) {
+    console.error('Get validations error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/rumors/:id/validate - Valider/Escalader une rumeur
+router.post('/rumors/:id/validate', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      action_type,
+      status,
+      notes,
+      rejection_reason,
+      actor_id
+    } = req.body;
+
+    // Récupérer la rumeur actuelle
+    const [rumors] = await db.query('SELECT * FROM cohrm_rumors WHERE id = ?', [id]);
+    if (rumors.length === 0) {
+      return res.status(404).json({ success: false, message: 'Rumeur non trouvée' });
+    }
+
+    const rumor = rumors[0];
+    const currentLevel = rumor.validation_level || 1;
+
+    // Déterminer le nouveau niveau
+    let newLevel = currentLevel;
+    if (status === 'validated' && currentLevel < 5) {
+      newLevel = currentLevel + 1;
+    } else if (status === 'escalated') {
+      newLevel = Math.min(currentLevel + 1, 5);
+    }
+
+    // Créer l'entrée de validation
+    await db.query(`
+      INSERT INTO cohrm_validations (
+        rumor_id, actor_id, user_id, level, action_type,
+        status, notes, rejection_reason, validated_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `, [
+      id, actor_id, req.user.id, currentLevel, action_type,
+      status, notes, rejection_reason
+    ]);
+
+    // Mettre à jour le niveau de validation de la rumeur
+    if (status === 'validated' || status === 'escalated') {
+      await db.query(`
+        UPDATE cohrm_rumors
+        SET validation_level = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [newLevel, id]);
+    }
+
+    // Ajouter à l'historique
+    await db.query(`
+      INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
+      VALUES (?, ?, 'validation', ?, NOW())
+    `, [id, req.user.id, `${action_type}: ${status} (niveau ${currentLevel} → ${newLevel})`]);
+
+    res.json({
+      success: true,
+      message: 'Validation enregistrée',
+      data: { new_level: newLevel }
+    });
+  } catch (error) {
+    console.error('Validate rumor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/rumors/:id/risk-assessment - Évaluation des risques
+router.post('/rumors/:id/risk-assessment', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      risk_level,
+      risk_description,
+      risk_context,
+      risk_exposure
+    } = req.body;
+
+    await db.query(`
+      UPDATE cohrm_rumors SET
+        risk_level = ?,
+        risk_description = ?,
+        risk_context = ?,
+        risk_exposure = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `, [risk_level, risk_description, risk_context, risk_exposure, id]);
+
+    // Ajouter à l'historique
+    await db.query(`
+      INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
+      VALUES (?, ?, 'risk_assessment', ?, NOW())
+    `, [id, req.user.id, `Niveau de risque évalué: ${risk_level}`]);
+
+    res.json({ success: true, message: 'Évaluation des risques enregistrée' });
+  } catch (error) {
+    console.error('Risk assessment error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// RETRO-INFORMATION (Feedback)
+// ============================================
+
+// GET /api/cohrm/rumors/:id/feedback - Feedback d'une rumeur
+router.get('/rumors/:id/feedback', auth, async (req, res) => {
+  try {
+    const [feedback] = await db.query(`
+      SELECT f.*,
+        CONCAT(u.first_name, ' ', u.last_name) as sender_name,
+        a.actor_type as sender_actor_type
+      FROM cohrm_feedback f
+      LEFT JOIN users u ON f.sender_id = u.id
+      LEFT JOIN cohrm_actors a ON f.sender_actor_id = a.id
+      WHERE f.rumor_id = ?
+      ORDER BY f.created_at DESC
+    `, [req.params.id]);
+
+    res.json({ success: true, data: feedback });
+  } catch (error) {
+    console.error('Get feedback error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/rumors/:id/feedback - Envoyer un feedback
+router.post('/rumors/:id/feedback', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      recipient_type,
+      recipient_phone,
+      recipient_email,
+      feedback_type,
+      message,
+      channel,
+      actor_id
+    } = req.body;
+
+    if (!recipient_type || !feedback_type || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type de destinataire, type de feedback et message sont requis'
+      });
+    }
+
+    // Créer l'entrée de feedback
+    const [result] = await db.query(`
+      INSERT INTO cohrm_feedback (
+        rumor_id, sender_id, sender_actor_id, recipient_type,
+        recipient_phone, recipient_email, feedback_type,
+        message, channel, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+    `, [
+      id, req.user.id, actor_id, recipient_type,
+      recipient_phone, recipient_email, feedback_type,
+      message, channel || 'system'
+    ]);
+
+    // Si le canal est SMS ou email, simuler l'envoi
+    // TODO: Intégrer avec un vrai service SMS/email
+    if (channel === 'sms' || channel === 'email') {
+      // Simuler l'envoi
+      await db.query(`
+        UPDATE cohrm_feedback
+        SET status = 'sent', sent_at = NOW()
+        WHERE id = ?
+      `, [result.insertId]);
+    }
+
+    // Ajouter à l'historique de la rumeur
+    await db.query(`
+      INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
+      VALUES (?, ?, 'feedback_sent', ?, NOW())
+    `, [id, req.user.id, `Rétro-information envoyée: ${feedback_type} à ${recipient_type}`]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Rétro-information enregistrée',
+      data: { id: result.insertId }
+    });
+  } catch (error) {
+    console.error('Send feedback error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// STATISTIQUES AVANCÉES
+// ============================================
+
+// GET /api/cohrm/stats/validation - Stats de validation par niveau
+router.get('/stats/validation', auth, async (req, res) => {
+  try {
+    // Rumeurs par niveau de validation
+    const [byLevel] = await db.query(`
+      SELECT validation_level, COUNT(*) as count
+      FROM cohrm_rumors
+      WHERE validation_level IS NOT NULL
+      GROUP BY validation_level
+      ORDER BY validation_level
+    `);
+
+    // Temps moyen de validation par niveau
+    const [avgTime] = await db.query(`
+      SELECT
+        level,
+        AVG(TIMESTAMPDIFF(HOUR, created_at, validated_at)) as avg_hours
+      FROM cohrm_validations
+      WHERE validated_at IS NOT NULL
+      GROUP BY level
+    `);
+
+    // Validations par acteur (top 10)
+    const [topActors] = await db.query(`
+      SELECT
+        a.actor_type, a.organization, a.region,
+        COUNT(v.id) as validation_count
+      FROM cohrm_actors a
+      JOIN cohrm_validations v ON a.id = v.actor_id
+      GROUP BY a.id
+      ORDER BY validation_count DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      success: true,
+      data: {
+        byLevel,
+        avgTime,
+        topActors
+      }
+    });
+  } catch (error) {
+    console.error('Get validation stats error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/stats/risk - Stats par niveau de risque
+router.get('/stats/risk', auth, async (req, res) => {
+  try {
+    const [byRisk] = await db.query(`
+      SELECT risk_level, COUNT(*) as count
+      FROM cohrm_rumors
+      WHERE risk_level IS NOT NULL AND risk_level != 'unknown'
+      GROUP BY risk_level
+    `);
+
+    const [byCategory] = await db.query(`
+      SELECT category, COUNT(*) as count
+      FROM cohrm_rumors
+      WHERE category IS NOT NULL
+      GROUP BY category
+    `);
+
+    const [highRiskByRegion] = await db.query(`
+      SELECT region, COUNT(*) as count
+      FROM cohrm_rumors
+      WHERE risk_level IN ('high', 'very_high')
+      AND region IS NOT NULL
+      GROUP BY region
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      success: true,
+      data: {
+        byRisk,
+        byCategory,
+        highRiskByRegion
+      }
+    });
+  } catch (error) {
+    console.error('Get risk stats error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// MISE À JOUR RUMEURS (avec nouveaux champs)
+// ============================================
+
+// POST /api/cohrm/rumors/extended - Créer une rumeur avec tous les champs
+router.post('/rumors/extended', auth, async (req, res) => {
+  try {
+    const {
+      // Champs existants
+      title,
+      description,
+      source,
+      source_details,
+      region,
+      department,
+      district,
+      location,
+      latitude,
+      longitude,
+      species,
+      symptoms,
+      affected_count,
+      dead_count,
+      priority,
+      reporter_name,
+      reporter_phone,
+      reporter_type,
+      // Nouveaux champs
+      date_detection,
+      date_circulation_start,
+      arrondissement,
+      commune,
+      aire_sante,
+      message_received,
+      category,
+      themes,
+      gravity_comment,
+      source_type,
+      // Champs "autre" personnalisés
+      category_other,
+      source_type_other,
+      reporter_type_other,
+      // Champs géométrie
+      geometry_type,
+      geometry_data
+    } = req.body;
+
+    if (!title || !region) {
+      return res.status(400).json({
+        success: false,
+        message: 'Titre et région sont requis'
+      });
+    }
+
+    const code = generateRumorCode();
+
+    const [result] = await db.query(`
+      INSERT INTO cohrm_rumors (
+        code, date_detection, date_circulation_start,
+        title, description, message_received,
+        source, source_type, source_type_other, source_details,
+        category, category_other, themes, gravity_comment,
+        region, department, arrondissement, commune,
+        district, aire_sante, location,
+        latitude, longitude, geometry_type, geometry_data,
+        species, symptoms,
+        affected_count, dead_count, priority, status,
+        validation_level, risk_level,
+        reporter_name, reporter_phone, reporter_type, reporter_type_other,
+        reported_by, created_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 'unknown',
+        ?, ?, ?, ?, ?, NOW()
+      )
+    `, [
+      code, date_detection, date_circulation_start,
+      title, description, message_received,
+      source || 'direct', source_type || 'direct', source_type_other, source_details,
+      category || 'human_health', category_other, themes ? JSON.stringify(themes) : null, gravity_comment,
+      region, department, arrondissement, commune,
+      district, aire_sante, location,
+      latitude, longitude, geometry_type || 'point', geometry_data ? JSON.stringify(geometry_data) : null,
+      species, symptoms,
+      affected_count, dead_count, priority || 'medium',
+      reporter_name, reporter_phone, reporter_type || 'anonymous', reporter_type_other,
+      req.user.id
+    ]);
+
+    // Ajouter la validation initiale (niveau 1 - collecte)
+    await db.query(`
+      INSERT INTO cohrm_validations (
+        rumor_id, user_id, level, action_type,
+        status, notes, validated_at, created_at
+      ) VALUES (?, ?, 1, 'collect', 'validated', 'Collecte initiale', NOW(), NOW())
+    `, [result.insertId, req.user.id]);
+
+    // Ajouter historique
+    await db.query(`
+      INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
+      VALUES (?, ?, 'created', 'Rumeur créée avec formulaire étendu', NOW())
+    `, [result.insertId, req.user.id]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Rumeur créée avec succès',
+      data: { id: result.insertId, code }
+    });
+  } catch (error) {
+    console.error('Create extended rumor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/rumors/:id/extended - Mettre à jour avec tous les champs
+router.put('/rumors/:id/extended', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      message_received,
+      source,
+      source_type,
+      source_details,
+      category,
+      themes,
+      gravity_comment,
+      date_detection,
+      date_circulation_start,
+      region,
+      department,
+      arrondissement,
+      commune,
+      district,
+      aire_sante,
+      location,
+      latitude,
+      longitude,
+      species,
+      symptoms,
+      affected_count,
+      dead_count,
+      priority,
+      status,
+      assigned_to,
+      verification_notes,
+      response_actions
+    } = req.body;
+
+    // Vérifier que la rumeur existe
+    const [existing] = await db.query('SELECT * FROM cohrm_rumors WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Rumeur non trouvée' });
+    }
+
+    const oldStatus = existing[0].status;
+
+    await db.query(`
+      UPDATE cohrm_rumors SET
+        title = COALESCE(?, title),
+        description = COALESCE(?, description),
+        message_received = COALESCE(?, message_received),
+        source = COALESCE(?, source),
+        source_type = COALESCE(?, source_type),
+        source_details = COALESCE(?, source_details),
+        category = COALESCE(?, category),
+        themes = COALESCE(?, themes),
+        gravity_comment = COALESCE(?, gravity_comment),
+        date_detection = COALESCE(?, date_detection),
+        date_circulation_start = COALESCE(?, date_circulation_start),
+        region = COALESCE(?, region),
+        department = COALESCE(?, department),
+        arrondissement = COALESCE(?, arrondissement),
+        commune = COALESCE(?, commune),
+        district = COALESCE(?, district),
+        aire_sante = COALESCE(?, aire_sante),
+        location = COALESCE(?, location),
+        latitude = COALESCE(?, latitude),
+        longitude = COALESCE(?, longitude),
+        species = COALESCE(?, species),
+        symptoms = COALESCE(?, symptoms),
+        affected_count = COALESCE(?, affected_count),
+        dead_count = COALESCE(?, dead_count),
+        priority = COALESCE(?, priority),
+        status = COALESCE(?, status),
+        assigned_to = ?,
+        verification_notes = COALESCE(?, verification_notes),
+        response_actions = COALESCE(?, response_actions),
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      title, description, message_received,
+      source, source_type, source_details,
+      category, themes ? JSON.stringify(themes) : null, gravity_comment,
+      date_detection, date_circulation_start,
+      region, department, arrondissement, commune,
+      district, aire_sante, location,
+      latitude, longitude, species, symptoms,
+      affected_count, dead_count, priority, status, assigned_to,
+      verification_notes, response_actions, id
+    ]);
+
+    // Ajouter historique si statut changé
+    if (status && status !== oldStatus) {
+      await db.query(`
+        INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
+        VALUES (?, ?, 'status_change', ?, NOW())
+      `, [id, req.user.id, `Statut modifié: ${oldStatus} → ${status}`]);
+    }
+
+    res.json({ success: true, message: 'Rumeur mise à jour' });
+  } catch (error) {
+    console.error('Update extended rumor error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/regions - Liste des régions avec départements
+router.get('/regions', async (req, res) => {
+  try {
+    const regions = [
+      {
+        code: 'AD',
+        name: 'Adamaoua',
+        departments: ['Djérem', 'Faro-et-Déo', 'Mayo-Banyo', 'Mbéré', 'Vina']
+      },
+      {
+        code: 'CE',
+        name: 'Centre',
+        departments: ['Haute-Sanaga', 'Lekié', 'Mbam-et-Inoubou', 'Mbam-et-Kim', 'Méfou-et-Afamba', 'Méfou-et-Akono', 'Mfoundi', 'Nyong-et-Kellé', 'Nyong-et-Mfoumou', 'Nyong-et-So\'o']
+      },
+      {
+        code: 'ES',
+        name: 'Est',
+        departments: ['Boumba-et-Ngoko', 'Haut-Nyong', 'Kadey', 'Lom-et-Djérem']
+      },
+      {
+        code: 'EN',
+        name: 'Extrême-Nord',
+        departments: ['Diamaré', 'Logone-et-Chari', 'Mayo-Danay', 'Mayo-Kani', 'Mayo-Sava', 'Mayo-Tsanaga']
+      },
+      {
+        code: 'LT',
+        name: 'Littoral',
+        departments: ['Moungo', 'Nkam', 'Sanaga-Maritime', 'Wouri']
+      },
+      {
+        code: 'NO',
+        name: 'Nord',
+        departments: ['Bénoué', 'Faro', 'Mayo-Louti', 'Mayo-Rey']
+      },
+      {
+        code: 'NW',
+        name: 'Nord-Ouest',
+        departments: ['Boyo', 'Bui', 'Donga-Mantung', 'Menchum', 'Mezam', 'Momo', 'Ngo-Ketunjia']
+      },
+      {
+        code: 'OU',
+        name: 'Ouest',
+        departments: ['Bamboutos', 'Haut-Nkam', 'Hauts-Plateaux', 'Koung-Khi', 'Menoua', 'Mifi', 'Ndé', 'Noun']
+      },
+      {
+        code: 'SU',
+        name: 'Sud',
+        departments: ['Dja-et-Lobo', 'Mvila', 'Océan', 'Vallée-du-Ntem']
+      },
+      {
+        code: 'SW',
+        name: 'Sud-Ouest',
+        departments: ['Fako', 'Koupé-Manengouba', 'Lebialem', 'Manyu', 'Meme', 'Ndian']
+      }
+    ];
+
+    res.json({ success: true, data: regions });
+  } catch (error) {
+    console.error('Get regions error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/dashboard - Dashboard complet
+router.get('/dashboard', auth, async (req, res) => {
+  try {
+    // Stats générales
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM cohrm_rumors');
+    const [[{ pending }]] = await db.query("SELECT COUNT(*) as pending FROM cohrm_rumors WHERE status = 'pending'");
+    const [[{ investigating }]] = await db.query("SELECT COUNT(*) as investigating FROM cohrm_rumors WHERE status = 'investigating'");
+    const [[{ confirmed }]] = await db.query("SELECT COUNT(*) as confirmed FROM cohrm_rumors WHERE status = 'confirmed'");
+    const [[{ alerts }]] = await db.query("SELECT COUNT(*) as alerts FROM cohrm_rumors WHERE priority IN ('high', 'critical') AND status != 'closed'");
+    const [[{ highRisk }]] = await db.query("SELECT COUNT(*) as highRisk FROM cohrm_rumors WHERE risk_level IN ('high', 'very_high')");
+
+    // Rumeurs par niveau de validation
+    const [byValidationLevel] = await db.query(`
+      SELECT validation_level, COUNT(*) as count
+      FROM cohrm_rumors
+      GROUP BY validation_level
+    `);
+
+    // Rumeurs par catégorie
+    const [byCategory] = await db.query(`
+      SELECT category, COUNT(*) as count
+      FROM cohrm_rumors
+      WHERE category IS NOT NULL
+      GROUP BY category
+    `);
+
+    // Rumeurs récentes
+    const [recentRumors] = await db.query(`
+      SELECT id, code, title, region, priority, status, validation_level, risk_level, created_at
+      FROM cohrm_rumors
+      ORDER BY created_at DESC
+      LIMIT 10
+    `);
+
+    // Rumeurs nécessitant une action (en attente de validation)
+    const [pendingValidation] = await db.query(`
+      SELECT id, code, title, region, priority, validation_level, created_at
+      FROM cohrm_rumors
+      WHERE status IN ('pending', 'investigating')
+      AND validation_level < 5
+      ORDER BY priority DESC, created_at ASC
+      LIMIT 10
+    `);
+
+    // Acteurs actifs
+    const [[{ activeActors }]] = await db.query('SELECT COUNT(*) as activeActors FROM cohrm_actors WHERE is_active = 1');
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          total,
+          pending,
+          investigating,
+          confirmed,
+          alerts,
+          highRisk,
+          activeActors
+        },
+        byValidationLevel,
+        byCategory,
+        recentRumors,
+        pendingValidation
+      }
+    });
+  } catch (error) {
+    console.error('Get dashboard error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
