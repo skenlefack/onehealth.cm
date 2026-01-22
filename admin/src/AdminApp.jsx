@@ -18,7 +18,7 @@ import {
   HelpCircle, FileQuestion, ListChecks, Timer, Target, CheckCircle2, CheckCircle, XCircle, File,
   Navigation, Map, Radio, AlertTriangle, Megaphone, Radar, Send, MessageCircle, Hash,
   Wifi, WifiOff, Signal, Smartphone as SmartphoneIcon, Database, Server, TrendingDown,
-  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode, ToggleLeft, TextCursorInput
+  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode, ToggleLeft, TextCursorInput, Shuffle
 } from 'lucide-react';
 
 // ============== COULEURS ONE HEALTH ==============
@@ -16101,7 +16101,7 @@ const OHELearningPage = ({ isDark, token }) => {
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div style={{ textAlign: 'center', padding: '10px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px' }}>
-                  <p style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: colors.primary }}>{quiz.question_count || 0}</p>
+                  <p style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: colors.primary }}>{quiz.total_questions || 0}</p>
                   <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>Questions</p>
                 </div>
                 <div style={{ textAlign: 'center', padding: '10px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px' }}>
@@ -17624,6 +17624,7 @@ const OHELearningPage = ({ isDark, token }) => {
       duration_hours: editingPath?.duration_hours || 0,
       min_passing_score: editingPath?.min_passing_score || 70,
       certificate_enabled: editingPath?.certificate_enabled !== false,
+      certificate_template: editingPath?.certificate_template || 'default',
       status: editingPath?.status || 'draft',
       require_final_exam: editingPath?.require_final_exam || false,
       final_exam_id: editingPath?.final_exam_id || null,
@@ -17723,11 +17724,28 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="published">Publié</option>
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', paddingTop: '28px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', paddingTop: '28px' }}>
                 <input type="checkbox" checked={form.certificate_enabled} onChange={e => setForm({ ...form, certificate_enabled: e.target.checked })} />
                 <span style={{ fontSize: '14px' }}>Certificat activé</span>
               </label>
+              {form.certificate_enabled && (
+                <div>
+                  <label style={styles.label}>Template de certificat</label>
+                  <select
+                    value={form.certificate_template}
+                    onChange={e => setForm({ ...form, certificate_template: e.target.value })}
+                    style={styles.select}
+                  >
+                    <option value="default">Par défaut</option>
+                    {certificateTemplates.map(template => (
+                      <option key={template.id} value={template.slug}>
+                        {template.name} {template.is_default ? '(Défaut)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -18361,7 +18379,9 @@ const OHELearningPage = ({ isDark, token }) => {
       allow_retake: editingQuiz?.allow_retake !== false,
       status: editingQuiz?.status || 'draft',
       contributes_to_grade: editingQuiz?.contributes_to_grade !== false,
-      grade_weight: editingQuiz?.grade_weight || 1.00
+      grade_weight: editingQuiz?.grade_weight || 1.00,
+      random_selection: editingQuiz?.random_selection || false,
+      question_count: editingQuiz?.question_count || null
     });
 
     return (
@@ -18548,6 +18568,54 @@ const OHELearningPage = ({ isDark, token }) => {
                 />
                 <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
                   Ex: 2.0 = compte double dans la moyenne
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Banque de Questions */}
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc', padding: '16px' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Shuffle size={16} color={colors.info} />
+                Banque de Questions (Sélection Aléatoire)
+              </span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                padding: '14px', borderRadius: '10px',
+                background: form.random_selection ? `${colors.info}10` : (isDark ? '#1e293b' : 'white'),
+                border: `1px solid ${form.random_selection ? colors.info : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input
+                  type="checkbox"
+                  checked={form.random_selection}
+                  onChange={e => setForm({ ...form, random_selection: e.target.checked })}
+                  style={{ accentColor: colors.info }}
+                />
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Activer la banque de questions</span>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Sélectionne aléatoirement un nombre limité de questions
+                  </p>
+                </div>
+              </label>
+              <div>
+                <label style={styles.label}>Nombre de questions à afficher</label>
+                <input
+                  type="number"
+                  value={form.question_count || ''}
+                  onChange={e => setForm({ ...form, question_count: e.target.value ? parseInt(e.target.value) : null })}
+                  style={styles.input}
+                  min="1"
+                  placeholder={editingQuiz?.total_questions ? `Max: ${editingQuiz.total_questions}` : 'Ex: 20'}
+                  disabled={!form.random_selection}
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  {editingQuiz?.total_questions
+                    ? `${form.question_count || editingQuiz.total_questions} questions sur ${editingQuiz.total_questions} dans la banque`
+                    : 'Ajoutez des questions au quiz pour définir la banque'}
                 </p>
               </div>
             </div>

@@ -548,7 +548,9 @@ export interface ELearningQuiz {
   status: 'draft' | 'published';
   created_by?: number;
   created_at?: string;
-  question_count?: number;
+  question_count?: number;      // Nombre de questions à afficher (si random_selection activé)
+  total_questions?: number;     // Nombre total de questions dans la banque
+  random_selection?: boolean;   // Sélection aléatoire depuis la banque de questions
   total_points?: number;
   questions?: ELearningQuestion[];
 }

@@ -180,9 +180,19 @@ export default function QuizIntroPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-slate-800/50 rounded-xl p-4 text-center">
                 <HelpCircle size={24} className="mx-auto mb-2 text-blue-400" />
-                <div className="text-2xl font-bold text-white">{quiz.question_count || '?'}</div>
+                <div className="text-2xl font-bold text-white">
+                  {quiz.random_selection && quiz.question_count
+                    ? quiz.question_count
+                    : (quiz.total_questions || quiz.question_count || '?')}
+                </div>
                 <div className="text-sm text-slate-400">
-                  {language === 'fr' ? 'Questions' : 'Questions'}
+                  {quiz.random_selection && quiz.question_count && quiz.total_questions ? (
+                    language === 'fr'
+                      ? `sur ${quiz.total_questions} (aléatoire)`
+                      : `of ${quiz.total_questions} (random)`
+                  ) : (
+                    language === 'fr' ? 'Questions' : 'Questions'
+                  )}
                 </div>
               </div>
 
@@ -266,6 +276,18 @@ export default function QuizIntroPage() {
                   )}
                 </span>
               </div>
+
+              {/* Random Selection / Question Bank indicator */}
+              {quiz.random_selection && quiz.question_count && (
+                <div className="flex items-center gap-3 text-slate-300 col-span-full bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
+                  <Shuffle size={18} className="text-blue-400" />
+                  <span>
+                    {language === 'fr'
+                      ? `Banque de questions : ${quiz.question_count} questions selectionnees aleatoirement parmi ${quiz.total_questions || '?'}`
+                      : `Question bank: ${quiz.question_count} questions randomly selected from ${quiz.total_questions || '?'}`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

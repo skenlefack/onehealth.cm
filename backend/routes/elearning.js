@@ -2184,7 +2184,7 @@ router.get('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => {
       SELECT q.*,
         u.first_name as created_by_first_name,
         u.last_name as created_by_last_name,
-        (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) as question_count,
+        (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) as total_questions,
         (SELECT SUM(points) FROM quiz_questions qq JOIN questions qs ON qq.question_id = qs.id WHERE qq.quiz_id = q.id) as total_points
       FROM quizzes q
       LEFT JOIN users u ON q.created_by = u.id
@@ -2211,7 +2211,7 @@ router.get('/quizzes/:id', auth, async (req, res) => {
 
     const [quizzes] = await db.query(`
       SELECT q.*,
-        (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) as question_count
+        (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) as total_questions
       FROM quizzes q
       WHERE q.id = ? AND q.is_active = 1
     `, [id]);
@@ -2266,7 +2266,9 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
       negative_marking_percent,
       status,
       contributes_to_grade,
-      grade_weight
+      grade_weight,
+      question_count,      // Nombre de questions à afficher (banque de questions)
+      random_selection     // Activer la sélection aléatoire
     } = req.body;
 
     if (!title_fr) {
@@ -2292,8 +2294,10 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
         status,
         created_by,
         contributes_to_grade,
-        grade_weight
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        grade_weight,
+        question_count,
+        random_selection
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title_fr, title_en,
       description_fr, description_en,
@@ -2312,7 +2316,9 @@ router.post('/quizzes', auth, authorize('admin', 'editor'), async (req, res) => 
       status || 'draft',
       req.user.id,
       contributes_to_grade !== false,
-      grade_weight || 1.00
+      grade_weight || 1.00,
+      question_count || null,
+      random_selection || false
     ]);
 
     const [newQuiz] = await db.query('SELECT * FROM quizzes WHERE id = ?', [result.insertId]);
@@ -2356,7 +2362,9 @@ router.put('/quizzes/:id', auth, authorize('admin', 'editor'), async (req, res) 
       'status',
       'is_active',
       'contributes_to_grade',
-      'grade_weight'
+      'grade_weight',
+      'question_count',      // Nombre de questions à afficher (banque de questions)
+      'random_selection'     // Activer la sélection aléatoire
     ];
 
     const setClauses = [];
@@ -2494,11 +2502,17 @@ router.put('/quizzes/:id/questions/reorder', auth, authorize('admin', 'editor'),
 router.post('/quizzes/:id/start', auth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { enrollment_id, context_type, context_id } = req.body; // context: 'lesson', 'module', 'course'
+    const { enrollment_id } = req.body;
 
-    // Récupérer le quiz
+    // Récupérer le quiz avec le total des points
     const [quizzes] = await db.query(`
-      SELECT * FROM quizzes WHERE id = ? AND status = 'published' AND is_active = 1
+      SELECT q.*,
+        (SELECT COALESCE(SUM(COALESCE(qq.points_override, qs.points)), 0)
+         FROM quiz_questions qq
+         JOIN questions qs ON qq.question_id = qs.id
+         WHERE qq.quiz_id = q.id) as total_points
+      FROM quizzes q
+      WHERE q.id = ? AND q.status = 'published' AND q.is_active = 1
     `, [id]);
 
     if (quizzes.length === 0) {
@@ -2550,21 +2564,24 @@ router.post('/quizzes/:id/start', auth, async (req, res) => {
     }
 
     // Créer une nouvelle tentative
-    const questionOrder = quiz.shuffle_questions
-      ? await getShuffledQuestionIds(id)
+    // Déterminer le nombre de questions à afficher (banque de questions)
+    const questionLimit = quiz.random_selection && quiz.question_count ? quiz.question_count : null;
+
+    // Si random_selection est activé OU shuffle_questions est activé, on mélange
+    // Si random_selection est activé avec question_count, on limite le nombre de questions
+    const questionOrder = (quiz.shuffle_questions || quiz.random_selection)
+      ? await getShuffledQuestionIds(id, questionLimit)
       : await getQuestionIds(id);
 
     const [result] = await db.query(`
       INSERT INTO quiz_attempts (
         user_id, quiz_id, enrollment_id,
-        context_type, context_id,
         attempt_number, status,
         started_at, question_order,
         max_score, ip_address
-      ) VALUES (?, ?, ?, ?, ?, ?, 'in_progress', NOW(), ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, 'in_progress', NOW(), ?, ?, ?)
     `, [
       req.user.id, id, enrollment_id || null,
-      context_type || null, context_id || null,
       attemptCount + 1,
       JSON.stringify(questionOrder),
       quiz.total_points || 0,
@@ -2608,12 +2625,16 @@ async function getQuestionIds(quizId) {
   return questions.map(q => q.question_id);
 }
 
-async function getShuffledQuestionIds(quizId) {
+async function getShuffledQuestionIds(quizId, limit = null) {
   const ids = await getQuestionIds(quizId);
   // Fisher-Yates shuffle
   for (let i = ids.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  // Si une limite est définie et est inférieure au nombre total, ne retourner que ce nombre
+  if (limit && limit > 0 && limit < ids.length) {
+    return ids.slice(0, limit);
   }
   return ids;
 }
