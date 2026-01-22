@@ -1902,4 +1902,497 @@ router.get('/dashboard', auth, async (req, res) => {
   }
 });
 
+// ============================================
+// GESTION DES ASSIGNATIONS DE VALIDATION
+// ============================================
+
+// GET /api/cohrm/validation-assignees - Liste toutes les assignations
+router.get('/validation-assignees', auth, async (req, res) => {
+  try {
+    const { level, region, active_only = 'true' } = req.query;
+
+    let whereConditions = [];
+    let params = [];
+
+    if (active_only === 'true') {
+      whereConditions.push('va.is_active = 1');
+    }
+    if (level) {
+      whereConditions.push('va.validation_level = ?');
+      params.push(parseInt(level));
+    }
+    if (region) {
+      whereConditions.push('(va.region = ? OR va.region IS NULL)');
+      params.push(region);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    const [assignees] = await db.query(`
+      SELECT
+        va.id,
+        va.user_id,
+        va.validation_level,
+        va.region,
+        va.department,
+        va.can_validate,
+        va.can_reject,
+        va.can_escalate,
+        va.can_assess_risk,
+        va.can_send_feedback,
+        va.notify_email,
+        va.notify_sms,
+        va.notes,
+        va.is_active,
+        va.assigned_at,
+        u.username,
+        u.email,
+        u.first_name,
+        u.last_name,
+        CONCAT(u.first_name, ' ', u.last_name) as full_name,
+        u.avatar,
+        u.role as user_role,
+        ab.username as assigned_by_username,
+        CONCAT(ab.first_name, ' ', ab.last_name) as assigned_by_name
+      FROM cohrm_validation_assignees va
+      JOIN users u ON va.user_id = u.id
+      LEFT JOIN users ab ON va.assigned_by = ab.id
+      ${whereClause}
+      ORDER BY va.validation_level ASC, u.last_name ASC
+    `, params);
+
+    // Grouper par niveau
+    const byLevel = {};
+    for (let i = 1; i <= 5; i++) {
+      byLevel[i] = assignees.filter(a => a.validation_level === i);
+    }
+
+    res.json({
+      success: true,
+      data: assignees,
+      byLevel
+    });
+  } catch (error) {
+    console.error('Get validation assignees error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/validation-assignees/level/:level - Assignés pour un niveau spécifique
+router.get('/validation-assignees/level/:level', auth, async (req, res) => {
+  try {
+    const { level } = req.params;
+    const { region } = req.query;
+
+    let whereConditions = ['va.validation_level = ?', 'va.is_active = 1'];
+    let params = [parseInt(level)];
+
+    if (region) {
+      whereConditions.push('(va.region = ? OR va.region IS NULL)');
+      params.push(region);
+    }
+
+    const [assignees] = await db.query(`
+      SELECT
+        va.id,
+        va.user_id,
+        va.validation_level,
+        va.region,
+        va.department,
+        va.can_validate,
+        va.can_reject,
+        va.can_escalate,
+        va.can_assess_risk,
+        va.can_send_feedback,
+        va.notify_email,
+        va.notify_sms,
+        u.username,
+        u.email,
+        u.first_name,
+        u.last_name,
+        CONCAT(u.first_name, ' ', u.last_name) as full_name,
+        u.avatar
+      FROM cohrm_validation_assignees va
+      JOIN users u ON va.user_id = u.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY u.last_name ASC
+    `, params);
+
+    res.json({ success: true, data: assignees });
+  } catch (error) {
+    console.error('Get level assignees error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/validation-assignees/available-users - Utilisateurs disponibles pour assignation
+router.get('/validation-assignees/available-users', auth, async (req, res) => {
+  try {
+    const { search, level } = req.query;
+
+    // Exclure les abonnés (subscribers) - seuls les admins, editors, etc. peuvent être validateurs
+    let whereConditions = ['u.is_active = 1', 'u.status = "active"', 'u.role != "subscriber"', 'u.role != "abonne"'];
+    let params = [];
+
+    if (search) {
+      whereConditions.push('(u.username LIKE ? OR u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    const [users] = await db.query(`
+      SELECT
+        u.id,
+        u.username,
+        u.email,
+        u.first_name,
+        u.last_name,
+        CONCAT(u.first_name, ' ', u.last_name) as full_name,
+        u.avatar,
+        u.role
+      FROM users u
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY u.last_name ASC
+      LIMIT 100
+    `, params);
+
+    // Si un niveau est spécifié, marquer les utilisateurs déjà assignés
+    if (level) {
+      const [assigned] = await db.query(
+        'SELECT user_id FROM cohrm_validation_assignees WHERE validation_level = ? AND is_active = 1',
+        [parseInt(level)]
+      );
+      const assignedIds = assigned.map(a => a.user_id);
+      users.forEach(u => {
+        u.already_assigned = assignedIds.includes(u.id);
+      });
+    }
+
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Get available users error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/validation-assignees/my-levels - Niveaux assignés à l'utilisateur connecté
+router.get('/validation-assignees/my-levels', auth, async (req, res) => {
+  try {
+    const [assignments] = await db.query(`
+      SELECT
+        va.id,
+        va.validation_level,
+        va.region,
+        va.department,
+        va.can_validate,
+        va.can_reject,
+        va.can_escalate,
+        va.can_assess_risk,
+        va.can_send_feedback
+      FROM cohrm_validation_assignees va
+      WHERE va.user_id = ? AND va.is_active = 1
+      ORDER BY va.validation_level ASC
+    `, [req.user.id]);
+
+    res.json({ success: true, data: assignments });
+  } catch (error) {
+    console.error('Get my levels error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/validation-assignees - Assigner un utilisateur à un niveau
+router.post('/validation-assignees', auth, authorize('admin'), async (req, res) => {
+  try {
+    const {
+      user_id,
+      validation_level,
+      region,
+      department,
+      can_validate = true,
+      can_reject = true,
+      can_escalate = true,
+      can_assess_risk = true,
+      can_send_feedback = true,
+      notify_email = true,
+      notify_sms = false,
+      notes
+    } = req.body;
+
+    if (!user_id || !validation_level) {
+      return res.status(400).json({
+        success: false,
+        message: 'user_id et validation_level sont requis'
+      });
+    }
+
+    if (validation_level < 1 || validation_level > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'validation_level doit être entre 1 et 5'
+      });
+    }
+
+    // Vérifier si l'utilisateur existe
+    const [users] = await db.query('SELECT id FROM users WHERE id = ?', [user_id]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+    }
+
+    // Vérifier si l'assignation existe déjà
+    const [existing] = await db.query(`
+      SELECT id, is_active FROM cohrm_validation_assignees
+      WHERE user_id = ? AND validation_level = ?
+      AND (region = ? OR (region IS NULL AND ? IS NULL))
+      AND (department = ? OR (department IS NULL AND ? IS NULL))
+    `, [user_id, validation_level, region, region, department, department]);
+
+    if (existing.length > 0) {
+      if (existing[0].is_active) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cet utilisateur est déjà assigné à ce niveau'
+        });
+      } else {
+        // Réactiver l'assignation existante
+        await db.query(`
+          UPDATE cohrm_validation_assignees
+          SET is_active = 1, assigned_by = ?, assigned_at = NOW(),
+              can_validate = ?, can_reject = ?, can_escalate = ?,
+              can_assess_risk = ?, can_send_feedback = ?,
+              notify_email = ?, notify_sms = ?, notes = ?
+          WHERE id = ?
+        `, [
+          req.user.id, can_validate, can_reject, can_escalate,
+          can_assess_risk, can_send_feedback, notify_email, notify_sms,
+          notes, existing[0].id
+        ]);
+
+        return res.json({
+          success: true,
+          message: 'Assignation réactivée',
+          data: { id: existing[0].id }
+        });
+      }
+    }
+
+    // Créer la nouvelle assignation
+    const [result] = await db.query(`
+      INSERT INTO cohrm_validation_assignees (
+        user_id, validation_level, region, department,
+        can_validate, can_reject, can_escalate, can_assess_risk, can_send_feedback,
+        notify_email, notify_sms, notes, assigned_by, assigned_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `, [
+      user_id, validation_level, region || null, department || null,
+      can_validate, can_reject, can_escalate, can_assess_risk, can_send_feedback,
+      notify_email, notify_sms, notes || null, req.user.id
+    ]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Utilisateur assigné avec succès',
+      data: { id: result.insertId }
+    });
+  } catch (error) {
+    console.error('Create validation assignee error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/validation-assignees/:id - Modifier une assignation
+router.put('/validation-assignees/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      region,
+      department,
+      can_validate,
+      can_reject,
+      can_escalate,
+      can_assess_risk,
+      can_send_feedback,
+      notify_email,
+      notify_sms,
+      notes
+    } = req.body;
+
+    // Vérifier si l'assignation existe
+    const [existing] = await db.query(
+      'SELECT id FROM cohrm_validation_assignees WHERE id = ?',
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Assignation non trouvée' });
+    }
+
+    await db.query(`
+      UPDATE cohrm_validation_assignees SET
+        region = ?,
+        department = ?,
+        can_validate = ?,
+        can_reject = ?,
+        can_escalate = ?,
+        can_assess_risk = ?,
+        can_send_feedback = ?,
+        notify_email = ?,
+        notify_sms = ?,
+        notes = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      region || null, department || null,
+      can_validate, can_reject, can_escalate, can_assess_risk, can_send_feedback,
+      notify_email, notify_sms, notes || null, id
+    ]);
+
+    res.json({ success: true, message: 'Assignation mise à jour' });
+  } catch (error) {
+    console.error('Update validation assignee error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/cohrm/validation-assignees/:id - Supprimer (désactiver) une assignation
+router.delete('/validation-assignees/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db.query(
+      'SELECT id FROM cohrm_validation_assignees WHERE id = ?',
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Assignation non trouvée' });
+    }
+
+    // Désactiver plutôt que supprimer pour garder l'historique
+    await db.query(
+      'UPDATE cohrm_validation_assignees SET is_active = 0, updated_at = NOW() WHERE id = ?',
+      [id]
+    );
+
+    res.json({ success: true, message: 'Assignation supprimée' });
+  } catch (error) {
+    console.error('Delete validation assignee error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/validation-assignees/stats - Statistiques des assignations
+router.get('/validation-assignees/stats', auth, async (req, res) => {
+  try {
+    // Nombre d'assignés par niveau
+    const [byLevel] = await db.query(`
+      SELECT validation_level, COUNT(*) as count
+      FROM cohrm_validation_assignees
+      WHERE is_active = 1
+      GROUP BY validation_level
+      ORDER BY validation_level
+    `);
+
+    // Nombre d'assignés par région
+    const [byRegion] = await db.query(`
+      SELECT COALESCE(region, 'Toutes régions') as region, COUNT(*) as count
+      FROM cohrm_validation_assignees
+      WHERE is_active = 1
+      GROUP BY region
+      ORDER BY region
+    `);
+
+    // Total des assignés actifs
+    const [[{ total }]] = await db.query(
+      'SELECT COUNT(*) as total FROM cohrm_validation_assignees WHERE is_active = 1'
+    );
+
+    // Utilisateurs avec plusieurs niveaux
+    const [multiLevel] = await db.query(`
+      SELECT user_id, COUNT(*) as level_count
+      FROM cohrm_validation_assignees
+      WHERE is_active = 1
+      GROUP BY user_id
+      HAVING level_count > 1
+    `);
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        byLevel,
+        byRegion,
+        multiLevelUsers: multiLevel.length
+      }
+    });
+  } catch (error) {
+    console.error('Get assignees stats error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/my-pending-validations - Validations en attente pour l'utilisateur connecté
+router.get('/my-pending-validations', auth, async (req, res) => {
+  try {
+    // Récupérer les niveaux assignés à l'utilisateur
+    const [myAssignments] = await db.query(`
+      SELECT validation_level, region, department
+      FROM cohrm_validation_assignees
+      WHERE user_id = ? AND is_active = 1
+    `, [req.user.id]);
+
+    if (myAssignments.length === 0) {
+      // Si l'utilisateur n'a pas d'assignation, vérifier s'il est admin
+      if (req.user.role === 'admin') {
+        // Les admins voient toutes les validations en attente
+        const [rumors] = await db.query(`
+          SELECT id, code, title, region, department, priority, status, validation_level, risk_level, created_at
+          FROM cohrm_rumors
+          WHERE status IN ('pending', 'investigating')
+          AND validation_level < 5
+          ORDER BY priority DESC, created_at ASC
+          LIMIT 50
+        `);
+        return res.json({ success: true, data: rumors, isAdmin: true });
+      }
+      return res.json({ success: true, data: [], message: 'Aucune assignation' });
+    }
+
+    // Construire la requête pour les rumeurs correspondant aux assignations
+    let conditions = [];
+    let params = [];
+
+    myAssignments.forEach(assignment => {
+      let condition = 'validation_level = ?';
+      params.push(assignment.validation_level);
+
+      if (assignment.region) {
+        condition += ' AND region = ?';
+        params.push(assignment.region);
+      }
+      if (assignment.department) {
+        condition += ' AND department = ?';
+        params.push(assignment.department);
+      }
+
+      conditions.push(`(${condition})`);
+    });
+
+    const [rumors] = await db.query(`
+      SELECT id, code, title, region, department, priority, status, validation_level, risk_level, created_at
+      FROM cohrm_rumors
+      WHERE status IN ('pending', 'investigating')
+      AND (${conditions.join(' OR ')})
+      ORDER BY priority DESC, created_at ASC
+      LIMIT 50
+    `, params);
+
+    res.json({
+      success: true,
+      data: rumors,
+      myLevels: myAssignments.map(a => a.validation_level)
+    });
+  } catch (error) {
+    console.error('Get my pending validations error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;

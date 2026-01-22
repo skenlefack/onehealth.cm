@@ -269,6 +269,30 @@ const COHRMSystemPage = ({ isDark, token }) => {
   // Dashboard extended stats
   const [dashboardData, setDashboardData] = useState(null);
 
+  // Validation assignees states
+  const [validationAssignees, setValidationAssignees] = useState({ data: [], byLevel: {} });
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [assigneeForm, setAssigneeForm] = useState({
+    user_id: '',
+    validation_level: 1,
+    region: '',
+    department: '',
+    can_validate: true,
+    can_reject: true,
+    can_escalate: true,
+    can_assess_risk: true,
+    can_send_feedback: true,
+    notify_email: true,
+    notify_sms: false,
+    notes: ''
+  });
+  const [assigneesViewMode, setAssigneesViewMode] = useState('list'); // 'list' or 'form'
+  const [selectedAssignee, setSelectedAssignee] = useState(null);
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [selectedLevelFilter, setSelectedLevelFilter] = useState(null);
+  const [myAssignedLevels, setMyAssignedLevels] = useState([]);
+
   // Styles
   const styles = {
     card: {
@@ -888,15 +912,140 @@ const COHRMSystemPage = ({ isDark, token }) => {
     setLoading(false);
   };
 
-  // Fetch pending validations
+  // Fetch pending validations (filtered by user's assigned levels)
   const fetchPendingValidations = async () => {
     setLoading(true);
-    const res = await api.get('/cohrm/dashboard', token);
-    if (res.success && res.data) {
-      setDashboardData(res.data);
-      setPendingValidations(res.data.pendingValidation || []);
+    // Fetch dashboard data for stats
+    const dashboardRes = await api.get('/cohrm/dashboard', token);
+    if (dashboardRes.success && dashboardRes.data) {
+      setDashboardData(dashboardRes.data);
+    }
+    // Fetch user-specific pending validations
+    const validationsRes = await api.get('/cohrm/my-pending-validations', token);
+    if (validationsRes.success) {
+      setPendingValidations(validationsRes.data || []);
+      // Track user's assigned levels
+      if (validationsRes.myLevels) {
+        setMyAssignedLevels(validationsRes.myLevels);
+      } else if (validationsRes.isAdmin) {
+        // Admins can see all levels
+        setMyAssignedLevels([1, 2, 3, 4, 5]);
+      }
     }
     setLoading(false);
+  };
+
+  // ============ VALIDATION ASSIGNEES FUNCTIONS ============
+
+  // Fetch all validation assignees
+  const fetchValidationAssignees = async () => {
+    setAssigneesLoading(true);
+    const res = await api.get('/cohrm/validation-assignees', token);
+    if (res.success) {
+      setValidationAssignees({ data: res.data || [], byLevel: res.byLevel || {} });
+    }
+    setAssigneesLoading(false);
+  };
+
+  // Fetch available users for assignment
+  const fetchAvailableUsers = async (search = '', level = null) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (level) params.append('level', level);
+    const res = await api.get(`/cohrm/validation-assignees/available-users?${params.toString()}`, token);
+    if (res.success) {
+      setAvailableUsers(res.data || []);
+    }
+  };
+
+  // Create validation assignee
+  const handleCreateAssignee = async () => {
+    if (!assigneeForm.user_id || !assigneeForm.validation_level) {
+      setToast({ type: 'error', message: 'Veuillez sélectionner un utilisateur et un niveau' });
+      return;
+    }
+    setAssigneesLoading(true);
+    const res = await api.post('/cohrm/validation-assignees', assigneeForm, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Utilisateur assigné avec succès' });
+      setAssigneesViewMode('list');
+      resetAssigneeForm();
+      fetchValidationAssignees();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors de l\'assignation' });
+    }
+    setAssigneesLoading(false);
+  };
+
+  // Update validation assignee
+  const handleUpdateAssignee = async () => {
+    if (!selectedAssignee) return;
+    setAssigneesLoading(true);
+    const res = await api.put(`/cohrm/validation-assignees/${selectedAssignee.id}`, assigneeForm, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Assignation mise à jour' });
+      setAssigneesViewMode('list');
+      setSelectedAssignee(null);
+      resetAssigneeForm();
+      fetchValidationAssignees();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors de la mise à jour' });
+    }
+    setAssigneesLoading(false);
+  };
+
+  // Delete validation assignee
+  const handleDeleteAssignee = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir retirer cet utilisateur de ce niveau de validation ?')) return;
+    setAssigneesLoading(true);
+    const res = await api.delete(`/cohrm/validation-assignees/${id}`, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Assignation supprimée' });
+      fetchValidationAssignees();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors de la suppression' });
+    }
+    setAssigneesLoading(false);
+  };
+
+  // Reset assignee form
+  const resetAssigneeForm = () => {
+    setAssigneeForm({
+      user_id: '',
+      validation_level: 1,
+      region: '',
+      department: '',
+      can_validate: true,
+      can_reject: true,
+      can_escalate: true,
+      can_assess_risk: true,
+      can_send_feedback: true,
+      notify_email: true,
+      notify_sms: false,
+      notes: ''
+    });
+    setUserSearchTerm('');
+    setAvailableUsers([]);
+  };
+
+  // Edit assignee
+  const handleEditAssignee = (assignee) => {
+    setSelectedAssignee(assignee);
+    setAssigneeForm({
+      user_id: assignee.user_id,
+      validation_level: assignee.validation_level,
+      region: assignee.region || '',
+      department: assignee.department || '',
+      can_validate: assignee.can_validate,
+      can_reject: assignee.can_reject,
+      can_escalate: assignee.can_escalate,
+      can_assess_risk: assignee.can_assess_risk,
+      can_send_feedback: assignee.can_send_feedback,
+      notify_email: assignee.notify_email,
+      notify_sms: assignee.notify_sms,
+      notes: assignee.notes || ''
+    });
+    setAssigneesViewMode('form');
   };
 
   // Fetch rumor detail for validation
@@ -2355,33 +2504,67 @@ const COHRMSystemPage = ({ isDark, token }) => {
         </button>
       </div>
 
+      {/* User's Assigned Levels */}
+      {myAssignedLevels.length > 0 && (
+        <div style={{
+          marginBottom: '16px', padding: '12px 16px',
+          background: isDark ? '#1e3a5f' : '#e0f2fe',
+          borderRadius: '10px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <Shield size={18} style={{ color: '#3498DB' }} />
+          <span style={{ fontSize: '13px', color: isDark ? '#93c5fd' : '#1e40af' }}>
+            Vous êtes assigné aux niveaux de validation:
+          </span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {myAssignedLevels.map(levelNum => {
+              const level = VALIDATION_LEVELS.find(l => l.level === levelNum);
+              return (
+                <span key={levelNum} style={{
+                  ...styles.badge(level?.color || '#64748b'),
+                  fontSize: '11px'
+                }}>
+                  Niveau {levelNum}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Validation Levels Progress */}
       <div style={{ marginBottom: '24px', padding: '20px', background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '12px' }}>
         <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
           Processus de validation multi-niveaux
         </h4>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {VALIDATION_LEVELS.map((level, idx) => (
-            <React.Fragment key={level.level}>
-              <div style={{
-                flex: 1, padding: '12px', borderRadius: '8px', textAlign: 'center',
-                background: `${level.color}20`, border: `1px solid ${level.color}`
-              }}>
-                <div style={{ fontSize: '11px', fontWeight: '600', color: level.color, marginBottom: '4px' }}>
-                  Niveau {level.level}
+          {VALIDATION_LEVELS.map((level, idx) => {
+            const isMyLevel = myAssignedLevels.includes(level.level);
+            return (
+              <React.Fragment key={level.level}>
+                <div style={{
+                  flex: 1, padding: '12px', borderRadius: '8px', textAlign: 'center',
+                  background: isMyLevel ? `${level.color}40` : `${level.color}20`,
+                  border: `${isMyLevel ? '2px' : '1px'} solid ${level.color}`,
+                  boxShadow: isMyLevel ? `0 0 10px ${level.color}40` : 'none'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: level.color, marginBottom: '4px' }}>
+                    Niveau {level.level}
+                    {isMyLevel && <Check size={12} style={{ marginLeft: '4px', verticalAlign: 'middle' }} />}
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    {level.label}
+                  </div>
+                  <div style={{ fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '4px' }}>
+                    {dashboardData?.byValidationLevel?.find(v => v.validation_level === level.level)?.count || 0} rumeurs
+                  </div>
                 </div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
-                  {level.label}
-                </div>
-                <div style={{ fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '4px' }}>
-                  {dashboardData?.byValidationLevel?.find(v => v.validation_level === level.level)?.count || 0} rumeurs
-                </div>
-              </div>
-              {idx < VALIDATION_LEVELS.length - 1 && (
-                <ArrowRight size={20} color={isDark ? '#64748b' : '#94a3b8'} />
-              )}
-            </React.Fragment>
-          ))}
+                {idx < VALIDATION_LEVELS.length - 1 && (
+                  <ArrowRight size={20} color={isDark ? '#64748b' : '#94a3b8'} />
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 
@@ -2389,12 +2572,23 @@ const COHRMSystemPage = ({ isDark, token }) => {
       <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
         <Bell size={16} style={{ marginRight: '8px', verticalAlign: 'middle', color: '#F39C12' }} />
         Rumeurs en attente de validation
+        {myAssignedLevels.length > 0 && myAssignedLevels.length < 5 && (
+          <span style={{ fontWeight: '400', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', marginLeft: '8px' }}>
+            (filtrées selon vos niveaux assignés)
+          </span>
+        )}
       </h4>
 
-      {pendingValidations.length === 0 ? (
+      {myAssignedLevels.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+          <Shield size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
+          <p style={{ margin: '0 0 8px' }}>Vous n'êtes assigné à aucun niveau de validation</p>
+          <p style={{ margin: 0, fontSize: '13px' }}>Contactez un administrateur pour être ajouté en tant que validateur</p>
+        </div>
+      ) : pendingValidations.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
           <CheckCircle size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
-          <p>Aucune rumeur en attente de validation</p>
+          <p>Aucune rumeur en attente de validation pour vos niveaux</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -2688,6 +2882,509 @@ const COHRMSystemPage = ({ isDark, token }) => {
       </div>
     );
   };
+
+  // ============ RENDER VALIDATION ASSIGNEES ============
+
+  // Render Assignees List
+  const renderAssigneesList = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Header */}
+      <div style={styles.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Shield size={20} style={{ color: '#E74C3C' }} />
+              Gestion des Validateurs
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Assignez des utilisateurs aux différents niveaux de validation
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              style={styles.btnSecondary}
+              onClick={fetchValidationAssignees}
+              disabled={assigneesLoading}
+            >
+              <RefreshCw size={16} className={assigneesLoading ? 'spin' : ''} /> Actualiser
+            </button>
+            <button
+              style={styles.btnPrimary}
+              onClick={() => {
+                resetAssigneeForm();
+                setSelectedAssignee(null);
+                setAssigneesViewMode('form');
+                fetchAvailableUsers('', 1);
+              }}
+            >
+              <Plus size={16} /> Assigner un utilisateur
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter by level */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          style={{
+            ...styles.btnSecondary,
+            background: selectedLevelFilter === null ? (isDark ? '#334155' : '#e2e8f0') : 'transparent'
+          }}
+          onClick={() => setSelectedLevelFilter(null)}
+        >
+          Tous les niveaux
+        </button>
+        {VALIDATION_LEVELS.map(level => (
+          <button
+            key={level.level}
+            style={{
+              ...styles.btnSecondary,
+              background: selectedLevelFilter === level.level ? level.color : 'transparent',
+              color: selectedLevelFilter === level.level ? 'white' : (isDark ? '#e2e8f0' : '#1e293b'),
+              borderColor: level.color
+            }}
+            onClick={() => setSelectedLevelFilter(level.level)}
+          >
+            Niveau {level.level}
+          </button>
+        ))}
+      </div>
+
+      {/* Assignees by Level */}
+      {VALIDATION_LEVELS.filter(l => selectedLevelFilter === null || l.level === selectedLevelFilter).map(level => {
+        const levelAssignees = validationAssignees.byLevel[level.level] || [];
+        return (
+          <div key={level.level} style={styles.card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '10px',
+                background: `linear-gradient(135deg, ${level.color} 0%, ${level.color}99 100%)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'white', fontWeight: '700', fontSize: '16px'
+              }}>
+                {level.level}
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                  Niveau {level.level}: {level.label}
+                </h4>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  {level.description} - {levelAssignees.length} utilisateur(s) assigné(s)
+                </p>
+              </div>
+            </div>
+
+            {levelAssignees.length === 0 ? (
+              <div style={{
+                padding: '20px', textAlign: 'center',
+                background: isDark ? '#0f172a' : '#f8fafc',
+                borderRadius: '10px', color: isDark ? '#64748b' : '#94a3b8'
+              }}>
+                <Users size={24} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                <p style={{ margin: 0, fontSize: '13px' }}>Aucun utilisateur assigné à ce niveau</p>
+                <button
+                  style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '12px' }}
+                  onClick={() => {
+                    resetAssigneeForm();
+                    setAssigneeForm(prev => ({ ...prev, validation_level: level.level }));
+                    setSelectedAssignee(null);
+                    setAssigneesViewMode('form');
+                    fetchAvailableUsers('', level.level);
+                  }}
+                >
+                  <Plus size={14} /> Assigner
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {levelAssignees.map(assignee => (
+                  <div
+                    key={assignee.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      background: isDark ? '#0f172a' : '#f8fafc',
+                      borderRadius: '10px',
+                      border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '40px', height: '40px', borderRadius: '50%',
+                        background: isDark ? '#334155' : '#e2e8f0',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        overflow: 'hidden'
+                      }}>
+                        {assignee.avatar ? (
+                          <img src={assignee.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <User size={20} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '14px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                          {assignee.full_name || assignee.username}
+                        </div>
+                        <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                          {assignee.email}
+                          {assignee.region && <span> • {assignee.region}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Permissions badges */}
+                      <div style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
+                        {assignee.can_validate && (
+                          <span style={{ ...styles.badge('#27AE60'), fontSize: '10px', padding: '2px 6px' }} title="Peut valider">
+                            <Check size={10} />
+                          </span>
+                        )}
+                        {assignee.can_reject && (
+                          <span style={{ ...styles.badge('#E74C3C'), fontSize: '10px', padding: '2px 6px' }} title="Peut rejeter">
+                            <X size={10} />
+                          </span>
+                        )}
+                        {assignee.can_escalate && (
+                          <span style={{ ...styles.badge('#3498DB'), fontSize: '10px', padding: '2px 6px' }} title="Peut escalader">
+                            <ArrowUpRight size={10} />
+                          </span>
+                        )}
+                        {assignee.notify_email && (
+                          <span style={{ ...styles.badge('#9B59B6'), fontSize: '10px', padding: '2px 6px' }} title="Notification email">
+                            <Mail size={10} />
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        style={{ ...styles.btnSecondary, padding: '6px 10px' }}
+                        onClick={() => handleEditAssignee(assignee)}
+                        title="Modifier"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        style={{ ...styles.btnSecondary, padding: '6px 10px', color: '#E74C3C' }}
+                        onClick={() => handleDeleteAssignee(assignee.id)}
+                        title="Supprimer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Render Assignee Form
+  const renderAssigneeForm = () => (
+    <div style={styles.card}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+        <button
+          style={styles.btnSecondary}
+          onClick={() => {
+            setAssigneesViewMode('list');
+            setSelectedAssignee(null);
+            resetAssigneeForm();
+          }}
+        >
+          <ChevronLeft size={16} /> Retour
+        </button>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+          {selectedAssignee ? 'Modifier l\'assignation' : 'Assigner un utilisateur'}
+        </h3>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        {/* Left Column - User Selection */}
+        <div>
+          <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+            Sélection de l'utilisateur
+          </h4>
+
+          {/* User Search/Filter */}
+          {!selectedAssignee && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                Filtrer les utilisateurs
+              </label>
+              <input
+                type="text"
+                style={styles.input}
+                placeholder="Rechercher par nom, email..."
+                value={userSearchTerm}
+                onChange={(e) => {
+                  setUserSearchTerm(e.target.value);
+                  fetchAvailableUsers(e.target.value, assigneeForm.validation_level);
+                }}
+              />
+              <p style={{ margin: '6px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                {availableUsers.length} utilisateur(s) disponible(s) (hors abonnés)
+              </p>
+            </div>
+          )}
+
+          {/* Available Users List */}
+          {!selectedAssignee && (
+            <div style={{
+              maxHeight: '300px', overflowY: 'auto',
+              border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+              borderRadius: '10px', marginBottom: '16px'
+            }}>
+              {availableUsers.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  <Users size={24} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                  <p style={{ margin: 0, fontSize: '13px' }}>Aucun utilisateur trouvé</p>
+                </div>
+              ) : availableUsers.map(user => (
+                <div
+                  key={user.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px',
+                    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                    background: assigneeForm.user_id === user.id ? (isDark ? '#1e3a5f' : '#e0f2fe') : 'transparent',
+                    cursor: user.already_assigned ? 'not-allowed' : 'pointer',
+                    opacity: user.already_assigned ? 0.5 : 1
+                  }}
+                  onClick={() => !user.already_assigned && setAssigneeForm(prev => ({ ...prev, user_id: user.id }))}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '50%',
+                      background: isDark ? '#334155' : '#e2e8f0',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      {user.avatar ? (
+                        <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <User size={16} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                        {user.full_name || user.username}
+                        <span style={{
+                          marginLeft: '8px', fontSize: '10px', padding: '2px 6px',
+                          background: user.role === 'admin' ? '#E74C3C20' : '#3498DB20',
+                          color: user.role === 'admin' ? '#E74C3C' : '#3498DB',
+                          borderRadius: '4px'
+                        }}>
+                          {user.role}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        {user.email}
+                      </div>
+                    </div>
+                  </div>
+                  {user.already_assigned ? (
+                    <span style={{ fontSize: '10px', color: '#E67E22' }}>Déjà assigné</span>
+                  ) : assigneeForm.user_id === user.id ? (
+                    <Check size={16} style={{ color: '#27AE60' }} />
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Selected User Display */}
+          {selectedAssignee && (
+            <div style={{
+              padding: '12px',
+              background: isDark ? '#0f172a' : '#f8fafc',
+              borderRadius: '10px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '40px', height: '40px', borderRadius: '50%',
+                  background: isDark ? '#334155' : '#e2e8f0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  {selectedAssignee.avatar ? (
+                    <img src={selectedAssignee.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <User size={20} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    {selectedAssignee.full_name || selectedAssignee.username}
+                  </div>
+                  <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    {selectedAssignee.email}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Validation Level */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+              Niveau de validation *
+            </label>
+            <select
+              style={styles.select}
+              value={assigneeForm.validation_level}
+              onChange={(e) => {
+                const newLevel = parseInt(e.target.value);
+                setAssigneeForm(prev => ({ ...prev, validation_level: newLevel }));
+                if (!selectedAssignee) fetchAvailableUsers(userSearchTerm, newLevel);
+              }}
+              disabled={!!selectedAssignee}
+            >
+              {VALIDATION_LEVELS.map(level => (
+                <option key={level.level} value={level.level}>
+                  Niveau {level.level}: {level.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Region */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+              Région (optionnel - laisser vide pour toutes les régions)
+            </label>
+            <select
+              style={styles.select}
+              value={assigneeForm.region}
+              onChange={(e) => setAssigneeForm(prev => ({ ...prev, region: e.target.value }))}
+            >
+              <option value="">Toutes les régions</option>
+              {REGIONS_CAMEROON.map(region => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+              Notes
+            </label>
+            <textarea
+              style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+              placeholder="Notes sur cette assignation..."
+              value={assigneeForm.notes}
+              onChange={(e) => setAssigneeForm(prev => ({ ...prev, notes: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        {/* Right Column - Permissions */}
+        <div>
+          <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+            Permissions et Notifications
+          </h4>
+
+          <div style={{
+            background: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: '10px',
+            padding: '16px'
+          }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>
+              Permissions
+            </h5>
+
+            {[
+              { key: 'can_validate', label: 'Peut valider les rumeurs', icon: Check, color: '#27AE60' },
+              { key: 'can_reject', label: 'Peut rejeter les rumeurs', icon: X, color: '#E74C3C' },
+              { key: 'can_escalate', label: 'Peut escalader au niveau supérieur', icon: ArrowUpRight, color: '#3498DB' },
+              { key: 'can_assess_risk', label: 'Peut évaluer les risques', icon: AlertTriangle, color: '#E67E22' },
+              { key: 'can_send_feedback', label: 'Peut envoyer des rétro-informations', icon: MessageSquare, color: '#9B59B6' }
+            ].map(perm => {
+              const Icon = perm.icon;
+              return (
+                <label
+                  key={perm.key}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 0',
+                    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={assigneeForm[perm.key]}
+                    onChange={(e) => setAssigneeForm(prev => ({ ...prev, [perm.key]: e.target.checked }))}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <Icon size={16} style={{ color: perm.color }} />
+                  <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>{perm.label}</span>
+                </label>
+              );
+            })}
+
+            <h5 style={{ margin: '20px 0 12px', fontSize: '13px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>
+              Notifications
+            </h5>
+
+            {[
+              { key: 'notify_email', label: 'Notification par email', icon: Mail },
+              { key: 'notify_sms', label: 'Notification par SMS', icon: Phone }
+            ].map(notif => {
+              const Icon = notif.icon;
+              return (
+                <label
+                  key={notif.key}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 0',
+                    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={assigneeForm[notif.key]}
+                    onChange={(e) => setAssigneeForm(prev => ({ ...prev, [notif.key]: e.target.checked }))}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <Icon size={16} style={{ color: '#64748b' }} />
+                  <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>{notif.label}</span>
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+            <button
+              style={{ ...styles.btnSecondary, flex: 1 }}
+              onClick={() => {
+                setAssigneesViewMode('list');
+                setSelectedAssignee(null);
+                resetAssigneeForm();
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              style={{ ...styles.btnPrimary, flex: 1 }}
+              onClick={selectedAssignee ? handleUpdateAssignee : handleCreateAssignee}
+              disabled={assigneesLoading || (!selectedAssignee && !assigneeForm.user_id)}
+            >
+              {assigneesLoading ? (
+                <><Loader size={16} className="spin" /> Enregistrement...</>
+              ) : (
+                <><Save size={16} /> {selectedAssignee ? 'Mettre à jour' : 'Assigner'}</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Render Settings
   const renderSettings = () => (
@@ -3007,6 +3704,9 @@ const COHRMSystemPage = ({ isDark, token }) => {
             <button style={styles.tab(activeTab === 'validation')} onClick={() => { setActiveTab('validation'); fetchPendingValidations(); }}>
               <ClipboardCheck size={16} /> Validation
             </button>
+            <button style={styles.tab(activeTab === 'assignees')} onClick={() => { setActiveTab('assignees'); fetchValidationAssignees(); }}>
+              <Shield size={16} /> Validateurs
+            </button>
             <button style={styles.tab(activeTab === 'sms-decoder')} onClick={() => setActiveTab('sms-decoder')}>
               <Phone size={16} /> SMS
             </button>
@@ -3025,6 +3725,7 @@ const COHRMSystemPage = ({ isDark, token }) => {
       {activeTab === 'rumors' && (viewMode === 'form' ? renderRumorForm() : renderRumorsList())}
       {activeTab === 'actors' && (actorViewMode === 'form' ? renderActorForm() : renderActorsList())}
       {activeTab === 'validation' && (validationDetail ? renderValidationDetail() : renderValidationList())}
+      {activeTab === 'assignees' && (assigneesViewMode === 'form' ? renderAssigneeForm() : renderAssigneesList())}
       {activeTab === 'sms-decoder' && renderSMSDecoder()}
       {activeTab === 'scan-history' && renderScanHistory()}
       {activeTab === 'settings' && renderSettings()}
