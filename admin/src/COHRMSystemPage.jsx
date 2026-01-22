@@ -242,6 +242,9 @@ const COHRMSystemPage = ({ isDark, token }) => {
   const [scanHistory, setScanHistory] = useState([]);
   const [scanHistoryLoading, setScanHistoryLoading] = useState(false);
   const [scanHistoryPagination, setScanHistoryPagination] = useState({ page: 1, limit: 20, total: 0 });
+  const [selectedScan, setSelectedScan] = useState(null);
+  const [scanDetails, setScanDetails] = useState(null);
+  const [scanDetailsLoading, setScanDetailsLoading] = useState(false);
 
   // Actors states
   const [actors, setActors] = useState([]);
@@ -860,6 +863,66 @@ const COHRMSystemPage = ({ isDark, token }) => {
       if (res.pagination) setScanHistoryPagination(res.pagination);
     }
     setScanHistoryLoading(false);
+  };
+
+  // Fetch scan details
+  const fetchScanDetails = async (scanId) => {
+    setScanDetailsLoading(true);
+    setSelectedScan(scanId);
+    const res = await api.get(`/cohrm/scan-history/${scanId}`, token);
+    if (res.success) {
+      setScanDetails(res.data);
+    } else {
+      setToast({ type: 'error', message: 'Erreur lors du chargement des détails' });
+    }
+    setScanDetailsLoading(false);
+  };
+
+  // Close scan details
+  const closeScanDetails = () => {
+    setSelectedScan(null);
+    setScanDetails(null);
+  };
+
+  // Convert scan result to rumor
+  const convertToRumor = async (result) => {
+    setLoading(true);
+    const rumorData = {
+      title: result.title || 'Rumeur détectée par scan',
+      description: result.content || '',
+      source: 'web_scan',
+      source_type: 'web_scan',
+      source_details: result.url,
+      priority: result.relevance_score >= 0.7 ? 'high' : result.relevance_score >= 0.4 ? 'medium' : 'low',
+      region: 'Centre', // Default, can be changed
+      status: 'pending'
+    };
+
+    const res = await api.post('/cohrm/rumors', rumorData, token);
+    if (res.success) {
+      // Update scan result status
+      await api.put(`/cohrm/scan-results/${result.id}`, {
+        status: 'converted',
+        rumor_id: res.data.id,
+        is_rumor: true
+      }, token);
+
+      setToast({ type: 'success', message: 'Rumeur créée avec succès' });
+      // Refresh scan details
+      if (selectedScan) fetchScanDetails(selectedScan);
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors de la création' });
+    }
+    setLoading(false);
+  };
+
+  // Ignore scan result
+  const ignoreScanResult = async (resultId) => {
+    const res = await api.put(`/cohrm/scan-results/${resultId}`, { status: 'ignored' }, token);
+    if (res.success) {
+      setToast({ type: 'info', message: 'Résultat ignoré' });
+      if (selectedScan) fetchScanDetails(selectedScan);
+    }
   };
 
   // Run manual scan
@@ -2214,10 +2277,7 @@ const COHRMSystemPage = ({ isDark, token }) => {
                       <td style={{ padding: '12px', textAlign: 'center' }}>
                         <button
                           style={{ ...styles.btnIcon, padding: '6px' }}
-                          onClick={() => {
-                            // View scan details
-                            setToast({ type: 'info', message: `Scan #${scan.id}: ${scan.rumors_found} rumeurs trouvées` });
-                          }}
+                          onClick={() => fetchScanDetails(scan.id)}
                           title="Voir les détails"
                         >
                           <Eye size={16} />
@@ -2287,6 +2347,264 @@ const COHRMSystemPage = ({ isDark, token }) => {
             <Settings size={14} /> Modifier la configuration
           </button>
         </div>
+
+        {/* Scan Details Modal */}
+        {selectedScan && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: '20px'
+          }} onClick={closeScanDetails}>
+            <div
+              style={{
+                background: isDark ? '#1e293b' : '#ffffff',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '1000px',
+                maxHeight: '90vh',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{
+                padding: '20px 24px',
+                borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    <Globe size={20} style={{ marginRight: '10px', verticalAlign: 'middle', color: '#3498DB' }} />
+                    Détails du Scan #{selectedScan}
+                  </h3>
+                  {scanDetails && (
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      {new Date(scanDetails.created_at).toLocaleString('fr-FR')} • {scanDetails.items_scanned} éléments analysés
+                    </p>
+                  )}
+                </div>
+                <button
+                  style={{ ...styles.btnIcon, padding: '8px' }}
+                  onClick={closeScanDetails}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+                {scanDetailsLoading ? (
+                  <div style={{ textAlign: 'center', padding: '60px' }}>
+                    <Loader size={40} style={{ animation: 'spin 1s linear infinite', color: '#3498DB' }} />
+                    <p style={{ marginTop: '16px', color: isDark ? '#64748b' : '#94a3b8' }}>Chargement des détails...</p>
+                  </div>
+                ) : scanDetails ? (
+                  <>
+                    {/* Status Summary */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                      <div style={{ padding: '12px', borderRadius: '10px', background: isDark ? '#0f172a' : '#f0f9ff', textAlign: 'center' }}>
+                        <p style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#3498DB' }}>{scanDetails.statusCounts?.new || 0}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>Nouveaux</p>
+                      </div>
+                      <div style={{ padding: '12px', borderRadius: '10px', background: isDark ? '#0f172a' : '#fef3c7', textAlign: 'center' }}>
+                        <p style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#F39C12' }}>{scanDetails.statusCounts?.reviewed || 0}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>Examinés</p>
+                      </div>
+                      <div style={{ padding: '12px', borderRadius: '10px', background: isDark ? '#0f172a' : '#f0fdf4', textAlign: 'center' }}>
+                        <p style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#27AE60' }}>{scanDetails.statusCounts?.converted || 0}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>Convertis</p>
+                      </div>
+                      <div style={{ padding: '12px', borderRadius: '10px', background: isDark ? '#0f172a' : '#f1f5f9', textAlign: 'center' }}>
+                        <p style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#64748b' }}>{scanDetails.statusCounts?.ignored || 0}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>Ignorés</p>
+                      </div>
+                    </div>
+
+                    {/* Results List */}
+                    <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                      <Search size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                      Éléments détectés ({scanDetails.results?.length || 0})
+                    </h4>
+
+                    {scanDetails.results?.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        <AlertCircle size={40} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                        <p>Aucun élément détecté lors de ce scan</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                        {scanDetails.results?.map(result => {
+                          const RESULT_STATUS = {
+                            new: { label: 'Nouveau', color: '#3498DB' },
+                            reviewed: { label: 'Examiné', color: '#F39C12' },
+                            converted: { label: 'Converti', color: '#27AE60' },
+                            ignored: { label: 'Ignoré', color: '#64748b' }
+                          };
+                          const status = RESULT_STATUS[result.status] || RESULT_STATUS.new;
+
+                          return (
+                            <div
+                              key={result.id}
+                              style={{
+                                padding: '16px',
+                                borderRadius: '12px',
+                                background: isDark ? '#0f172a' : '#f8fafc',
+                                border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                                borderLeft: `4px solid ${status.color}`
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                    <span style={{
+                                      padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '500',
+                                      background: `${status.color}20`, color: status.color
+                                    }}>
+                                      {status.label}
+                                    </span>
+                                    <span style={{
+                                      padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+                                      background: isDark ? '#334155' : '#e2e8f0', color: isDark ? '#94a3b8' : '#64748b'
+                                    }}>
+                                      {result.source}
+                                    </span>
+                                    <span style={{
+                                      padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+                                      background: result.relevance_score >= 0.8 ? '#E74C3C20' : result.relevance_score >= 0.6 ? '#F39C1220' : '#27AE6020',
+                                      color: result.relevance_score >= 0.8 ? '#E74C3C' : result.relevance_score >= 0.6 ? '#F39C12' : '#27AE60'
+                                    }}>
+                                      Pertinence: {Math.round(result.relevance_score * 100)}%
+                                    </span>
+                                  </div>
+                                  <h5 style={{ margin: '0 0 6px', fontSize: '14px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                                    {result.title}
+                                  </h5>
+                                  {result.content && (
+                                    <p style={{ margin: '0 0 8px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', lineHeight: '1.5' }}>
+                                      {result.content.length > 200 ? result.content.substring(0, 200) + '...' : result.content}
+                                    </p>
+                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                                    {result.author && <span><User size={12} style={{ marginRight: '4px' }} />{result.author}</span>}
+                                    {result.url && (
+                                      <a href={result.url} target="_blank" rel="noopener noreferrer" style={{ color: '#3498DB', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <ExternalLink size={12} /> Voir la source
+                                      </a>
+                                    )}
+                                  </div>
+                                  {result.matched_keywords && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+                                      {(typeof result.matched_keywords === 'string' ? JSON.parse(result.matched_keywords) : result.matched_keywords).map((kw, i) => (
+                                        <span key={i} style={{
+                                          padding: '2px 6px', borderRadius: '4px', fontSize: '10px',
+                                          background: isDark ? '#1e3a5f' : '#e0f2fe', color: isDark ? '#93c5fd' : '#1e40af'
+                                        }}>
+                                          {kw}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Actions */}
+                                <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+                                  {result.status === 'new' && (
+                                    <>
+                                      <button
+                                        style={{ ...styles.btnPrimary, padding: '6px 12px', fontSize: '12px' }}
+                                        onClick={() => convertToRumor(result)}
+                                        disabled={loading}
+                                        title="Créer une rumeur"
+                                      >
+                                        <Plus size={14} /> Créer rumeur
+                                      </button>
+                                      <button
+                                        style={{ ...styles.btnSecondary, padding: '6px 10px' }}
+                                        onClick={() => ignoreScanResult(result.id)}
+                                        title="Ignorer"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </>
+                                  )}
+                                  {result.status === 'converted' && result.rumor_id && (
+                                    <button
+                                      style={{ ...styles.btnSecondary, padding: '6px 12px', fontSize: '12px' }}
+                                      onClick={() => {
+                                        closeScanDetails();
+                                        setActiveTab('rumors');
+                                        // TODO: Open rumor detail
+                                      }}
+                                    >
+                                      <Eye size={14} /> Voir la rumeur
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Rumors Created from this scan */}
+                    {scanDetails.rumorsCreated?.length > 0 && (
+                      <>
+                        <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                          <AlertTriangle size={16} style={{ marginRight: '8px', verticalAlign: 'middle', color: '#27AE60' }} />
+                          Rumeurs créées à partir de ce scan ({scanDetails.rumorsCreated.length})
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {scanDetails.rumorsCreated.map(rumor => (
+                            <div
+                              key={rumor.id}
+                              style={{
+                                padding: '12px 16px',
+                                borderRadius: '10px',
+                                background: isDark ? '#0f172a' : '#f0fdf4',
+                                border: `1px solid ${isDark ? '#166534' : '#86efac'}`,
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                              }}
+                            >
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#27AE60' }}>{rumor.code}</span>
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
+                                    background: RUMOR_PRIORITIES.find(p => p.value === rumor.priority)?.color + '20',
+                                    color: RUMOR_PRIORITIES.find(p => p.value === rumor.priority)?.color
+                                  }}>
+                                    {RUMOR_PRIORITIES.find(p => p.value === rumor.priority)?.label}
+                                  </span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                                  {rumor.title}
+                                </p>
+                                <p style={{ margin: '4px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                                  {rumor.region} • {new Date(rumor.created_at).toLocaleDateString('fr-FR')}
+                                </p>
+                              </div>
+                              <button
+                                style={{ ...styles.btnSecondary, padding: '6px 12px', fontSize: '12px' }}
+                                onClick={() => {
+                                  closeScanDetails();
+                                  setActiveTab('rumors');
+                                }}
+                              >
+                                <Eye size={14} /> Voir
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

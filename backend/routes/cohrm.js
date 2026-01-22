@@ -913,22 +913,95 @@ router.get('/scan-history/:id', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Scan non trouvé' });
     }
 
-    // Récupérer les résultats du scan
+    // Récupérer les résultats du scan avec info utilisateur
     const [results] = await db.query(`
-      SELECT * FROM cohrm_scan_results
-      WHERE scan_id = ?
-      ORDER BY created_at DESC
+      SELECT sr.*,
+        CONCAT(u.first_name, ' ', u.last_name) as reviewed_by_name
+      FROM cohrm_scan_results sr
+      LEFT JOIN users u ON sr.reviewed_by = u.id
+      WHERE sr.scan_id = ?
+      ORDER BY sr.relevance_score DESC, sr.created_at DESC
     `, [req.params.id]);
+
+    // Récupérer les rumeurs créées à partir de ce scan
+    const [rumorsCreated] = await db.query(`
+      SELECT r.id, r.code, r.title, r.status, r.priority, r.region, r.created_at,
+        sr.id as scan_result_id, sr.title as original_title
+      FROM cohrm_rumors r
+      JOIN cohrm_scan_results sr ON sr.rumor_id = r.id
+      WHERE sr.scan_id = ?
+      ORDER BY r.created_at DESC
+    `, [req.params.id]);
+
+    // Statistiques par statut
+    const statusCounts = {
+      new: results.filter(r => r.status === 'new').length,
+      reviewed: results.filter(r => r.status === 'reviewed').length,
+      converted: results.filter(r => r.status === 'converted').length,
+      ignored: results.filter(r => r.status === 'ignored').length
+    };
 
     res.json({
       success: true,
       data: {
         ...scans[0],
-        results
+        results,
+        rumorsCreated,
+        statusCounts
       }
     });
   } catch (error) {
     console.error('Get scan details error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/scan-results/:id - Mettre à jour un résultat de scan
+router.put('/scan-results/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rumor_id, is_rumor, notes } = req.body;
+
+    // Vérifier si le résultat existe
+    const [existing] = await db.query('SELECT id FROM cohrm_scan_results WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Résultat non trouvé' });
+    }
+
+    await db.query(`
+      UPDATE cohrm_scan_results SET
+        status = COALESCE(?, status),
+        rumor_id = COALESCE(?, rumor_id),
+        is_rumor = COALESCE(?, is_rumor),
+        notes = COALESCE(?, notes),
+        reviewed_by = ?,
+        reviewed_at = NOW()
+      WHERE id = ?
+    `, [status, rumor_id, is_rumor, notes, req.user.id, id]);
+
+    res.json({ success: true, message: 'Résultat mis à jour' });
+  } catch (error) {
+    console.error('Update scan result error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/scan-results/:scanId/rumors - Récupérer les rumeurs créées à partir d'un scan
+router.get('/scan-results/:scanId/rumors', auth, async (req, res) => {
+  try {
+    const { scanId } = req.params;
+
+    const [rumors] = await db.query(`
+      SELECT r.*, sr.id as scan_result_id
+      FROM cohrm_rumors r
+      JOIN cohrm_scan_results sr ON sr.rumor_id = r.id
+      WHERE sr.scan_id = ?
+      ORDER BY r.created_at DESC
+    `, [scanId]);
+
+    res.json({ success: true, data: rumors });
+  } catch (error) {
+    console.error('Get scan rumors error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -957,13 +1030,66 @@ router.post('/scan/run', auth, async (req, res) => {
     const scanId = result.insertId;
 
     // Simuler un scan (dans une vraie implémentation, cela serait un job asynchrone)
-    // Pour l'instant, on simule juste des résultats
+    // Pour l'instant, on simule juste des résultats réalistes
     setTimeout(async () => {
       try {
-        // Simuler des résultats de scan
+        // Exemples de résultats de scan simulés
+        const simulatedResults = [
+          {
+            title: 'Cas suspects de choléra signalés dans la région du Nord',
+            content: 'Plusieurs cas de diarrhée aiguë ont été signalés dans des villages près de Garoua. Les autorités sanitaires enquêtent sur une possible épidémie de choléra.',
+            url: 'https://cameroon-tribune.cm/sante/cholera-nord-2024',
+            source: 'news',
+            author: 'Cameroon Tribune',
+            keywords: ['choléra', 'épidémie', 'diarrhée'],
+            relevance: 0.92
+          },
+          {
+            title: 'Rumeur sur Facebook: vaccin COVID dangereux au Cameroun',
+            content: 'Un post viral sur Facebook affirme que le vaccin COVID causerait des effets secondaires graves. Cette information non vérifiée circule dans les groupes WhatsApp.',
+            url: 'https://facebook.com/post/123456789',
+            source: 'facebook',
+            author: 'Utilisateur anonyme',
+            keywords: ['vaccin', 'COVID', 'effets secondaires'],
+            relevance: 0.78
+          },
+          {
+            title: 'Grippe aviaire: mortalité élevée de volailles à Bafoussam',
+            content: 'Des éleveurs de l\'Ouest signalent une mortalité anormale de poulets. Les services vétérinaires ont été alertés pour des prélèvements.',
+            url: 'https://actucameroun.com/grippe-aviaire-ouest',
+            source: 'news',
+            author: 'Actu Cameroun',
+            keywords: ['grippe aviaire', 'volailles', 'mortalité'],
+            relevance: 0.85
+          },
+          {
+            title: 'Tweet: Eau contaminée à Douala Bonabéri',
+            content: 'Habitants de Bonabéri signalent une eau du robinet trouble et malodorante depuis 3 jours. Plusieurs cas de gastro-entérite rapportés.',
+            url: 'https://twitter.com/user/status/987654321',
+            source: 'twitter',
+            author: '@citoyen_douala',
+            keywords: ['eau', 'contamination', 'gastro-entérite'],
+            relevance: 0.71
+          },
+          {
+            title: 'Alerte: Cas de rougeole en augmentation à Yaoundé',
+            content: 'Le district de santé de Biyem-Assi rapporte une hausse des cas de rougeole chez les enfants non vaccinés.',
+            url: 'https://minsante.cm/alerte-rougeole-yaounde',
+            source: 'news',
+            author: 'MinSanté',
+            keywords: ['rougeole', 'vaccination', 'enfants'],
+            relevance: 0.88
+          }
+        ];
+
+        // Sélectionner aléatoirement des résultats
+        const numResults = Math.floor(Math.random() * 4) + 2; // 2 à 5 résultats
+        const selectedResults = simulatedResults
+          .sort(() => Math.random() - 0.5)
+          .slice(0, numResults);
+
         const itemsScanned = Math.floor(Math.random() * 100) + 50;
-        const rumorsFound = Math.floor(Math.random() * 5);
-        const rumorsCreated = Math.floor(rumorsFound * 0.6);
+        const rumorsFound = selectedResults.length;
         const duration = Math.floor(Math.random() * 30) + 10;
 
         // Mettre à jour le scan avec les résultats
@@ -972,25 +1098,28 @@ router.post('/scan/run', auth, async (req, res) => {
           SET status = 'completed',
               items_scanned = ?,
               rumors_found = ?,
-              rumors_created = ?,
+              rumors_created = 0,
               duration = ?,
               completed_at = NOW()
           WHERE id = ?
-        `, [itemsScanned, rumorsFound, rumorsCreated, duration, scanId]);
+        `, [itemsScanned, rumorsFound, duration, scanId]);
 
-        // Si des rumeurs ont été trouvées, créer des entrées de résultat
-        for (let i = 0; i < rumorsFound; i++) {
+        // Créer les entrées de résultat détaillées
+        for (const result of selectedResults) {
           await db.query(`
             INSERT INTO cohrm_scan_results (
-              scan_id, title, url, source, matched_keywords, relevance_score, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
+              scan_id, title, content, url, source, author,
+              matched_keywords, relevance_score, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', NOW())
           `, [
             scanId,
-            `Alerte sanitaire détectée #${i + 1}`,
-            `https://example.com/article/${Date.now()}`,
-            source === 'all' ? ['twitter', 'facebook', 'news'][Math.floor(Math.random() * 3)] : source,
-            JSON.stringify(scanKeywords.slice(0, 2)),
-            (Math.random() * 0.5 + 0.5).toFixed(2)
+            result.title,
+            result.content,
+            result.url,
+            result.source,
+            result.author,
+            JSON.stringify(result.keywords),
+            result.relevance
           ]);
         }
       } catch (err) {
