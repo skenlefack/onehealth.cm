@@ -912,7 +912,7 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
       module_id, title_fr, title_en,
       content_fr, content_en, summary_fr, summary_en,
       content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
-      pdf_url, attachments, resources,
+      pdf_url, pptx_url, attachments, resources,
       duration_minutes, sort_order, is_preview, is_required, is_downloadable,
       has_quiz, quiz_id, quiz_position, quiz_weight,
       completion_type, min_video_watch_percent, min_time_spent_seconds,
@@ -944,17 +944,17 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
         module_id, title_fr, title_en,
         content_fr, content_en, summary_fr, summary_en,
         content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
-        pdf_url, attachments, resources,
+        pdf_url, pptx_url, attachments, resources,
         duration_minutes, sort_order, is_preview, is_required, is_downloadable,
         has_quiz, quiz_id, quiz_position, quiz_weight,
         completion_type, min_video_watch_percent, min_time_spent_seconds,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       module_id, title_fr, title_en,
       content_fr, content_en, summary_fr, summary_en,
       content_type || 'text', video_url, video_duration_seconds || 0, video_provider || 'upload', video_thumbnail,
-      pdf_url, JSON.stringify(attachments || []), JSON.stringify(resources || []),
+      pdf_url, pptx_url, JSON.stringify(attachments || []), JSON.stringify(resources || []),
       duration_minutes || 0, order, is_preview || false, is_required !== false, is_downloadable || false,
       has_quiz || false, quiz_id, quiz_position || 'end', quiz_weight || 1.00,
       completion_type || 'view', min_video_watch_percent || 80, min_time_spent_seconds || 0,
@@ -991,7 +991,7 @@ router.put('/lessons/:id', auth, authorize('admin', 'editor'), async (req, res) 
     const allowedFields = [
       'title_fr', 'title_en', 'content_fr', 'content_en', 'summary_fr', 'summary_en',
       'content_type', 'video_url', 'video_duration_seconds', 'video_provider', 'video_thumbnail',
-      'pdf_url', 'duration_minutes', 'sort_order', 'is_preview', 'is_required', 'is_downloadable',
+      'pdf_url', 'pptx_url', 'duration_minutes', 'sort_order', 'is_preview', 'is_required', 'is_downloadable',
       'has_quiz', 'quiz_id', 'quiz_position', 'quiz_weight',
       'completion_type', 'min_video_watch_percent', 'min_time_spent_seconds',
       'status', 'is_active'
@@ -2521,17 +2521,7 @@ router.post('/quizzes/:id/start', auth, async (req, res) => {
 
     const quiz = quizzes[0];
 
-    // Vérifier le nombre de tentatives
-    const [[{ attemptCount }]] = await db.query(`
-      SELECT COUNT(*) as attemptCount FROM quiz_attempts
-      WHERE user_id = ? AND quiz_id = ? AND status != 'abandoned'
-    `, [req.user.id, id]);
-
-    if (quiz.max_attempts && attemptCount >= quiz.max_attempts) {
-      return res.status(400).json({ success: false, message: 'Nombre maximum de tentatives atteint' });
-    }
-
-    // Vérifier si une tentative est déjà en cours
+    // Vérifier si une tentative est déjà en cours (AVANT de vérifier max_attempts)
     const [inProgress] = await db.query(`
       SELECT * FROM quiz_attempts
       WHERE user_id = ? AND quiz_id = ? AND status = 'in_progress'
@@ -2561,6 +2551,16 @@ router.post('/quizzes/:id/start', auth, async (req, res) => {
         },
         message: 'Tentative en cours récupérée'
       });
+    }
+
+    // Vérifier le nombre de tentatives (seulement si pas de tentative en cours)
+    const [[{ attemptCount }]] = await db.query(`
+      SELECT COUNT(*) as attemptCount FROM quiz_attempts
+      WHERE user_id = ? AND quiz_id = ? AND status NOT IN ('abandoned', 'in_progress')
+    `, [req.user.id, id]);
+
+    if (quiz.max_attempts && attemptCount >= quiz.max_attempts) {
+      return res.status(400).json({ success: false, message: 'Nombre maximum de tentatives atteint' });
     }
 
     // Créer une nouvelle tentative
@@ -2744,9 +2744,15 @@ router.post('/attempts/:id/submit', auth, async (req, res) => {
     const { id } = req.params;
     const { responses } = req.body; // [{question_id, answer}, ...]
 
-    // Récupérer la tentative
+    // Récupérer la tentative (attention: éviter conflit de colonnes status entre a et q)
     const [attempts] = await db.query(`
-      SELECT a.*, q.*
+      SELECT a.id, a.user_id, a.quiz_id, a.enrollment_id, a.attempt_number,
+             a.status as attempt_status, a.started_at, a.completed_at,
+             a.time_spent_seconds, a.score, a.score_percent, a.max_score,
+             a.correct_count, a.total_questions, a.passed, a.question_order,
+             q.title_fr, q.title_en, q.time_limit_minutes, q.passing_score,
+             q.shuffle_questions, q.shuffle_options, q.show_correct_answers,
+             q.show_explanation
       FROM quiz_attempts a
       JOIN quizzes q ON a.quiz_id = q.id
       WHERE a.id = ? AND a.user_id = ?
@@ -2758,7 +2764,7 @@ router.post('/attempts/:id/submit', auth, async (req, res) => {
 
     const attempt = attempts[0];
 
-    if (attempt.status !== 'in_progress') {
+    if (attempt.attempt_status !== 'in_progress') {
       return res.status(400).json({ success: false, message: 'Cette tentative est déjà terminée' });
     }
 
@@ -2894,6 +2900,85 @@ router.post('/attempts/:id/submit', auth, async (req, res) => {
     // Mettre à jour l'enrollment si lié
     if (attempt.enrollment_id) {
       // On pourrait mettre à jour la progression ici si nécessaire
+    }
+
+    // Vérifier si c'est un quiz final d'un cours sans modules (quiz-only course)
+    if (passed) {
+      const [courseWithFinalQuiz] = await db.query(`
+        SELECT c.id, c.title_fr, c.title_en, c.certificate_enabled, c.certificate_validity_months, c.duration_hours, c.min_passing_score,
+               (SELECT COUNT(*) FROM course_modules WHERE course_id = c.id AND is_active = 1) as module_count
+        FROM courses c
+        WHERE c.final_quiz_id = ?
+      `, [attempt.quiz_id]);
+
+      if (courseWithFinalQuiz.length > 0) {
+        const course = courseWithFinalQuiz[0];
+
+        // Si le cours n'a pas de modules (quiz-only), marquer comme terminé et générer certificat
+        if (course.module_count === 0) {
+          // Trouver l'enrollment de l'utilisateur pour ce cours
+          const [enrollments] = await db.query(`
+            SELECT e.*, u.username, u.email, u.first_name, u.last_name
+            FROM enrollments e
+            JOIN users u ON e.user_id = u.id
+            WHERE e.user_id = ? AND e.enrollable_type = 'course' AND e.enrollable_id = ?
+          `, [req.user.id, course.id]);
+
+          if (enrollments.length > 0) {
+            const enrollment = enrollments[0];
+
+            // Mettre à jour l'enrollment comme terminé
+            await db.query(`
+              UPDATE enrollments
+              SET status = 'completed',
+                  completed_at = NOW(),
+                  progress_percent = 100,
+                  final_score = ?,
+                  weighted_score = ?,
+                  certificate_eligible = 1
+              WHERE id = ?
+            `, [scorePercent, scorePercent, enrollment.id]);
+
+            // Générer le certificat si les certificats sont activés et qu'il n'existe pas déjà
+            if (course.certificate_enabled) {
+              const [existingCert] = await db.query(`
+                SELECT id FROM certificates WHERE enrollment_id = ? AND status = 'active'
+              `, [enrollment.id]);
+
+              if (existingCert.length === 0) {
+                const certificateNumber = generateCertificateNumber();
+                const verificationCode = `${certificateNumber}-${Date.now().toString(36)}`.toUpperCase();
+                const recipientName = enrollment.first_name && enrollment.last_name
+                  ? `${enrollment.first_name} ${enrollment.last_name}`
+                  : enrollment.username;
+                const issueDate = new Date();
+                let expiryDate = null;
+                if (course.certificate_validity_months) {
+                  expiryDate = new Date();
+                  expiryDate.setMonth(expiryDate.getMonth() + course.certificate_validity_months);
+                }
+
+                const [certResult] = await db.query(`
+                  INSERT INTO certificates (
+                    certificate_number, user_id, enrollable_type, enrollable_id, enrollment_id,
+                    title_fr, title_en, recipient_name, recipient_email, final_score, total_hours,
+                    issue_date, expiry_date, verification_code, status
+                  ) VALUES (?, ?, 'course', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                `, [
+                  certificateNumber, req.user.id, course.id, enrollment.id,
+                  course.title_fr, course.title_en, recipientName, enrollment.email,
+                  scorePercent, course.duration_hours, issueDate, expiryDate, verificationCode
+                ]);
+
+                // Mettre à jour l'enrollment avec l'ID du certificat
+                await db.query('UPDATE enrollments SET certificate_id = ? WHERE id = ?', [certResult.insertId, enrollment.id]);
+
+                console.log(`Certificate generated for quiz-only course: ${course.title_fr}, user: ${req.user.id}`);
+              }
+            }
+          }
+        }
+      }
     }
 
     // Log d'activité
@@ -3104,6 +3189,34 @@ router.get('/certificates', auth, async (req, res) => {
     res.json({ success: true, data: certificates });
   } catch (error) {
     console.error('Get certificates error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/elearning/certificates/my - Certificat de l'utilisateur pour un cours/parcours spécifique
+router.get('/certificates/my', auth, async (req, res) => {
+  try {
+    const { enrollable_type, enrollable_id } = req.query;
+
+    if (!enrollable_type || !enrollable_id) {
+      return res.status(400).json({ success: false, message: 'enrollable_type et enrollable_id requis' });
+    }
+
+    const [certificates] = await db.query(`
+      SELECT c.*,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_fr ELSE lp.title_fr END as course_title_fr,
+        CASE WHEN c.enrollable_type = 'course' THEN co.title_en ELSE lp.title_en END as course_title_en,
+        CASE WHEN c.enrollable_type = 'course' THEN co.thumbnail ELSE lp.thumbnail END as thumbnail
+      FROM certificates c
+      LEFT JOIN courses co ON c.enrollable_type = 'course' AND c.enrollable_id = co.id
+      LEFT JOIN learning_paths lp ON c.enrollable_type = 'learning_path' AND c.enrollable_id = lp.id
+      WHERE c.user_id = ? AND c.enrollable_type = ? AND c.enrollable_id = ? AND c.status = 'active'
+      ORDER BY c.issue_date DESC
+    `, [req.user.id, enrollable_type, enrollable_id]);
+
+    res.json({ success: true, data: certificates });
+  } catch (error) {
+    console.error('Get my certificate error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

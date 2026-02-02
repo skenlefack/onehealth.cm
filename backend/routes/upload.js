@@ -17,7 +17,8 @@ const uploadDirs = [
   'uploads/elearning/videos',
   'uploads/elearning/thumbnails',
   'uploads/elearning/pdfs',
-  'uploads/elearning/attachments'
+  'uploads/elearning/attachments',
+  'uploads/elearning/presentations'
 ];
 
 uploadDirs.forEach(dir => {
@@ -170,6 +171,42 @@ const uploadElearningPdf = multer({
   storage: elearningPdfStorage,
   fileFilter: pdfFilter,
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB max for PDFs
+});
+
+// File filter for PowerPoint files only
+const powerpointFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Seuls les fichiers PowerPoint (PPT, PPTX) sont autorisés'), false);
+  }
+};
+
+// Storage configuration for e-learning PowerPoint presentations
+const elearningPptStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '..', 'uploads', 'elearning', 'presentations');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `${uniqueId}-${safeName}`);
+  }
+});
+
+const uploadElearningPpt = multer({
+  storage: elearningPptStorage,
+  fileFilter: powerpointFilter,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max for PowerPoint
 });
 
 // Upload image (photo, logo)
@@ -329,6 +366,32 @@ router.post('/elearning/pdf', auth, uploadElearningPdf.single('file'), async (re
   } catch (error) {
     console.error('E-learning PDF upload error:', error);
     res.status(500).json({ success: false, message: 'Erreur lors de l\'upload du PDF' });
+  }
+});
+
+// Upload e-learning PowerPoint
+router.post('/elearning/powerpoint', auth, uploadElearningPpt.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Aucun fichier uploadé' });
+    }
+
+    const fileUrl = `/uploads/elearning/presentations/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      data: {
+        url: fileUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+        type: 'powerpoint'
+      }
+    });
+  } catch (error) {
+    console.error('E-learning PowerPoint upload error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de l\'upload du PowerPoint' });
   }
 });
 

@@ -17386,6 +17386,15 @@ const OHELearningPage = ({ isDark, token }) => {
   };
 
   // ============ LESSON FORM INLINE ============
+  // Helper to detect video provider from URL
+  const detectVideoProvider = (url) => {
+    if (!url) return 'upload';
+    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+    if (url.includes('vimeo.com')) return 'vimeo';
+    if (url.startsWith('/uploads')) return 'upload';
+    return 'other';
+  };
+
   const LessonFormInline = () => {
     const [form, setForm] = useState({
       title_fr: editingLesson?.title_fr || '',
@@ -17393,7 +17402,10 @@ const OHELearningPage = ({ isDark, token }) => {
       content_type: editingLesson?.content_type || 'text',
       content_fr: editingLesson?.content_fr || '',
       video_url: editingLesson?.video_url || '',
+      video_provider: editingLesson?.video_provider || 'upload',
+      video_source_type: editingLesson?.video_url && !editingLesson?.video_url.startsWith('/uploads') ? 'url' : 'upload',
       pdf_url: editingLesson?.pdf_url || '',
+      pptx_url: editingLesson?.pptx_url || '',
       duration_minutes: editingLesson?.duration_minutes || 0,
       is_preview: editingLesson?.is_preview || false,
       status: editingLesson?.status || 'draft',
@@ -17446,6 +17458,34 @@ const OHELearningPage = ({ isDark, token }) => {
         console.error('PDF upload error:', err);
       }
       setUploading(false);
+    };
+
+    const handlePptxUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const response = await fetch('/api/upload/elearning/powerpoint', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        const text = await response.text();
+        const res = text ? JSON.parse(text) : { success: false };
+        if (res.success) {
+          setForm(prev => ({ ...prev, pptx_url: res.data.url }));
+        }
+      } catch (err) {
+        console.error('PowerPoint upload error:', err);
+      }
+      setUploading(false);
+    };
+
+    const handleVideoUrlChange = (url) => {
+      const provider = detectVideoProvider(url);
+      setForm(prev => ({ ...prev, video_url: url, video_provider: provider }));
     };
 
     return (
@@ -17505,6 +17545,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="text">Texte</option>
                 <option value="video">Vidéo</option>
                 <option value="pdf">PDF</option>
+                <option value="powerpoint">PowerPoint</option>
                 <option value="mixed">Mixte</option>
               </select>
             </div>
@@ -17520,30 +17561,111 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           </div>
 
-          {/* Video Upload */}
+          {/* Video Upload/URL */}
           {(form.content_type === 'video' || form.content_type === 'mixed') && (
             <div>
               <label style={styles.label}>Vidéo</label>
-              {form.video_url ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
-                  <Play size={20} color={colors.success} />
-                  <span style={{ flex: 1, fontSize: '13px' }}>{form.video_url}</span>
-                  <button onClick={() => setForm({ ...form, video_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                  textAlign: 'center', cursor: 'pointer'
-                }} onClick={() => document.getElementById('lesson-video-input').click()}>
-                  <Play size={28} color={isDark ? '#475569' : '#94a3b8'} />
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    {uploading ? 'Upload en cours...' : 'Cliquer pour uploader une vidéo (max 500MB)'}
-                  </p>
+
+              {/* Toggle between upload and URL */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, video_source_type: 'upload', video_url: '', video_provider: 'upload' })}
+                  style={{
+                    ...styles.btnSecondary,
+                    flex: 1,
+                    background: form.video_source_type === 'upload' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                    color: form.video_source_type === 'upload' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                    border: 'none'
+                  }}
+                >
+                  <Upload size={16} style={{ marginRight: '8px' }} />
+                  Uploader un fichier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, video_source_type: 'url', video_url: '', video_provider: 'other' })}
+                  style={{
+                    ...styles.btnSecondary,
+                    flex: 1,
+                    background: form.video_source_type === 'url' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                    color: form.video_source_type === 'url' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                    border: 'none'
+                  }}
+                >
+                  <Link size={16} style={{ marginRight: '8px' }} />
+                  URL externe
+                </button>
+              </div>
+
+              {/* Upload mode */}
+              {form.video_source_type === 'upload' && (
+                <>
+                  {form.video_url ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
+                      <Play size={20} color={colors.success} />
+                      <span style={{ flex: 1, fontSize: '13px' }}>{form.video_url}</span>
+                      <button onClick={() => setForm({ ...form, video_url: '', video_provider: 'upload' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                      textAlign: 'center', cursor: 'pointer'
+                    }} onClick={() => document.getElementById('lesson-video-input').click()}>
+                      <Play size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                      <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        {uploading ? 'Upload en cours...' : 'Cliquer pour uploader une vidéo (max 500MB)'}
+                      </p>
+                    </div>
+                  )}
+                  <input type="file" id="lesson-video-input" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} />
+                </>
+              )}
+
+              {/* URL mode */}
+              {form.video_source_type === 'url' && (
+                <div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="url"
+                      value={form.video_url}
+                      onChange={e => handleVideoUrlChange(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                      style={{
+                        ...styles.input,
+                        paddingLeft: form.video_provider && form.video_provider !== 'other' ? '40px' : '12px'
+                      }}
+                    />
+                    {form.video_provider === 'youtube' && (
+                      <div style={{
+                        position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                        width: '20px', height: '20px', borderRadius: '4px', background: '#FF0000',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <Play size={12} color="#fff" fill="#fff" />
+                      </div>
+                    )}
+                    {form.video_provider === 'vimeo' && (
+                      <div style={{
+                        position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                        width: '20px', height: '20px', borderRadius: '4px', background: '#1ab7ea',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <Play size={12} color="#fff" fill="#fff" />
+                      </div>
+                    )}
+                  </div>
+                  {form.video_url && (
+                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: form.video_provider === 'youtube' ? '#FF0000' : form.video_provider === 'vimeo' ? '#1ab7ea' : colors.text.muted }}>
+                      {form.video_provider === 'youtube' ? 'YouTube détecté' :
+                       form.video_provider === 'vimeo' ? 'Vimeo détecté' :
+                       'Autre provider vidéo'}
+                    </p>
+                  )}
                 </div>
               )}
-              <input type="file" id="lesson-video-input" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} />
             </div>
           )}
 
@@ -17571,6 +17693,36 @@ const OHELearningPage = ({ isDark, token }) => {
                 </div>
               )}
               <input type="file" id="lesson-pdf-input" accept="application/pdf" onChange={handlePdfUpload} style={{ display: 'none' }} />
+            </div>
+          )}
+
+          {/* PowerPoint Upload */}
+          {form.content_type === 'powerpoint' && (
+            <div>
+              <label style={styles.label}>Présentation PowerPoint</label>
+              {form.pptx_url ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fef2f2', borderRadius: '10px' }}>
+                  <FileText size={20} color="#ea580c" />
+                  <span style={{ flex: 1, fontSize: '13px' }}>{form.pptx_url}</span>
+                  <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                  textAlign: 'center', cursor: 'pointer'
+                }} onClick={() => document.getElementById('lesson-pptx-input').click()}>
+                  <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    {uploading ? 'Upload en cours...' : 'Cliquer pour uploader un PowerPoint (max 100MB)'}
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
+                    Formats acceptés : .ppt, .pptx
+                  </p>
+                </div>
+              )}
+              <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} />
             </div>
           )}
 

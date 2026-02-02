@@ -14,7 +14,7 @@ import {
   getImageUrl, completeLesson, updateLessonProgress
 } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
-import { ProgressBar, VideoPlayer, VideoProgressData } from '@/components/elearning';
+import { ProgressBar, VideoPlayer, VideoProgressData, PowerPointViewer } from '@/components/elearning';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -236,6 +236,8 @@ export default function LessonViewerPage() {
         return <Play size={14} />;
       case 'pdf':
         return <File size={14} />;
+      case 'powerpoint':
+        return <FileText size={14} />;
       case 'quiz':
         return <FileText size={14} />;
       default:
@@ -468,6 +470,19 @@ export default function LessonViewerPage() {
                     </Button>
                   </a>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* PowerPoint content */}
+          {currentLesson.content_type === 'powerpoint' && currentLesson.pptx_url && (
+            <div className="bg-slate-800 p-4">
+              <div className="max-w-5xl mx-auto">
+                <PowerPointViewer
+                  pptxUrl={currentLesson.pptx_url}
+                  title={lessonTitle}
+                  lang={language}
+                />
               </div>
             </div>
           )}

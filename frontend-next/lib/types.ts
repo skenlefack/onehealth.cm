@@ -340,6 +340,10 @@ export interface ELearningCourse {
   updated_at: string;
   module_count?: number;
   lesson_count?: number;
+  // Quiz final
+  final_quiz_id?: number;
+  final_quiz_weight?: number;
+  module_quizzes_weight?: number;
   // For enrolled users
   enrollment_id?: number;
   enrollment_status?: string;
@@ -374,11 +378,12 @@ export interface ELearningLesson {
   title_en?: string;
   content_fr?: string;
   content_en?: string;
-  content_type: 'video' | 'text' | 'pdf' | 'mixed' | 'quiz';
+  content_type: 'video' | 'text' | 'pdf' | 'mixed' | 'quiz' | 'powerpoint';
   video_url?: string;
   video_duration_seconds: number;
   video_provider: 'youtube' | 'vimeo' | 'upload' | 'other';
   pdf_url?: string;
+  pptx_url?: string;
   attachments?: { name: string; url: string; type: string }[];
   duration_minutes: number;
   sort_order: number;
