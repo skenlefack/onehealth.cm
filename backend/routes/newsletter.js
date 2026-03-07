@@ -1251,7 +1251,8 @@ router.post('/campaigns', auth, async (req, res) => {
   try {
     const {
       name, subject_fr, subject_en, preview_text_fr, preview_text_en,
-      content_html_fr, content_html_en, template_id, target_lists, target_language
+      content_html_fr, content_html_en, template_id, target_lists, target_language,
+      attachments
     } = req.body;
 
     if (!name || !subject_fr || !content_html_fr || !target_lists) {
@@ -1263,11 +1264,11 @@ router.post('/campaigns', auth, async (req, res) => {
     const [result] = await db.query(`
       INSERT INTO newsletters
       (name, slug, subject_fr, subject_en, preview_text_fr, preview_text_en,
-       content_html_fr, content_html_en, template_id, target_lists, target_language, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       content_html_fr, content_html_en, template_id, target_lists, target_language, attachments, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [name, slug, subject_fr, subject_en, preview_text_fr, preview_text_en,
         content_html_fr, content_html_en, template_id, JSON.stringify(target_lists),
-        target_language || 'all', req.user.id]);
+        target_language || 'all', attachments || null, req.user.id]);
 
     res.status(201).json({
       success: true,
@@ -1286,7 +1287,7 @@ router.put('/campaigns/:id', auth, async (req, res) => {
     const { id } = req.params;
     const {
       name, subject_fr, subject_en, preview_text_fr, preview_text_en,
-      content_html_fr, content_html_en, target_lists, target_language
+      content_html_fr, content_html_en, target_lists, target_language, attachments
     } = req.body;
 
     // Check if campaign can be edited
@@ -1308,12 +1309,13 @@ router.put('/campaigns/:id', auth, async (req, res) => {
         content_html_fr = COALESCE(?, content_html_fr),
         content_html_en = COALESCE(?, content_html_en),
         target_lists = COALESCE(?, target_lists),
-        target_language = COALESCE(?, target_language)
+        target_language = COALESCE(?, target_language),
+        attachments = COALESCE(?, attachments)
       WHERE id = ?
     `, [name, subject_fr, subject_en, preview_text_fr, preview_text_en,
         content_html_fr, content_html_en,
         target_lists ? JSON.stringify(target_lists) : null,
-        target_language, id]);
+        target_language, attachments || null, id]);
 
     res.json({ success: true, message: 'Campagne mise a jour' });
   } catch (error) {
@@ -1636,6 +1638,121 @@ router.delete('/campaigns/:id', auth, async (req, res) => {
   } catch (error) {
     console.error('Delete campaign error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ------------------------------------
+// DOCUMENT IMPORT
+// ------------------------------------
+
+const multer = require('multer');
+const path = require('path');
+const documentConversionService = require('../services/documentConversionService');
+
+// Configure multer for document uploads
+const documentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../uploads/newsletter-imports'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const documentFilter = (req, file, cb) => {
+  const allowedMimes = [
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/pdf'
+  ];
+  const allowedExts = ['.docx', '.pdf'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Format non supporte. Utilisez .docx ou .pdf'), false);
+  }
+};
+
+const documentUpload = multer({
+  storage: documentStorage,
+  fileFilter: documentFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024 // 20MB max
+  }
+});
+
+// POST /api/newsletter/convert-document - Convert Word/PDF to HTML
+router.post('/convert-document', auth, documentUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aucun fichier fourni'
+      });
+    }
+
+    const filePath = req.file.path;
+    const originalName = req.file.originalname;
+    const keepAsAttachment = req.body.keepAsAttachment === 'true';
+
+    try {
+      // Convert document to HTML
+      const result = await documentConversionService.convertDocument(filePath);
+
+      let attachment = null;
+
+      if (keepAsAttachment) {
+        // Move file to attachments directory instead of deleting
+        const fs = require('fs').promises;
+        const attachmentFilename = `${uuidv4()}${path.extname(originalName)}`;
+        const attachmentPath = path.join(__dirname, '../uploads/newsletter-attachments', attachmentFilename);
+
+        await fs.rename(filePath, attachmentPath);
+
+        attachment = {
+          filename: originalName,
+          path: `/uploads/newsletter-attachments/${attachmentFilename}`,
+          mimetype: req.file.mimetype,
+          size: req.file.size
+        };
+      } else {
+        // Clean up the uploaded file
+        await documentConversionService.cleanupFile(filePath);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          html: result.html,
+          warnings: result.warnings,
+          images: result.images || [],
+          originalName: originalName,
+          fileType: result.fileType,
+          attachment: attachment
+        }
+      });
+    } catch (conversionError) {
+      // Clean up on error
+      await documentConversionService.cleanupFile(filePath);
+      throw conversionError;
+    }
+  } catch (error) {
+    console.error('Document conversion error:', error);
+
+    // Handle multer errors
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Le fichier est trop volumineux. Taille maximum: 20MB'
+      });
+    }
+
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Erreur lors de la conversion du document'
+    });
   }
 });
 

@@ -99,6 +99,11 @@ export default function QuizTakePage() {
             }
           }
         } else {
+          // Check if max attempts reached - redirect to intro page with message
+          if (attemptRes.message?.includes('maximum') || attemptRes.message?.includes('tentatives')) {
+            router.push(`/${lang}/oh-elearning/quiz/${quizId}?maxAttempts=true`);
+            return;
+          }
           setError(attemptRes.message || (language === 'fr' ? 'Erreur lors du demarrage' : 'Error starting quiz'));
         }
       } catch (err) {

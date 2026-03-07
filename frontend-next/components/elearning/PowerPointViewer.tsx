@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, RefreshCw, ExternalLink, AlertCircle, Presentation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Language } from '@/lib/types';
 import { Button } from '@/components/ui';
@@ -19,28 +19,40 @@ export function PowerPointViewer({
   lang = 'fr',
   className
 }: PowerPointViewerProps) {
-  const [viewerType, setViewerType] = useState<'google' | 'microsoft'>('google');
+  const [viewerType, setViewerType] = useState<'microsoft' | 'google'>('microsoft');
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [fullUrl, setFullUrl] = useState('');
 
-  // Construire l'URL complète du fichier
-  const getFullUrl = () => {
+  // Construire l'URL complète du fichier côté client
+  useEffect(() => {
     if (pptxUrl.startsWith('http')) {
-      return pptxUrl;
+      setFullUrl(pptxUrl);
+    } else {
+      // Utiliser le domaine public actuel
+      const publicDomain = typeof window !== 'undefined'
+        ? window.location.origin.replace('www.', '')
+        : 'https://onehealth.cm';
+      const cleanPath = pptxUrl.startsWith('/') ? pptxUrl : `/${pptxUrl}`;
+      setFullUrl(`${publicDomain}${cleanPath}`);
     }
-    // Utiliser l'URL du serveur backend
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    return `${baseUrl}${pptxUrl}`;
-  };
+  }, [pptxUrl]);
 
-  const fullUrl = getFullUrl();
   const encodedUrl = encodeURIComponent(fullUrl);
 
-  // URLs des viewers
-  const googleViewerUrl = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
-  const microsoftViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+  // URLs des viewers (Microsoft fonctionne mieux avec les fichiers .pptx)
+  const microsoftViewerUrl = fullUrl ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}` : '';
+  const googleViewerUrl = fullUrl ? `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true` : '';
 
-  const currentViewerUrl = viewerType === 'google' ? googleViewerUrl : microsoftViewerUrl;
+  const currentViewerUrl = viewerType === 'microsoft' ? microsoftViewerUrl : googleViewerUrl;
+
+  // Reset loading state when URL changes
+  useEffect(() => {
+    if (fullUrl) {
+      setIsLoading(true);
+      setHasError(false);
+    }
+  }, [fullUrl, viewerType]);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -138,33 +150,35 @@ export function PowerPointViewer({
       </div>
 
       {/* Viewer Container - 16:9 aspect ratio */}
-      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+      <div className="relative w-full bg-white" style={{ paddingBottom: '56.25%' }}>
         {/* Loading State */}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+        {(isLoading || !fullUrl) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-100">
             <div className="text-center">
-              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-400">{t.loading}</p>
+              <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-600">{t.loading}</p>
             </div>
           </div>
         )}
 
         {/* Error State */}
-        {hasError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+        {hasError && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-100">
             <div className="text-center max-w-md px-6">
-              <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">{t.error}</h3>
-              <p className="text-slate-400 mb-6">
+              <Presentation size={48} className="mx-auto text-orange-500 mb-4" />
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                {lang === 'fr' ? 'Présentation PowerPoint' : 'PowerPoint Presentation'}
+              </h3>
+              <p className="text-slate-600 mb-6">
                 {lang === 'fr'
-                  ? 'Le fichier PowerPoint ne peut pas être affiché dans le navigateur.'
-                  : 'The PowerPoint file cannot be displayed in the browser.'}
+                  ? 'Téléchargez le fichier pour le visualiser sur votre ordinateur.'
+                  : 'Download the file to view it on your computer.'}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button
                   variant="outline"
                   onClick={switchViewer}
-                  className="text-slate-300 border-slate-500"
+                  className="text-slate-600 border-slate-400 hover:bg-slate-200"
                 >
                   <ExternalLink size={18} className="mr-2" />
                   {t.tryOther}
@@ -183,19 +197,20 @@ export function PowerPointViewer({
         )}
 
         {/* Iframe Viewer */}
-        <iframe
-          id="pptx-viewer-iframe"
-          src={currentViewerUrl}
-          className={cn(
-            'absolute inset-0 w-full h-full border-0',
-            (isLoading || hasError) && 'invisible'
-          )}
-          title={title || 'PowerPoint Presentation'}
-          onLoad={handleLoad}
-          onError={handleError}
-          allowFullScreen
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-        />
+        {fullUrl && currentViewerUrl && (
+          <iframe
+            id="pptx-viewer-iframe"
+            src={currentViewerUrl}
+            className={cn(
+              'absolute inset-0 w-full h-full border-0 bg-white',
+              (isLoading || hasError) && 'invisible'
+            )}
+            title={title || 'PowerPoint Presentation'}
+            onLoad={handleLoad}
+            onError={handleError}
+            allowFullScreen
+          />
+        )}
       </div>
 
       {/* Title Bar (optional) */}

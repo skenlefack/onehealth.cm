@@ -848,7 +848,7 @@ router.get('/modules/:moduleId/lessons', optionalAuth, async (req, res) => {
 });
 
 // GET /api/elearning/lessons/:id - Détail d'une leçon
-router.get('/lessons/:id', auth, async (req, res) => {
+router.get('/lessons/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -865,8 +865,20 @@ router.get('/lessons/:id', auth, async (req, res) => {
 
     const lesson = lessons[0];
 
+    // Parse JSON fields
+    try {
+      lesson.attachments = lesson.attachments ? JSON.parse(lesson.attachments) : [];
+    } catch (e) {
+      lesson.attachments = [];
+    }
+    try {
+      lesson.resources = lesson.resources ? JSON.parse(lesson.resources) : [];
+    } catch (e) {
+      lesson.resources = [];
+    }
+
     // Vérifier que l'utilisateur est inscrit au cours (sauf si preview)
-    if (!lesson.is_preview) {
+    if (!lesson.is_preview && req.user) {
       const [enrollment] = await db.query(`
         SELECT * FROM enrollments
         WHERE user_id = ? AND enrollable_type = 'course' AND enrollable_id = ?
@@ -875,15 +887,20 @@ router.get('/lessons/:id', auth, async (req, res) => {
       if (enrollment.length === 0 && !['admin', 'editor'].includes(req.user.role)) {
         return res.status(403).json({ success: false, message: 'Vous devez être inscrit à ce cours' });
       }
+    } else if (!lesson.is_preview && !req.user) {
+      // Non-preview lesson requires authentication
+      return res.status(401).json({ success: false, message: 'Authentification requise' });
     }
 
-    // Récupérer la progression de l'utilisateur
-    const [progress] = await db.query(`
-      SELECT * FROM lesson_progress
-      WHERE user_id = ? AND lesson_id = ?
-    `, [req.user.id, id]);
+    // Récupérer la progression de l'utilisateur (si authentifié)
+    if (req.user) {
+      const [progress] = await db.query(`
+        SELECT * FROM lesson_progress
+        WHERE user_id = ? AND lesson_id = ?
+      `, [req.user.id, id]);
 
-    lesson.progress = progress.length > 0 ? progress[0] : null;
+      lesson.progress = progress.length > 0 ? progress[0] : null;
+    }
 
     // Leçons précédente et suivante
     const [prevNext] = await db.query(`

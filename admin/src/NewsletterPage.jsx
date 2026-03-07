@@ -20,7 +20,7 @@ import {
   Globe, List, Copy, Target, Pause, X, Check, Loader, ExternalLink,
   MousePointer, MailOpen, UserPlus, UserMinus, Activity, ArrowLeft, Image,
   Type, Layout, Newspaper, Bold, Italic, Underline, AlignLeft, AlignCenter,
-  AlignRight, Link, Palette, Sparkles
+  AlignRight, Link, Palette, Sparkles, Paperclip
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
@@ -85,6 +85,18 @@ const api = {
     } catch (error) {
       return { success: false, message: 'Erreur de connexion' };
     }
+  },
+  upload: async (endpoint, formData, token) => {
+    try {
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      return res.json();
+    } catch (error) {
+      return { success: false, message: 'Erreur de connexion' };
+    }
   }
 };
 
@@ -136,8 +148,21 @@ const NewsletterPage = ({ isDark, token }) => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showImportDocumentModal, setShowImportDocumentModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [selectedSubscribers, setSelectedSubscribers] = useState([]);
+
+  // Document import state
+  const [importDocumentState, setImportDocumentState] = useState({
+    file: null,
+    converting: false,
+    result: null,
+    error: null,
+    keepAsAttachment: false
+  });
+
+  // Newsletter attachments state
+  const [newsletterAttachments, setNewsletterAttachments] = useState([]);
 
   // Sending progress state
   const [sendingProgress, setSendingProgress] = useState({
@@ -963,6 +988,383 @@ marie@example.com,Marie,Dupont,fr"
     );
   };
 
+  // Import Document Modal - Convert Word/PDF to Newsletter HTML
+  const ImportDocumentModal = () => {
+    const fileInputRef = useRef(null);
+
+    const handleFileSelect = (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setImportDocumentState({
+          file,
+          converting: false,
+          result: null,
+          error: null
+        });
+      }
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const file = e.dataTransfer.files?.[0];
+      if (file) {
+        const ext = file.name.toLowerCase().split('.').pop();
+        if (['docx', 'pdf'].includes(ext)) {
+          setImportDocumentState({
+            file,
+            converting: false,
+            result: null,
+            error: null
+          });
+        } else {
+          setImportDocumentState(prev => ({
+            ...prev,
+            error: 'Format non supporte. Utilisez .docx ou .pdf'
+          }));
+        }
+      }
+    };
+
+    const handleConvert = async () => {
+      if (!importDocumentState.file) return;
+
+      setImportDocumentState(prev => ({ ...prev, converting: true, error: null }));
+
+      const formData = new FormData();
+      formData.append('file', importDocumentState.file);
+      formData.append('keepAsAttachment', importDocumentState.keepAsAttachment.toString());
+
+      const res = await api.upload('/newsletter/convert-document', formData, token);
+
+      if (res.success) {
+        setImportDocumentState(prev => ({
+          ...prev,
+          converting: false,
+          result: res.data
+        }));
+      } else {
+        setImportDocumentState(prev => ({
+          ...prev,
+          converting: false,
+          error: res.message || 'Erreur lors de la conversion'
+        }));
+      }
+    };
+
+    const handleUseContent = () => {
+      if (importDocumentState.result?.html) {
+        // Update the editor content
+        if (editorRef.current) {
+          editorRef.current.innerHTML = importDocumentState.result.html;
+          // Trigger blur event to update formData in NewsletterEditor
+          editorRef.current.focus();
+          editorRef.current.blur();
+        }
+
+        // Store attachment if present
+        if (importDocumentState.result.attachment) {
+          setNewsletterAttachments(prev => [...prev, importDocumentState.result.attachment]);
+        }
+
+        showNotification(importDocumentState.result.attachment
+          ? 'Contenu importe avec piece jointe'
+          : 'Contenu importe avec succes');
+        closeImportDocumentModal();
+      }
+    };
+
+    const closeImportDocumentModal = () => {
+      setShowImportDocumentModal(false);
+      setImportDocumentState({
+        file: null,
+        keepAsAttachment: false,
+        converting: false,
+        result: null,
+        error: null
+      });
+    };
+
+    const formatFileSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    return (
+      <div style={styles.modal} onClick={closeImportDocumentModal}>
+        <div style={{ ...styles.modalContent, maxWidth: '700px' }} onClick={e => e.stopPropagation()}>
+          <div style={styles.modalHeader}>
+            <h3 style={{ margin: 0, color: isDark ? '#e2e8f0' : '#1e293b', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <FileText size={20} />
+              Importer un document
+            </h3>
+            <button style={styles.btnIcon} onClick={closeImportDocumentModal}>
+              <X size={20} />
+            </button>
+          </div>
+
+          <div style={styles.modalBody}>
+            {!importDocumentState.result ? (
+              <>
+                {/* Drop zone */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  style={{
+                    border: `2px dashed ${importDocumentState.file ? colors.primary : (isDark ? '#475569' : '#cbd5e1')}`,
+                    borderRadius: '12px',
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: importDocumentState.file
+                      ? (isDark ? 'rgba(39, 174, 96, 0.1)' : 'rgba(39, 174, 96, 0.05)')
+                      : (isDark ? '#1e293b' : '#f8fafc'),
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+
+                  {importDocumentState.file ? (
+                    <div>
+                      <div style={{
+                        width: '60px', height: '60px', borderRadius: '12px',
+                        background: `linear-gradient(135deg, ${colors.primary}20, ${colors.secondary}20)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 16px'
+                      }}>
+                        <FileText size={28} color={colors.primary} />
+                      </div>
+                      <p style={{ margin: '0 0 4px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                        {importDocumentState.file.name}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        {formatFileSize(importDocumentState.file.size)}
+                      </p>
+                      <button
+                        style={{ marginTop: '12px', fontSize: '13px', color: colors.error, background: 'none', border: 'none', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImportDocumentState(prev => ({ ...prev, file: null }));
+                        }}
+                      >
+                        Changer de fichier
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{
+                        width: '60px', height: '60px', borderRadius: '12px',
+                        background: isDark ? '#334155' : '#e2e8f0',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 16px'
+                      }}>
+                        <Upload size={28} color={isDark ? '#64748b' : '#94a3b8'} />
+                      </div>
+                      <p style={{ margin: '0 0 8px', fontWeight: '600', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                        Glissez-deposez ou cliquez pour selectionner
+                      </p>
+                      <p style={{ margin: 0, fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        Formats acceptes: .docx, .pdf (max 20 MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Error message */}
+                {importDocumentState.error && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '12px 16px',
+                    background: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+                    borderRadius: '8px',
+                    border: `1px solid ${isDark ? 'rgba(239, 68, 68, 0.2)' : '#fecaca'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <AlertCircle size={18} color={colors.error} />
+                    <span style={{ color: colors.error, fontSize: '14px' }}>
+                      {importDocumentState.error}
+                    </span>
+                  </div>
+                )}
+
+                {/* Attachment option */}
+                {importDocumentState.file && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: isDark ? '#1e293b' : '#f8fafc',
+                    borderRadius: '10px',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                  }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={importDocumentState.keepAsAttachment}
+                        onChange={(e) => setImportDocumentState(prev => ({
+                          ...prev,
+                          keepAsAttachment: e.target.checked
+                        }))}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          accentColor: colors.primary
+                        }}
+                      />
+                      <div>
+                        <span style={{
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          color: isDark ? '#e2e8f0' : '#1e293b'
+                        }}>
+                          Joindre le fichier original en piece jointe
+                        </span>
+                        <p style={{
+                          margin: '4px 0 0',
+                          fontSize: '12px',
+                          color: isDark ? '#64748b' : '#94a3b8'
+                        }}>
+                          Le fichier sera envoye en piece jointe avec la newsletter
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {/* Info */}
+                <div style={{
+                  marginTop: '20px',
+                  padding: '16px',
+                  background: isDark ? '#1e293b' : '#f0f9ff',
+                  borderRadius: '10px',
+                  border: `1px solid ${isDark ? '#334155' : '#bae6fd'}`
+                }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    Informations
+                  </h4>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', lineHeight: '1.8' }}>
+                    <li><strong>Word (.docx):</strong> Conversion fidele avec titres, paragraphes et images</li>
+                    <li><strong>PDF:</strong> Extraction du texte uniquement (pas d'images)</li>
+                    <li>Les styles sont automatiquement adaptes pour les emails</li>
+                  </ul>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Warnings */}
+                {importDocumentState.result.warnings?.length > 0 && (
+                  <div style={{
+                    marginBottom: '16px',
+                    padding: '12px 16px',
+                    background: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb',
+                    borderRadius: '8px',
+                    border: `1px solid ${isDark ? 'rgba(245, 158, 11, 0.2)' : '#fde68a'}`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <AlertCircle size={16} color={colors.warning} />
+                      <span style={{ fontWeight: '600', color: colors.warning, fontSize: '13px' }}>Avertissements</span>
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: isDark ? '#fcd34d' : '#b45309' }}>
+                      {importDocumentState.result.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Success info */}
+                <div style={{
+                  marginBottom: '16px',
+                  padding: '12px 16px',
+                  background: isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4',
+                  borderRadius: '8px',
+                  border: `1px solid ${isDark ? 'rgba(34, 197, 94, 0.2)' : '#bbf7d0'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <CheckCircle size={18} color={colors.success} />
+                  <span style={{ color: colors.success, fontSize: '14px' }}>
+                    Document converti: <strong>{importDocumentState.result.originalName}</strong>
+                    {importDocumentState.result.images?.length > 0 && (
+                      <span> ({importDocumentState.result.images.length} image(s) extraite(s))</span>
+                    )}
+                  </span>
+                </div>
+
+                {/* Preview */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    Apercu du contenu
+                  </label>
+                  <div style={{
+                    maxHeight: '350px',
+                    overflow: 'auto',
+                    padding: '20px',
+                    background: isDark ? '#0f172a' : '#ffffff',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                    borderRadius: '8px'
+                  }}>
+                    <div
+                      dangerouslySetInnerHTML={{ __html: importDocumentState.result.html }}
+                      style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={styles.modalFooter}>
+            <button style={styles.btn('ghost')} onClick={closeImportDocumentModal}>
+              Annuler
+            </button>
+
+            {!importDocumentState.result ? (
+              <button
+                style={styles.btn('primary')}
+                onClick={handleConvert}
+                disabled={!importDocumentState.file || importDocumentState.converting}
+              >
+                {importDocumentState.converting ? (
+                  <>
+                    <Loader size={16} className="spin" />
+                    Conversion...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} />
+                    Convertir
+                  </>
+                )}
+              </button>
+            ) : (
+              <button style={styles.btn('primary')} onClick={handleUseContent}>
+                <Check size={16} />
+                Utiliser ce contenu
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ============================================
   // CAMPAIGN MANAGEMENT
   // ============================================
@@ -1350,7 +1752,8 @@ marie@example.com,Marie,Dupont,fr"
         ...updatedFormData,
         content_html_fr: htmlContent,
         content_html_en: htmlContent,
-        source_type: selectedArticles.length > 0 ? 'articles_digest' : 'custom'
+        source_type: selectedArticles.length > 0 ? 'articles_digest' : 'custom',
+        attachments: newsletterAttachments.length > 0 ? JSON.stringify(newsletterAttachments) : null
       };
 
       const res = editingItem
@@ -1364,6 +1767,7 @@ marie@example.com,Marie,Dupont,fr"
         setEditorMode(false);
         setSelectedTemplate(null);
         setSelectedArticles([]);
+        setNewsletterAttachments([]);
         setNewsletterContent({
           name: '', subject_fr: '', subject_en: '', content_html_fr: '', content_html_en: '',
           target_lists: [], target_language: 'all', blocks: []
@@ -1750,6 +2154,18 @@ marie@example.com,Marie,Dupont,fr"
                     <div style={{ width: '1px', background: isDark ? '#334155' : '#e2e8f0', margin: '0 8px' }} />
                     <button style={styles.btnIcon} title="Lien"><Link size={16} /></button>
                     <button style={styles.btnIcon} title="Image"><Image size={16} /></button>
+                    <div style={{ width: '1px', background: isDark ? '#334155' : '#e2e8f0', margin: '0 8px' }} />
+                    <button
+                      style={{
+                        ...styles.btnIcon,
+                        background: `linear-gradient(135deg, ${colors.primary}15, ${colors.secondary}15)`,
+                        border: `1px solid ${colors.primary}40`
+                      }}
+                      title="Importer Word/PDF"
+                      onClick={() => setShowImportDocumentModal(true)}
+                    >
+                      <FileText size={16} color={colors.primary} />
+                    </button>
                   </div>
 
                   <div
@@ -1774,6 +2190,65 @@ marie@example.com,Marie,Dupont,fr"
                     Variables: {'{{first_name}}'}, {'{{last_name}}'}, {'{{email}}'}, {'{{unsubscribe_url}}'}
                   </p>
                 </div>
+
+                {/* Attachments Display */}
+                {newsletterAttachments.length > 0 && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    borderRadius: '12px',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                  }}>
+                    <h4 style={{
+                      margin: '0 0 12px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: isDark ? '#e2e8f0' : '#1e293b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <Paperclip size={16} color={colors.primary} />
+                      Pieces jointes ({newsletterAttachments.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {newsletterAttachments.map((attachment, index) => (
+                        <div key={index} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          background: isDark ? '#0f172a' : '#f8fafc',
+                          borderRadius: '8px',
+                          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <FileText size={18} color={colors.secondary} />
+                            <div>
+                              <p style={{ margin: 0, fontSize: '13px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                                {attachment.filename}
+                              </p>
+                              <p style={{ margin: 0, fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                                {attachment.size ? (attachment.size / 1024).toFixed(1) + ' KB' : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            style={{
+                              ...styles.btnIcon,
+                              color: colors.error
+                            }}
+                            onClick={() => setNewsletterAttachments(prev => prev.filter((_, i) => i !== index))}
+                            title="Supprimer"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -3218,6 +3693,7 @@ marie@example.com,Marie,Dupont,fr"
       {showListModal && <ListModal />}
       {showSubscriberModal && <SubscriberModal />}
       {showImportModal && <ImportModal />}
+      {showImportDocumentModal && <ImportDocumentModal />}
 
       {/* Progress Modal */}
       {showProgressModal && (

@@ -272,6 +272,17 @@ export interface OHWRStats {
   documents: { total: number; by_type?: Record<string, number> };
 }
 
+export interface OHWRDocumentType {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  display_order: number;
+  is_active: boolean;
+}
+
 // ============== E-LEARNING TYPES ==============
 
 export interface ELearningCategory {

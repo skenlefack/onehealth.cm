@@ -296,6 +296,17 @@ const COHRMSystemPage = ({ isDark, token }) => {
   const [selectedLevelFilter, setSelectedLevelFilter] = useState(null);
   const [myAssignedLevels, setMyAssignedLevels] = useState([]);
 
+  // Notifications states
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsPagination, setNotificationsPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
+  const [notificationStats, setNotificationStats] = useState(null);
+  const [notificationFilters, setNotificationFilters] = useState({
+    type: '', status: '', startDate: '', endDate: ''
+  });
+  const [notificationPreferences, setNotificationPreferences] = useState(null);
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+
   // Styles
   const styles = {
     card: {
@@ -1109,6 +1120,99 @@ const COHRMSystemPage = ({ isDark, token }) => {
       notes: assignee.notes || ''
     });
     setAssigneesViewMode('form');
+  };
+
+  // ============ NOTIFICATIONS FUNCTIONS ============
+
+  // Fetch notifications
+  const fetchNotifications = async (page = 1) => {
+    setNotificationsLoading(true);
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', notificationsPagination.limit);
+    if (notificationFilters.type) params.append('type', notificationFilters.type);
+    if (notificationFilters.status) params.append('status', notificationFilters.status);
+    if (notificationFilters.startDate) params.append('startDate', notificationFilters.startDate);
+    if (notificationFilters.endDate) params.append('endDate', notificationFilters.endDate);
+
+    const res = await api.get(`/cohrm/notifications?${params.toString()}`, token);
+    if (res.success) {
+      setNotifications(res.data || []);
+      setNotificationsPagination(res.pagination || { page: 1, limit: 20, total: 0, pages: 0 });
+      if (res.stats) {
+        setNotificationStats(res.stats);
+      }
+    }
+    setNotificationsLoading(false);
+  };
+
+  // Fetch notification statistics
+  const fetchNotificationStats = async () => {
+    const res = await api.get('/cohrm/notifications/stats', token);
+    if (res.success) {
+      setNotificationStats(res.data);
+    }
+  };
+
+  // Fetch user notification preferences
+  const fetchNotificationPreferences = async () => {
+    const res = await api.get('/cohrm/notification-preferences', token);
+    if (res.success) {
+      setNotificationPreferences(res.data);
+    }
+  };
+
+  // Update notification preferences
+  const handleUpdatePreferences = async (prefs) => {
+    setLoading(true);
+    const res = await api.put('/cohrm/notification-preferences', prefs, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Préférences mises à jour' });
+      setNotificationPreferences(prefs);
+      setShowPreferencesModal(false);
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
+  };
+
+  // Retry failed notification
+  const handleRetryNotification = async (id) => {
+    setLoading(true);
+    const res = await api.post(`/cohrm/notifications/retry/${id}`, {}, token);
+    if (res.success) {
+      setToast({ type: 'success', message: 'Notification renvoyée' });
+      fetchNotifications(notificationsPagination.page);
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur lors de la relance' });
+    }
+    setLoading(false);
+  };
+
+  // Send test notification
+  const handleSendTestNotification = async (type = 'new_rumor') => {
+    setLoading(true);
+    const res = await api.post('/cohrm/notifications/test', { type }, token);
+    if (res.success) {
+      setToast({ type: 'success', message: res.message || 'Notification de test envoyée' });
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
+  };
+
+  // Send pending reminders (manual trigger)
+  const handleSendReminders = async () => {
+    if (!window.confirm('Envoyer les rappels de validation en attente à tous les validateurs concernés ?')) return;
+    setLoading(true);
+    const res = await api.post('/cohrm/notifications/send-reminders', {}, token);
+    if (res.success) {
+      setToast({ type: 'success', message: res.message || 'Rappels envoyés' });
+      fetchNotifications();
+    } else {
+      setToast({ type: 'error', message: res.message || 'Erreur' });
+    }
+    setLoading(false);
   };
 
   // Fetch rumor detail for validation
@@ -3704,6 +3808,344 @@ const COHRMSystemPage = ({ isDark, token }) => {
     </div>
   );
 
+  // Notification type labels
+  const NOTIFICATION_TYPES = {
+    'new_rumor': { label: 'Nouvelle rumeur', color: '#3498DB', icon: AlertTriangle },
+    'escalation': { label: 'Escalade', color: '#9B59B6', icon: ArrowUpRight },
+    'validation': { label: 'Validation', color: '#27AE60', icon: CheckCircle },
+    'rejection': { label: 'Rejet', color: '#E74C3C', icon: XCircle },
+    'risk_assessment': { label: 'Évaluation risque', color: '#F39C12', icon: AlertCircle },
+    'reminder': { label: 'Rappel', color: '#3498DB', icon: Bell },
+    'feedback': { label: 'Rétro-info', color: '#17A2B8', icon: MessageSquare },
+    'system': { label: 'Système', color: '#95a5a6', icon: Settings }
+  };
+
+  const NOTIFICATION_STATUSES = {
+    'pending': { label: 'En attente', color: '#F39C12' },
+    'sent': { label: 'Envoyé', color: '#27AE60' },
+    'delivered': { label: 'Livré', color: '#2ECC71' },
+    'failed': { label: 'Échoué', color: '#E74C3C' },
+    'cancelled': { label: 'Annulé', color: '#95a5a6' }
+  };
+
+  // Render Notifications
+  const renderNotifications = () => (
+    <div style={styles.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+          <Bell size={20} style={{ marginRight: '10px', verticalAlign: 'middle', color: '#3498DB' }} />
+          Historique des Notifications
+        </h3>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            style={{ ...styles.btnSecondary, padding: '8px 12px' }}
+            onClick={() => { fetchNotificationPreferences(); setShowPreferencesModal(true); }}
+          >
+            <Settings size={14} /> Préférences
+          </button>
+          <button
+            style={{ ...styles.btnSecondary, padding: '8px 12px' }}
+            onClick={handleSendReminders}
+            disabled={loading}
+          >
+            <Send size={14} /> Envoyer rappels
+          </button>
+          <button
+            style={{ ...styles.btnPrimary, padding: '8px 12px' }}
+            onClick={() => handleSendTestNotification('new_rumor')}
+            disabled={loading}
+          >
+            <Mail size={14} /> Tester
+          </button>
+        </div>
+      </div>
+
+      {/* Statistics */}
+      {notificationStats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ padding: '16px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: '700', color: '#27AE60' }}>{notificationStats.sent || 0}</div>
+            <div style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Envoyés</div>
+          </div>
+          <div style={{ padding: '16px', background: isDark ? '#0f172a' : '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: '700', color: '#F39C12' }}>{notificationStats.pending || 0}</div>
+            <div style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>En attente</div>
+          </div>
+          <div style={{ padding: '16px', background: isDark ? '#0f172a' : '#fee2e2', borderRadius: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: '700', color: '#E74C3C' }}>{notificationStats.failed || 0}</div>
+            <div style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Échoués</div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <select
+          style={{ ...styles.select, width: 'auto', minWidth: '150px' }}
+          value={notificationFilters.type}
+          onChange={(e) => { setNotificationFilters(f => ({ ...f, type: e.target.value })); fetchNotifications(1); }}
+        >
+          <option value="">Tous les types</option>
+          {Object.entries(NOTIFICATION_TYPES).map(([value, { label }]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <select
+          style={{ ...styles.select, width: 'auto', minWidth: '150px' }}
+          value={notificationFilters.status}
+          onChange={(e) => { setNotificationFilters(f => ({ ...f, status: e.target.value })); fetchNotifications(1); }}
+        >
+          <option value="">Tous les statuts</option>
+          {Object.entries(NOTIFICATION_STATUSES).map(([value, { label }]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <input
+          type="date"
+          style={{ ...styles.input, width: 'auto' }}
+          value={notificationFilters.startDate}
+          onChange={(e) => { setNotificationFilters(f => ({ ...f, startDate: e.target.value })); fetchNotifications(1); }}
+          placeholder="Date début"
+        />
+        <input
+          type="date"
+          style={{ ...styles.input, width: 'auto' }}
+          value={notificationFilters.endDate}
+          onChange={(e) => { setNotificationFilters(f => ({ ...f, endDate: e.target.value })); fetchNotifications(1); }}
+          placeholder="Date fin"
+        />
+        <button
+          style={{ ...styles.btnSecondary, padding: '8px 12px' }}
+          onClick={() => { setNotificationFilters({ type: '', status: '', startDate: '', endDate: '' }); fetchNotifications(1); }}
+        >
+          <RefreshCw size={14} /> Réinitialiser
+        </button>
+      </div>
+
+      {/* Notifications list */}
+      {notificationsLoading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <Loader size={32} className="spin" style={{ color: '#3498DB' }} />
+        </div>
+      ) : notifications.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+          <Bell size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
+          <p>Aucune notification trouvée</p>
+        </div>
+      ) : (
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: isDark ? '#0f172a' : '#f8fafc' }}>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>Type</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>Destinataire</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>Rumeur</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>Statut</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>Date</th>
+                  <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notifications.map((notif) => {
+                  const typeInfo = NOTIFICATION_TYPES[notif.notification_type] || { label: notif.notification_type, color: '#95a5a6', icon: Bell };
+                  const statusInfo = NOTIFICATION_STATUSES[notif.status] || { label: notif.status, color: '#95a5a6' };
+                  const TypeIcon = typeInfo.icon;
+
+                  return (
+                    <tr key={notif.id} style={{ borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '8px',
+                            background: `${typeInfo.color}20`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            <TypeIcon size={16} style={{ color: typeInfo.color }} />
+                          </div>
+                          <span style={{ fontSize: '13px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                            {typeInfo.label}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                            {notif.recipient_name || notif.recipient_email || '-'}
+                          </div>
+                          {notif.recipient_email && notif.recipient_name && (
+                            <div style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                              {notif.recipient_email}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {notif.rumor_code ? (
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '500', color: '#3498DB' }}>
+                              {notif.rumor_code}
+                            </div>
+                            <div style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {notif.rumor_title}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>-</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600',
+                          background: `${statusInfo.color}20`, color: statusInfo.color
+                        }}>
+                          {notif.status === 'sent' && <CheckCircle size={12} />}
+                          {notif.status === 'failed' && <XCircle size={12} />}
+                          {notif.status === 'pending' && <Clock size={12} />}
+                          {statusInfo.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                          {new Date(notif.created_at).toLocaleString('fr-FR')}
+                        </div>
+                        {notif.sent_at && notif.sent_at !== notif.created_at && (
+                          <div style={{ fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                            Envoyé: {new Date(notif.sent_at).toLocaleString('fr-FR')}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        {notif.status === 'failed' && (
+                          <button
+                            style={{ ...styles.btnSecondary, padding: '6px 10px', fontSize: '11px' }}
+                            onClick={() => handleRetryNotification(notif.id)}
+                            title="Relancer"
+                          >
+                            <RefreshCw size={12} /> Relancer
+                          </button>
+                        )}
+                        {notif.error_message && (
+                          <div style={{ fontSize: '10px', color: '#E74C3C', marginTop: '4px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={notif.error_message}>
+                            {notif.error_message}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {notificationsPagination.pages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
+              <button
+                style={{ ...styles.btnSecondary, padding: '8px' }}
+                onClick={() => fetchNotifications(notificationsPagination.page - 1)}
+                disabled={notificationsPagination.page <= 1}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                Page {notificationsPagination.page} / {notificationsPagination.pages}
+              </span>
+              <button
+                style={{ ...styles.btnSecondary, padding: '8px' }}
+                onClick={() => fetchNotifications(notificationsPagination.page + 1)}
+                disabled={notificationsPagination.page >= notificationsPagination.pages}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Preferences Modal */}
+      {showPreferencesModal && notificationPreferences && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div style={{ ...styles.card, width: '500px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto' }}>
+            <h4 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: '700', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+              <Settings size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Préférences de notifications
+            </h4>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ ...styles.label, marginBottom: '12px' }}>Types de notifications</label>
+              {[
+                { key: 'notify_new_rumor', label: 'Nouvelles rumeurs' },
+                { key: 'notify_escalation', label: 'Escalades' },
+                { key: 'notify_validation', label: 'Validations' },
+                { key: 'notify_rejection', label: 'Rejets' },
+                { key: 'notify_risk_assessment', label: 'Évaluations des risques' },
+                { key: 'notify_reminder', label: 'Rappels de validation' },
+                { key: 'notify_feedback', label: 'Rétro-informations' }
+              ].map(({ key, label }) => (
+                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences[key]}
+                    onChange={(e) => setNotificationPreferences(p => ({ ...p, [key]: e.target.checked }))}
+                  />
+                  <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>{label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ ...styles.label, marginBottom: '12px' }}>Canaux</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={notificationPreferences.prefer_email}
+                  onChange={(e) => setNotificationPreferences(p => ({ ...p, prefer_email: e.target.checked }))}
+                />
+                <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>Email</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={notificationPreferences.prefer_sms}
+                  onChange={(e) => setNotificationPreferences(p => ({ ...p, prefer_sms: e.target.checked }))}
+                />
+                <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>SMS (non disponible)</span>
+              </label>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={styles.label}>Fréquence des rappels</label>
+              <select
+                style={styles.select}
+                value={notificationPreferences.reminder_frequency}
+                onChange={(e) => setNotificationPreferences(p => ({ ...p, reminder_frequency: e.target.value }))}
+              >
+                <option value="none">Pas de rappels</option>
+                <option value="daily">Quotidien</option>
+                <option value="twice_daily">2 fois par jour</option>
+                <option value="weekly">Hebdomadaire</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button style={styles.btnSecondary} onClick={() => setShowPreferencesModal(false)}>
+                Annuler
+              </button>
+              <button style={styles.btnPrimary} onClick={() => handleUpdatePreferences(notificationPreferences)}>
+                <Save size={14} /> Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // Render Settings
   const renderSettings = () => (
     <div style={styles.card}>
@@ -4031,6 +4473,9 @@ const COHRMSystemPage = ({ isDark, token }) => {
             <button style={styles.tab(activeTab === 'scan-history')} onClick={() => { setActiveTab('scan-history'); fetchScanHistory(); }}>
               <Globe size={16} /> Scans
             </button>
+            <button style={styles.tab(activeTab === 'notifications')} onClick={() => { setActiveTab('notifications'); fetchNotifications(); }}>
+              <Bell size={16} /> Notifications
+            </button>
             <button style={styles.tab(activeTab === 'settings')} onClick={() => setActiveTab('settings')}>
               <Settings size={16} /> Paramètres
             </button>
@@ -4046,6 +4491,7 @@ const COHRMSystemPage = ({ isDark, token }) => {
       {activeTab === 'assignees' && (assigneesViewMode === 'form' ? renderAssigneeForm() : renderAssigneesList())}
       {activeTab === 'sms-decoder' && renderSMSDecoder()}
       {activeTab === 'scan-history' && renderScanHistory()}
+      {activeTab === 'notifications' && renderNotifications()}
       {activeTab === 'settings' && renderSettings()}
 
       {/* Map Modal */}

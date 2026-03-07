@@ -521,10 +521,12 @@ export default function LessonViewerPage() {
 
             {/* Text content */}
             {(currentLesson.content_type === 'text' || currentLesson.content_type === 'mixed') && lessonContent && (
-              <div
-                className="prose prose-invert max-w-none mb-8"
-                dangerouslySetInnerHTML={{ __html: lessonContent }}
-              />
+              <div className="bg-white rounded-xl p-6 md:p-8 mb-8 shadow-lg">
+                <div
+                  className="prose prose-slate max-w-none prose-headings:text-slate-800 prose-p:text-slate-700 prose-a:text-blue-600 prose-strong:text-slate-800 prose-ul:text-slate-700 prose-ol:text-slate-700 prose-li:text-slate-700"
+                  dangerouslySetInnerHTML={{ __html: lessonContent }}
+                />
+              </div>
             )}
 
             {/* Attachments */}

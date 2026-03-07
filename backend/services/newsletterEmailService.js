@@ -449,16 +449,44 @@ const sendNewsletter = async (newsletter, subscriber) => {
       }
     };
 
+    // Initialize attachments array
+    mailOptions.attachments = [];
+
     // Add logo as CID attachment if it exists
     if (fs.existsSync(logoPath)) {
       const logoContent = fs.readFileSync(logoPath);
-      mailOptions.attachments = [{
+      mailOptions.attachments.push({
         filename: 'logo.jpg',
         content: logoContent,
         contentType: 'image/jpeg',
         contentDisposition: 'inline',
         cid: 'onehealth-logo'
-      }];
+      });
+    }
+
+    // Add newsletter file attachments if present
+    if (newsletter.attachments) {
+      let attachments = newsletter.attachments;
+      if (typeof attachments === 'string') {
+        try {
+          attachments = JSON.parse(attachments);
+        } catch (e) {
+          attachments = [];
+        }
+      }
+
+      if (Array.isArray(attachments) && attachments.length > 0) {
+        for (const attachment of attachments) {
+          const attachmentPath = path.join(__dirname, '..', attachment.path);
+          if (fs.existsSync(attachmentPath)) {
+            mailOptions.attachments.push({
+              filename: attachment.filename,
+              path: attachmentPath,
+              contentType: attachment.mimetype || 'application/octet-stream'
+            });
+          }
+        }
+      }
     }
 
     await transporter.sendMail(mailOptions);

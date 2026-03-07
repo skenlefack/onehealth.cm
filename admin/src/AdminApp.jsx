@@ -17413,74 +17413,93 @@ const OHELearningPage = ({ isDark, token }) => {
     });
 
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadingType, setUploadingType] = useState(''); // 'video', 'pdf', 'powerpoint'
+    const [uploadFileName, setUploadFileName] = useState('');
+
+    // Helper function for upload with progress
+    const uploadWithProgress = (url, file, onSuccess, type) => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setUploading(true);
+        setUploadProgress(0);
+        setUploadingType(type);
+        setUploadFileName(file.name);
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(percent);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const res = JSON.parse(xhr.responseText);
+              if (res.success) {
+                onSuccess(res.data.url);
+              }
+            } catch (err) {
+              console.error('Parse error:', err);
+            }
+          }
+          setUploading(false);
+          setUploadProgress(0);
+          setUploadingType('');
+          setUploadFileName('');
+          resolve();
+        });
+
+        xhr.addEventListener('error', () => {
+          console.error(`${type} upload error`);
+          setUploading(false);
+          setUploadProgress(0);
+          setUploadingType('');
+          setUploadFileName('');
+          reject(new Error('Upload failed'));
+        });
+
+        xhr.open('POST', url);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(formData);
+      });
+    };
 
     const handleVideoUpload = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const response = await fetch('/api/upload/elearning/video', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        const text = await response.text();
-        const res = text ? JSON.parse(text) : { success: false };
-        if (res.success) {
-          setForm(prev => ({ ...prev, video_url: res.data.url }));
-        }
-      } catch (err) {
-        console.error('Video upload error:', err);
-      }
-      setUploading(false);
+      await uploadWithProgress(
+        '/api/upload/elearning/video',
+        file,
+        (url) => setForm(prev => ({ ...prev, video_url: url, video_provider: 'upload' })),
+        'video'
+      );
     };
 
     const handlePdfUpload = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const response = await fetch('/api/upload/elearning/pdf', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        const text = await response.text();
-        const res = text ? JSON.parse(text) : { success: false };
-        if (res.success) {
-          setForm(prev => ({ ...prev, pdf_url: res.data.url }));
-        }
-      } catch (err) {
-        console.error('PDF upload error:', err);
-      }
-      setUploading(false);
+      await uploadWithProgress(
+        '/api/upload/elearning/pdf',
+        file,
+        (url) => setForm(prev => ({ ...prev, pdf_url: url })),
+        'pdf'
+      );
     };
 
     const handlePptxUpload = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const response = await fetch('/api/upload/elearning/powerpoint', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        const text = await response.text();
-        const res = text ? JSON.parse(text) : { success: false };
-        if (res.success) {
-          setForm(prev => ({ ...prev, pptx_url: res.data.url }));
-        }
-      } catch (err) {
-        console.error('PowerPoint upload error:', err);
-      }
-      setUploading(false);
+      await uploadWithProgress(
+        '/api/upload/elearning/powerpoint',
+        file,
+        (url) => setForm(prev => ({ ...prev, pptx_url: url })),
+        'powerpoint'
+      );
     };
 
     const handleVideoUrlChange = (url) => {
@@ -17605,22 +17624,50 @@ const OHELearningPage = ({ isDark, token }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
                       <Play size={20} color={colors.success} />
                       <span style={{ flex: 1, fontSize: '13px' }}>{form.video_url}</span>
-                      <button onClick={() => setForm({ ...form, video_url: '', video_provider: 'upload' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
+                      <button onClick={() => setForm({ ...form, video_url: '', video_provider: 'upload' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
                         <X size={14} />
                       </button>
+                    </div>
+                  ) : uploading && uploadingType === 'video' ? (
+                    <div style={{
+                      padding: '24px', borderRadius: '10px', border: `2px solid ${colors.primary}`,
+                      background: isDark ? '#1e293b' : '#f0f9ff'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <Loader size={24} color={colors.primary} style={{ animation: 'spin 1s linear infinite' }} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                            Upload en cours...
+                          </p>
+                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                            {uploadFileName}
+                          </p>
+                        </div>
+                        <span style={{ fontSize: '16px', fontWeight: '600', color: colors.primary }}>{uploadProgress}%</span>
+                      </div>
+                      <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${uploadProgress}%`,
+                          background: `linear-gradient(90deg, ${colors.primary}, ${colors.success})`,
+                          borderRadius: '4px',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
                     </div>
                   ) : (
                     <div style={{
                       padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                      textAlign: 'center', cursor: 'pointer'
-                    }} onClick={() => document.getElementById('lesson-video-input').click()}>
+                      textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                      opacity: uploading ? 0.5 : 1
+                    }} onClick={() => !uploading && document.getElementById('lesson-video-input').click()}>
                       <Play size={28} color={isDark ? '#475569' : '#94a3b8'} />
                       <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                        {uploading ? 'Upload en cours...' : 'Cliquer pour uploader une vidéo (max 500MB)'}
+                        Cliquer pour uploader une vidéo (max 500MB)
                       </p>
                     </div>
                   )}
-                  <input type="file" id="lesson-video-input" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} />
+                  <input type="file" id="lesson-video-input" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} disabled={uploading} />
                 </>
               )}
 
@@ -17677,22 +17724,50 @@ const OHELearningPage = ({ isDark, token }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fef3c7', borderRadius: '10px' }}>
                   <FileText size={20} color={colors.warning} />
                   <span style={{ flex: 1, fontSize: '13px' }}>{form.pdf_url}</span>
-                  <button onClick={() => setForm({ ...form, pdf_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
+                  <button onClick={() => setForm({ ...form, pdf_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
                     <X size={14} />
                   </button>
+                </div>
+              ) : uploading && uploadingType === 'pdf' ? (
+                <div style={{
+                  padding: '24px', borderRadius: '10px', border: `2px solid ${colors.warning}`,
+                  background: isDark ? '#1e293b' : '#fffbeb'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <Loader size={24} color={colors.warning} style={{ animation: 'spin 1s linear infinite' }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                        Upload en cours...
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                        {uploadFileName}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: colors.warning }}>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${uploadProgress}%`,
+                      background: colors.warning,
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
                 </div>
               ) : (
                 <div style={{
                   padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                  textAlign: 'center', cursor: 'pointer'
-                }} onClick={() => document.getElementById('lesson-pdf-input').click()}>
+                  textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                  opacity: uploading ? 0.5 : 1
+                }} onClick={() => !uploading && document.getElementById('lesson-pdf-input').click()}>
                   <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
                   <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    {uploading ? 'Upload en cours...' : 'Cliquer pour uploader un PDF (max 50MB)'}
+                    Cliquer pour uploader un PDF (max 50MB)
                   </p>
                 </div>
               )}
-              <input type="file" id="lesson-pdf-input" accept="application/pdf" onChange={handlePdfUpload} style={{ display: 'none' }} />
+              <input type="file" id="lesson-pdf-input" accept="application/pdf" onChange={handlePdfUpload} style={{ display: 'none' }} disabled={uploading} />
             </div>
           )}
 
@@ -17701,28 +17776,56 @@ const OHELearningPage = ({ isDark, token }) => {
             <div>
               <label style={styles.label}>Présentation PowerPoint</label>
               {form.pptx_url ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fef2f2', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fff7ed', borderRadius: '10px' }}>
                   <FileText size={20} color="#ea580c" />
                   <span style={{ flex: 1, fontSize: '13px' }}>{form.pptx_url}</span>
-                  <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
+                  <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
                     <X size={14} />
                   </button>
+                </div>
+              ) : uploading && uploadingType === 'powerpoint' ? (
+                <div style={{
+                  padding: '24px', borderRadius: '10px', border: `2px solid #ea580c`,
+                  background: isDark ? '#1e293b' : '#fff7ed'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <Loader size={24} color="#ea580c" style={{ animation: 'spin 1s linear infinite' }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                        Upload en cours...
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                        {uploadFileName}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#ea580c' }}>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${uploadProgress}%`,
+                      background: 'linear-gradient(90deg, #ea580c, #f97316)',
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
                 </div>
               ) : (
                 <div style={{
                   padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                  textAlign: 'center', cursor: 'pointer'
-                }} onClick={() => document.getElementById('lesson-pptx-input').click()}>
+                  textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                  opacity: uploading ? 0.5 : 1
+                }} onClick={() => !uploading && document.getElementById('lesson-pptx-input').click()}>
                   <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
                   <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    {uploading ? 'Upload en cours...' : 'Cliquer pour uploader un PowerPoint (max 100MB)'}
+                    Cliquer pour uploader un PowerPoint (max 100MB)
                   </p>
                   <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
                     Formats acceptés : .ppt, .pptx
                   </p>
                 </div>
               )}
-              <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} />
+              <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} disabled={uploading} />
             </div>
           )}
 
@@ -17751,13 +17854,45 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           </div>
 
+          {/* Upload progress overlay message */}
+          {uploading && (
+            <div style={{
+              padding: '12px 16px',
+              background: isDark ? '#1e3a5f' : '#dbeafe',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <Loader size={18} color={colors.primary} style={{ animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: '13px', color: isDark ? '#93c5fd' : '#1e40af' }}>
+                Veuillez patienter, upload en cours ({uploadProgress}%)...
+              </span>
+            </div>
+          )}
+
           <div style={{
             display: 'flex', gap: '12px', justifyContent: 'flex-end',
             paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
           }}>
-            <button onClick={() => setShowLessonForm(false)} style={styles.btnSecondary}>Annuler</button>
-            <button onClick={() => handleSaveLesson(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingLesson ? 'Enregistrer les modifications' : 'Créer la leçon'}
+            <button onClick={() => setShowLessonForm(false)} style={styles.btnSecondary} disabled={uploading}>Annuler</button>
+            <button
+              onClick={() => handleSaveLesson(form)}
+              style={{
+                ...styles.btnPrimary,
+                opacity: (!form.title_fr || uploading) ? 0.5 : 1,
+                cursor: (!form.title_fr || uploading) ? 'not-allowed' : 'pointer'
+              }}
+              disabled={!form.title_fr || uploading}
+            >
+              {uploading ? (
+                <>
+                  <Loader size={16} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                  Upload en cours...
+                </>
+              ) : (
+                editingLesson ? 'Enregistrer les modifications' : 'Créer la leçon'
+              )}
             </button>
           </div>
         </div>

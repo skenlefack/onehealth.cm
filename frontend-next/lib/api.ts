@@ -1,7 +1,7 @@
 import {
   Post, Category, Menu, ApiResponse,
   OHWRStats, OHWRRegion, OHWRExpertiseDomain, OHWRExpert,
-  OHWROrganization, OHWRMaterial, OHWRDocument, OHWRMapMarker,
+  OHWROrganization, OHWRMaterial, OHWRDocument, OHWRMapMarker, OHWRDocumentType,
   ELearningCategory, ELearningCourse, ELearningLearningPath,
   ELearningCourseCurriculum, ELearningEnrollment, ELearningCertificate,
   ELearningStats, ELearningLesson, ELearningQuiz, QuizAttempt,
@@ -327,6 +327,11 @@ export async function getOHWRRecentDocuments(limit: number = 10): Promise<ApiRes
   return fetchApi<OHWRDocument[]>(`/mapping/documents/recent?limit=${limit}`);
 }
 
+// Document Types
+export async function getOHWRDocumentTypes(): Promise<ApiResponse<{ id: number; name: string; slug: string; description?: string; icon?: string; color?: string }[]>> {
+  return fetchApi<{ id: number; name: string; slug: string; description?: string; icon?: string; color?: string }[]>('/mapping/document-types');
+}
+
 // ============== E-LEARNING API ==============
 
 // Categories
@@ -535,10 +540,16 @@ export async function getQuizAttempt(attemptId: number, token: string): Promise<
 
 // Submit quiz answers
 export async function submitQuizAttempt(attemptId: number, responses: Record<number, any>, token: string): Promise<ApiResponse<QuizAttemptResult>> {
+  // Convert object {question_id: answer} to array [{question_id, answer}, ...]
+  const responsesArray = Object.entries(responses).map(([questionId, answer]) => ({
+    question_id: parseInt(questionId),
+    answer
+  }));
+
   return fetchApi<QuizAttemptResult>(`/elearning/attempts/${attemptId}/submit`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ responses })
+    body: JSON.stringify({ responses: responsesArray })
   });
 }
 

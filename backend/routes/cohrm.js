@@ -15,6 +15,9 @@ const db = require('../config/db');
 const { auth, authorize, optionalAuth } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 
+// Service de notifications COHRM
+const cohrmNotificationService = require('../services/cohrmNotificationService');
+
 // ============================================
 // HELPERS
 // ============================================
@@ -360,6 +363,23 @@ router.post('/rumors', auth, async (req, res) => {
       INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
       VALUES (?, ?, 'created', 'Rumeur créée', NOW())
     `, [result.insertId, req.user.id]);
+
+    // Envoyer les notifications aux validateurs de niveau 1
+    try {
+      await cohrmNotificationService.notifyNewRumor({
+        id: result.insertId,
+        code,
+        title,
+        category: 'other',
+        region,
+        department,
+        district,
+        validation_level: 1
+      });
+    } catch (notifError) {
+      console.error('Error sending new rumor notifications:', notifError);
+      // Ne pas bloquer la création de rumeur si la notification échoue
+    }
 
     res.status(201).json({
       success: true,
@@ -1454,6 +1474,39 @@ router.post('/rumors/:id/validate', auth, async (req, res) => {
       VALUES (?, ?, 'validation', ?, NOW())
     `, [id, req.user.id, `${action_type}: ${status} (niveau ${currentLevel} → ${newLevel})`]);
 
+    // Envoyer les notifications selon l'action
+    try {
+      const userName = `${req.user.first_name} ${req.user.last_name}`.trim() || req.user.username;
+
+      if (status === 'escalated') {
+        // Notifier les validateurs du niveau supérieur
+        await cohrmNotificationService.notifyEscalation(
+          { ...rumor, id },
+          currentLevel,
+          newLevel,
+          userName,
+          notes || rejection_reason
+        );
+      } else if (status === 'validated' && newLevel <= 5) {
+        // Notifier les validateurs du niveau suivant
+        await cohrmNotificationService.notifyValidation(
+          { ...rumor, id, validation_level: currentLevel },
+          userName,
+          notes
+        );
+      } else if (status === 'rejected') {
+        // Notifier les validateurs des niveaux inférieurs
+        await cohrmNotificationService.notifyRejection(
+          { ...rumor, id, validation_level: currentLevel },
+          userName,
+          rejection_reason
+        );
+      }
+    } catch (notifError) {
+      console.error('Error sending validation notifications:', notifError);
+      // Ne pas bloquer la validation si la notification échoue
+    }
+
     res.json({
       success: true,
       message: 'Validation enregistrée',
@@ -1491,6 +1544,24 @@ router.post('/rumors/:id/risk-assessment', auth, async (req, res) => {
       INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
       VALUES (?, ?, 'risk_assessment', ?, NOW())
     `, [id, req.user.id, `Niveau de risque évalué: ${risk_level}`]);
+
+    // Notifier les superviseurs pour les risques élevés
+    try {
+      if (risk_level === 'high' || risk_level === 'very_high') {
+        const [rumors] = await db.query('SELECT * FROM cohrm_rumors WHERE id = ?', [id]);
+        if (rumors.length > 0) {
+          const userName = `${req.user.first_name} ${req.user.last_name}`.trim() || req.user.username;
+          await cohrmNotificationService.notifyRiskAssessment(
+            rumors[0],
+            userName,
+            risk_level,
+            risk_description
+          );
+        }
+      }
+    } catch (notifError) {
+      console.error('Error sending risk assessment notifications:', notifError);
+    }
 
     res.json({ success: true, message: 'Évaluation des risques enregistrée' });
   } catch (error) {
@@ -1558,15 +1629,38 @@ router.post('/rumors/:id/feedback', auth, async (req, res) => {
       message, channel || 'system'
     ]);
 
-    // Si le canal est SMS ou email, simuler l'envoi
-    // TODO: Intégrer avec un vrai service SMS/email
-    if (channel === 'sms' || channel === 'email') {
-      // Simuler l'envoi
-      await db.query(`
-        UPDATE cohrm_feedback
-        SET status = 'sent', sent_at = NOW()
-        WHERE id = ?
-      `, [result.insertId]);
+    // Envoyer la rétro-information par email
+    if (channel === 'email' && recipient_email) {
+      try {
+        // Récupérer le code de la rumeur
+        const [rumors] = await db.query('SELECT code FROM cohrm_rumors WHERE id = ?', [id]);
+        const rumorCode = rumors[0]?.code || `#${id}`;
+
+        const emailResult = await cohrmNotificationService.sendFeedbackEmail(
+          recipient_email,
+          rumorCode,
+          feedback_type,
+          message
+        );
+
+        // Mettre à jour le statut d'envoi
+        await db.query(`
+          UPDATE cohrm_feedback
+          SET status = ?, sent_at = ${emailResult.success ? 'NOW()' : 'NULL'},
+              error_message = ?
+          WHERE id = ?
+        `, [emailResult.success ? 'sent' : 'failed', emailResult.error || null, result.insertId]);
+      } catch (emailError) {
+        console.error('Error sending feedback email:', emailError);
+        await db.query(`
+          UPDATE cohrm_feedback
+          SET status = 'failed', error_message = ?
+          WHERE id = ?
+        `, [emailError.message, result.insertId]);
+      }
+    } else if (channel === 'sms') {
+      // SMS non implémenté pour l'instant - marquer comme pending
+      console.log('SMS sending not yet implemented. Would send to:', recipient_phone);
     }
 
     // Ajouter à l'historique de la rumeur
@@ -1781,6 +1875,23 @@ router.post('/rumors/extended', auth, async (req, res) => {
       INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details, created_at)
       VALUES (?, ?, 'created', 'Rumeur créée avec formulaire étendu', NOW())
     `, [result.insertId, req.user.id]);
+
+    // Envoyer les notifications aux validateurs de niveau 1
+    try {
+      await cohrmNotificationService.notifyNewRumor({
+        id: result.insertId,
+        code,
+        title,
+        category: category || 'human_health',
+        region,
+        department,
+        district,
+        date_detection,
+        validation_level: 1
+      });
+    } catch (notifError) {
+      console.error('Error sending new rumor notifications:', notifError);
+    }
 
     res.status(201).json({
       success: true,
@@ -2521,6 +2632,503 @@ router.get('/my-pending-validations', auth, async (req, res) => {
   } catch (error) {
     console.error('Get my pending validations error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// NOTIFICATIONS COHRM
+// ============================================
+
+// GET /api/cohrm/notifications - Historique des notifications
+router.get('/notifications', auth, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      type,
+      status,
+      rumor_id,
+      user_id,
+      startDate,
+      endDate
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    let whereConditions = ['1=1'];
+    let params = [];
+
+    if (type) {
+      whereConditions.push('n.notification_type = ?');
+      params.push(type);
+    }
+    if (status) {
+      whereConditions.push('n.status = ?');
+      params.push(status);
+    }
+    if (rumor_id) {
+      whereConditions.push('n.rumor_id = ?');
+      params.push(rumor_id);
+    }
+    if (user_id) {
+      whereConditions.push('n.user_id = ?');
+      params.push(user_id);
+    }
+    if (startDate) {
+      whereConditions.push('DATE(n.created_at) >= ?');
+      params.push(startDate);
+    }
+    if (endDate) {
+      whereConditions.push('DATE(n.created_at) <= ?');
+      params.push(endDate);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Récupérer les notifications
+    const [notifications] = await db.query(`
+      SELECT n.*,
+        r.code as rumor_code,
+        r.title as rumor_title,
+        CONCAT(u.first_name, ' ', u.last_name) as recipient_name
+      FROM cohrm_notifications n
+      LEFT JOIN cohrm_rumors r ON n.rumor_id = r.id
+      LEFT JOIN users u ON n.user_id = u.id
+      WHERE ${whereClause}
+      ORDER BY n.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, parseInt(limit), offset]);
+
+    // Compter le total
+    const [[{ total }]] = await db.query(`
+      SELECT COUNT(*) as total
+      FROM cohrm_notifications n
+      WHERE ${whereClause}
+    `, params);
+
+    // Statistiques
+    const [stats] = await db.query(`
+      SELECT
+        status,
+        COUNT(*) as count
+      FROM cohrm_notifications
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY status
+    `);
+
+    res.json({
+      success: true,
+      data: notifications,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      },
+      stats: stats.reduce((acc, s) => ({ ...acc, [s.status]: s.count }), {})
+    });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/notifications/my - Mes notifications
+router.get('/notifications/my', auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const [notifications] = await db.query(`
+      SELECT n.*,
+        r.code as rumor_code,
+        r.title as rumor_title
+      FROM cohrm_notifications n
+      LEFT JOIN cohrm_rumors r ON n.rumor_id = r.id
+      WHERE n.user_id = ? OR n.recipient_email = ?
+      ORDER BY n.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [req.user.id, req.user.email, parseInt(limit), offset]);
+
+    const [[{ total }]] = await db.query(`
+      SELECT COUNT(*) as total
+      FROM cohrm_notifications
+      WHERE user_id = ? OR recipient_email = ?
+    `, [req.user.id, req.user.email]);
+
+    res.json({
+      success: true,
+      data: notifications,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get my notifications error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/notifications/stats - Statistiques des notifications
+router.get('/notifications/stats', auth, async (req, res) => {
+  try {
+    // Par type
+    const [byType] = await db.query(`
+      SELECT notification_type, COUNT(*) as count
+      FROM cohrm_notifications
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      GROUP BY notification_type
+    `);
+
+    // Par statut
+    const [byStatus] = await db.query(`
+      SELECT status, COUNT(*) as count
+      FROM cohrm_notifications
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      GROUP BY status
+    `);
+
+    // Par jour (7 derniers jours)
+    const [byDay] = await db.query(`
+      SELECT
+        DATE(created_at) as date,
+        COUNT(*) as total,
+        SUM(status = 'sent') as sent,
+        SUM(status = 'failed') as failed
+      FROM cohrm_notifications
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `);
+
+    // Taux de succès
+    const [[successRate]] = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(status = 'sent') as sent,
+        SUM(status = 'failed') as failed,
+        ROUND(SUM(status = 'sent') / COUNT(*) * 100, 2) as success_rate
+      FROM cohrm_notifications
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    `);
+
+    res.json({
+      success: true,
+      data: {
+        byType,
+        byStatus,
+        byDay,
+        successRate
+      }
+    });
+  } catch (error) {
+    console.error('Get notification stats error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/notifications/retry/:id - Relancer une notification échouée
+router.post('/notifications/retry/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Récupérer la notification
+    const [notifications] = await db.query(`
+      SELECT n.*, r.code as rumor_code, r.title as rumor_title, r.*
+      FROM cohrm_notifications n
+      LEFT JOIN cohrm_rumors r ON n.rumor_id = r.id
+      WHERE n.id = ? AND n.status = 'failed'
+    `, [id]);
+
+    if (notifications.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification non trouvée ou non éligible pour relance'
+      });
+    }
+
+    const notification = notifications[0];
+
+    // Déterminer le template à utiliser
+    const templates = {
+      'new_rumor': 'newRumorAssigned',
+      'escalation': 'rumorEscalated',
+      'validation': 'rumorValidated',
+      'rejection': 'rumorRejected',
+      'risk_assessment': 'riskAssessmentCompleted',
+      'reminder': 'pendingValidationReminder'
+    };
+
+    const templateName = templates[notification.notification_type];
+    if (!templateName || !cohrmNotificationService.emailTemplates[templateName]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type de notification non supporté pour relance'
+      });
+    }
+
+    // Tenter de renvoyer l'email
+    const adminUrl = process.env.ADMIN_URL || 'http://localhost:3001';
+    const emailContent = cohrmNotificationService.emailTemplates[templateName]({
+      userName: 'Validateur',
+      rumorId: notification.rumor_id,
+      rumorCode: notification.rumor_code || `#${notification.rumor_id}`,
+      title: notification.rumor_title,
+      adminUrl
+    });
+
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: `"COHRM - One Health Cameroun" <${process.env.SMTP_FROM || 'noreply@onehealth.cm'}>`,
+      to: notification.recipient_email,
+      subject: emailContent.subject,
+      html: emailContent.html
+    });
+
+    // Mettre à jour le statut
+    await db.query(`
+      UPDATE cohrm_notifications
+      SET status = 'sent', sent_at = NOW(), retry_count = retry_count + 1
+      WHERE id = ?
+    `, [id]);
+
+    res.json({
+      success: true,
+      message: 'Notification renvoyée avec succès'
+    });
+  } catch (error) {
+    console.error('Retry notification error:', error);
+
+    // Mettre à jour le compteur de tentatives
+    await db.query(`
+      UPDATE cohrm_notifications
+      SET retry_count = retry_count + 1, error_message = ?
+      WHERE id = ?
+    `, [error.message, req.params.id]);
+
+    res.status(500).json({ success: false, message: 'Erreur lors de la relance' });
+  }
+});
+
+// POST /api/cohrm/notifications/send-reminders - Envoyer les rappels (pour cron job)
+router.post('/notifications/send-reminders', auth, async (req, res) => {
+  try {
+    const results = await cohrmNotificationService.sendPendingReminders();
+    res.json({
+      success: true,
+      message: `${results.length} rappel(s) envoyé(s)`,
+      data: results
+    });
+  } catch (error) {
+    console.error('Send reminders error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/notification-preferences - Préférences de l'utilisateur
+router.get('/notification-preferences', auth, async (req, res) => {
+  try {
+    const [prefs] = await db.query(`
+      SELECT * FROM cohrm_notification_preferences
+      WHERE user_id = ?
+    `, [req.user.id]);
+
+    if (prefs.length === 0) {
+      // Retourner les valeurs par défaut
+      res.json({
+        success: true,
+        data: {
+          user_id: req.user.id,
+          notify_new_rumor: true,
+          notify_escalation: true,
+          notify_validation: true,
+          notify_rejection: true,
+          notify_risk_assessment: true,
+          notify_reminder: true,
+          notify_feedback: true,
+          prefer_email: true,
+          prefer_sms: false,
+          prefer_push: false,
+          reminder_frequency: 'daily',
+          quiet_hours_start: '22:00:00',
+          quiet_hours_end: '07:00:00',
+          respect_quiet_hours: true
+        }
+      });
+    } else {
+      res.json({ success: true, data: prefs[0] });
+    }
+  } catch (error) {
+    console.error('Get notification preferences error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/notification-preferences - Mettre à jour les préférences
+router.put('/notification-preferences', auth, async (req, res) => {
+  try {
+    const {
+      notify_new_rumor,
+      notify_escalation,
+      notify_validation,
+      notify_rejection,
+      notify_risk_assessment,
+      notify_reminder,
+      notify_feedback,
+      prefer_email,
+      prefer_sms,
+      prefer_push,
+      reminder_frequency,
+      quiet_hours_start,
+      quiet_hours_end,
+      respect_quiet_hours
+    } = req.body;
+
+    // Upsert les préférences
+    await db.query(`
+      INSERT INTO cohrm_notification_preferences (
+        user_id, notify_new_rumor, notify_escalation, notify_validation,
+        notify_rejection, notify_risk_assessment, notify_reminder, notify_feedback,
+        prefer_email, prefer_sms, prefer_push,
+        reminder_frequency, quiet_hours_start, quiet_hours_end, respect_quiet_hours,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        notify_new_rumor = VALUES(notify_new_rumor),
+        notify_escalation = VALUES(notify_escalation),
+        notify_validation = VALUES(notify_validation),
+        notify_rejection = VALUES(notify_rejection),
+        notify_risk_assessment = VALUES(notify_risk_assessment),
+        notify_reminder = VALUES(notify_reminder),
+        notify_feedback = VALUES(notify_feedback),
+        prefer_email = VALUES(prefer_email),
+        prefer_sms = VALUES(prefer_sms),
+        prefer_push = VALUES(prefer_push),
+        reminder_frequency = VALUES(reminder_frequency),
+        quiet_hours_start = VALUES(quiet_hours_start),
+        quiet_hours_end = VALUES(quiet_hours_end),
+        respect_quiet_hours = VALUES(respect_quiet_hours),
+        updated_at = NOW()
+    `, [
+      req.user.id,
+      notify_new_rumor ?? true,
+      notify_escalation ?? true,
+      notify_validation ?? true,
+      notify_rejection ?? true,
+      notify_risk_assessment ?? true,
+      notify_reminder ?? true,
+      notify_feedback ?? true,
+      prefer_email ?? true,
+      prefer_sms ?? false,
+      prefer_push ?? false,
+      reminder_frequency || 'daily',
+      quiet_hours_start || '22:00:00',
+      quiet_hours_end || '07:00:00',
+      respect_quiet_hours ?? true
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Préférences mises à jour avec succès'
+    });
+  } catch (error) {
+    console.error('Update notification preferences error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/notifications/test - Envoyer une notification de test
+router.post('/notifications/test', auth, async (req, res) => {
+  try {
+    const { type = 'new_rumor' } = req.body;
+
+    // Créer une notification de test
+    const testData = {
+      userName: `${req.user.first_name} ${req.user.last_name}`.trim() || req.user.username,
+      rumorId: 0,
+      rumorCode: 'TEST-0000',
+      title: 'Notification de test COHRM',
+      category: 'human_health',
+      location: 'Test Location',
+      level: 1,
+      fromLevel: 1,
+      toLevel: 2,
+      escalatedBy: 'Système',
+      validatedBy: 'Système',
+      rejectedBy: 'Système',
+      riskLevel: 'high',
+      assessedBy: 'Système',
+      pendingCount: 5
+    };
+
+    const templates = {
+      'new_rumor': cohrmNotificationService.emailTemplates.newRumorAssigned,
+      'escalation': cohrmNotificationService.emailTemplates.rumorEscalated,
+      'validation': cohrmNotificationService.emailTemplates.rumorValidated,
+      'rejection': cohrmNotificationService.emailTemplates.rumorRejected,
+      'risk_assessment': cohrmNotificationService.emailTemplates.riskAssessmentCompleted,
+      'reminder': cohrmNotificationService.emailTemplates.pendingValidationReminder
+    };
+
+    const template = templates[type];
+    if (!template) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type de notification non supporté'
+      });
+    }
+
+    const adminUrl = process.env.ADMIN_URL || 'http://localhost:3001';
+    const emailContent = template({ ...testData, adminUrl });
+
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: `"COHRM - One Health Cameroun" <${process.env.SMTP_FROM || 'noreply@onehealth.cm'}>`,
+      to: req.user.email,
+      subject: `[TEST] ${emailContent.subject}`,
+      html: emailContent.html
+    });
+
+    // Enregistrer la notification de test
+    await db.query(`
+      INSERT INTO cohrm_notifications
+      (user_id, notification_type, channel, recipient_email, subject, status, sent_at, created_at)
+      VALUES (?, 'system', 'email', ?, ?, 'sent', NOW(), NOW())
+    `, [req.user.id, req.user.email, `[TEST] ${emailContent.subject}`]);
+
+    res.json({
+      success: true,
+      message: `Notification de test envoyée à ${req.user.email}`
+    });
+  } catch (error) {
+    console.error('Send test notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'envoi de la notification de test',
+      error: error.message
+    });
   }
 });
 

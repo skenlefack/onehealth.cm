@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Clock, Target, AlertCircle, Play, RotateCcw,
@@ -18,6 +18,7 @@ import { useAuth } from '@/lib/AuthContext';
 export default function QuizIntroPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, token } = useAuth();
   const lang = (params.lang as string) || 'fr';
   const quizId = parseInt(params.quizId as string);
@@ -28,6 +29,9 @@ export default function QuizIntroPage() {
 
   const language = lang as Language;
   const t = getTranslation(language);
+
+  // Check if redirected from max attempts
+  const showMaxAttemptsNotice = searchParams.get('maxAttempts') === 'true';
 
   // States
   const [quiz, setQuiz] = useState<ELearningQuiz | null>(null);
@@ -150,7 +154,21 @@ export default function QuizIntroPage() {
         </Link>
       </header>
 
-      <main className="pt-20 pb-12 px-4">
+      {/* Max Attempts Notification */}
+      {showMaxAttemptsNotice && (
+        <div className="fixed top-14 left-0 right-0 bg-amber-500/20 border-b border-amber-500/30 z-40">
+          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+            <AlertCircle className="text-amber-400 flex-shrink-0" size={20} />
+            <p className="text-amber-200 text-sm">
+              {language === 'fr'
+                ? 'Vous avez atteint le nombre maximum de tentatives pour ce quiz. Consultez votre historique ci-dessous.'
+                : 'You have reached the maximum number of attempts for this quiz. Check your history below.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <main className={cn("pb-12 px-4", showMaxAttemptsNotice ? "pt-32" : "pt-20")}>
         <div className="max-w-3xl mx-auto">
           {/* Quiz Header Card */}
           <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-3xl p-8 mb-8 border border-blue-500/20">
