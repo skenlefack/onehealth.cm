@@ -29,6 +29,7 @@ const SECTION_MARKERS = [
   { regex: /^E\s*D\s*I\s*T\s*O\s*R\s*I\s*A\s*L$/i, name: 'Éditorial' },
   { regex: /^Edito$/i, name: 'Éditorial' },
   { regex: /^Editorial$/i, name: 'Éditorial' },
+  { regex: /^[EÉ]dito$/i, name: 'Éditorial' },
   { regex: /^E\s*N\s+B\s*R\s*E\s*F$/i, name: 'En bref' },
   { regex: /^En bref$/i, name: 'En bref' },
   { regex: /^D\s*O\s*S\s*S\s*I\s*E\s*R$/i, name: 'Dossier' },
@@ -99,18 +100,24 @@ function detectSectionMarker(line) {
 }
 
 function isDropCap(line) {
-  // Single uppercase letter on its own line (PDF drop-cap rendering)
   return /^[A-ZÀ-Ú]$/.test(line.trim());
 }
 
 function isAuthorLine(line) {
   const t = line.trim();
-  return /^(Chef|Coordonnat|Secrétaire|Membre|Ministre|Directeur|Président)/i.test(t)
-    || /^(Dr\.|M\.|Mme|Mr\.|Mrs\.)\s/i.test(t)
-    || /^[A-Z]{2,}\s+[A-Z]{2,}/.test(t) // ALL CAPS name like "DJENY NGANDO Damaris"
-    || /\b(MINCOM|MINSANTE|MINEPIA|PNPLZER|MINADER|ONACC)\b/.test(t);
+  if (/^(Chef|Coordonnat|Secrétaire|Membre|Ministre|Directeur|Président)/i.test(t)) return true;
+  if (/^(Dr\.|M\.|Mme|Mr\.|Mrs\.)\s/i.test(t)) return true;
+  // ALL CAPS names — only short lines (< 45 chars) to avoid matching uppercase TITLES
+  if (/^[A-Z]{2,}\s+[A-Z]{2,}/.test(t) && t.length < 45) return true;
+  // Lines that are just institution acronyms
+  if (/\b(MINCOM|MINSANTE|MINEPIA|PNPLZER|MINADER|ONACC)\b/.test(t) && t.length < 60) return true;
+  return false;
 }
 
+/**
+ * Check if a line is a good title candidate.
+ * Must start with uppercase letter and look like a headline.
+ */
 function isTitleCandidate(line) {
   const t = line.trim();
   if (t.length < 12 || t.length > 200) return false;
@@ -120,6 +127,15 @@ function isTitleCandidate(line) {
   if (isAuthorLine(t)) return false;
   if (/^\d{1,2}$/.test(t)) return false;
   if (detectSectionMarker(t)) return false;
+
+  // Must start with uppercase letter (not a body text fragment)
+  // Body fragments start with lowercase: "des acteurs...", "pour échanger...", "'après..."
+  if (!/^[A-ZÀ-ÚÉÈ«"0-9]/.test(t)) return false;
+
+  // Reject lines ending with period (body sentences, not titles)
+  // But allow lines ending with ! or ? (headline style)
+  if (/\.\s*$/.test(t) && !/[!?]\s*$/.test(t)) return false;
+
   return true;
 }
 
@@ -168,7 +184,7 @@ function hasExtractableText(pdfDoc) {
 // ─── Newsletter Parser ──────────────────────────────────────
 
 /**
- * Clean page text: strip headers, fix drop-caps, normalize whitespace
+ * Clean page text: strip headers, fix drop-caps
  */
 function cleanPageText(rawText) {
   let lines = rawText.split('\n');
@@ -176,69 +192,82 @@ function cleanPageText(rawText) {
   // Strip page headers
   lines = lines.filter(l => !isPageHeader(l.trim()));
 
-  // Fix drop-caps: merge single uppercase letter with next line
+  // Fix drop-caps: merge single uppercase letter with next non-empty line
   const merged = [];
   for (let i = 0; i < lines.length; i++) {
-    if (isDropCap(lines[i]) && i + 1 < lines.length) {
-      merged.push(lines[i].trim() + lines[i + 1]);
-      i++; // skip next line
-    } else {
-      merged.push(lines[i]);
+    if (isDropCap(lines[i])) {
+      // Look ahead for the continuation, skipping empty lines
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j < lines.length) {
+        merged.push(lines[i].trim() + lines[j]);
+        i = j; // skip to the continuation line
+        continue;
+      }
     }
+    merged.push(lines[i]);
   }
 
   return merged;
 }
 
 /**
- * Find article title from a list of lines starting at a given index.
- * Returns { title, nextIndex } or null.
- * May concatenate multiple short lines into one title.
+ * Find article title from lines starting at startIdx.
+ * Returns { title, endIdx } where endIdx is past the title lines,
+ * or null if no good title found.
  */
 function findTitle(lines, startIdx) {
   let title = '';
   let linesUsed = 0;
+  let lastTitleIdx = startIdx;
 
   for (let i = startIdx; i < lines.length && linesUsed < 4; i++) {
     const line = lines[i].trim();
     if (!line) {
       if (title) break; // empty line after title = end of title
-      continue; // empty line before title = skip
+      continue;
     }
 
     if (isSkipLine(line)) continue;
     if (isAuthorLine(line)) continue;
-    if (detectSectionMarker(line)) break; // another section marker
-    if (isDropCap(line)) break; // drop-cap = body text starting
+    if (detectSectionMarker(line)) break;
 
-    if (!isTitleCandidate(line) && !title) continue;
+    if (!isTitleCandidate(line)) {
+      if (title) break; // non-title line after title = end of title
+      continue; // non-title line before title = skip
+    }
 
     if (!title) {
-      // First title line
       title = line;
       linesUsed = 1;
-    } else if (line.length < 80 && (title.length + line.length) < 200) {
-      // Title continuation (short line, total still reasonable)
+      lastTitleIdx = i;
+    } else if (line.length < 80 && (title.length + line.length + 1) < 200) {
+      // Title continuation
       title += ' ' + line;
       linesUsed++;
+      lastTitleIdx = i;
     } else {
-      break; // line too long = body text
+      break;
     }
   }
 
-  return title.length >= 12 ? title : null;
+  if (title.length >= 12) {
+    return { title, endIdx: lastTitleIdx + 1 };
+  }
+  return null;
 }
 
 /**
  * Parse a newsletter PDF into article sections.
+ * Groups content by section markers, extracting real titles.
  */
 function parseNewsletter(pdfDoc, docTitle) {
   const pc = pdfDoc.countPages();
   const articles = [];
   let current = null;
+  let skipUntilNextSection = false;
 
-  // Start from page index 2 (page 3 in 1-indexed) to skip cover + credits
-  for (let pi = 2; pi < pc; pi++) {
+  for (let pi = 2; pi < pc; pi++) { // Skip cover (0) and credits (1)
     const page = pdfDoc.loadPage(pi);
     const rawText = getPageText(page);
     if (rawText.length < 20) continue;
@@ -248,59 +277,67 @@ function parseNewsletter(pdfDoc, docTitle) {
 
     while (lineIdx < lines.length) {
       const line = lines[lineIdx].trim();
-
       if (!line) { lineIdx++; continue; }
 
-      // Check for section marker
       const sectionName = detectSectionMarker(line);
 
       if (sectionName) {
+        skipUntilNextSection = false;
+
         if (sectionName === '_SKIP_') {
-          // Table of contents — skip this entire page
+          // Table of contents — skip entire page
           current = null;
+          skipUntilNextSection = true;
           break;
         }
 
-        // Save previous article if it has substance
-        if (current && current.bodyLines.length > 0) {
-          const bodyText = current.bodyLines.join('\n').trim();
-          if (bodyText.length > 80) {
-            current.body = bodyText;
-            articles.push(current);
-          }
-        }
+        // Try to find a title after this section marker
+        const titleResult = findTitle(lines, lineIdx + 1);
 
-        // Start new article section
-        current = {
-          sectionName,
-          title: null,
-          body: '',
-          bodyLines: [],
-          startPage: pi,
-        };
-
-        // Find title in the lines following the section marker
-        lineIdx++;
-        const foundTitle = findTitle(lines, lineIdx);
-        if (foundTitle) {
-          current.title = foundTitle;
-          // Skip past the title lines
-          const titleWords = foundTitle.split(' ');
-          while (lineIdx < lines.length) {
-            const l = lines[lineIdx].trim();
-            if (l && foundTitle.includes(l.slice(0, 30))) {
-              lineIdx++;
-            } else {
-              break;
+        if (titleResult) {
+          // Good title found → save previous article, start new one
+          if (current && current.bodyLines.length > 0) {
+            const bodyText = current.bodyLines.join('\n').trim();
+            if (bodyText.length > 80) {
+              current.body = bodyText;
+              articles.push(current);
             }
           }
+
+          current = {
+            sectionName,
+            title: titleResult.title,
+            body: '',
+            bodyLines: [],
+            startPage: pi,
+          };
+
+          // Advance lineIdx past the title
+          lineIdx = titleResult.endIdx;
+          continue;
+        } else {
+          // No good title → accumulate into current article
+          // (don't create a new article with a bad/missing title)
+          if (!current) {
+            // First section without title → create with fallback
+            current = {
+              sectionName,
+              title: null, // will be set to fallback later
+              body: '',
+              bodyLines: [],
+              startPage: pi,
+            };
+          }
+          lineIdx++;
+          continue;
         }
-        continue;
       }
 
-      // If no current article yet (text before any section marker on first pages),
-      // start a default "Éditorial" section
+      if (skipUntilNextSection) { lineIdx++; continue; }
+
+      // Text before any section marker → start default Éditorial
       if (!current) {
+        // Only if it's substantive text (not credits or metadata)
         if (line.length > 20 && !isSkipLine(line) && !isAuthorLine(line)) {
           current = {
             sectionName: 'Éditorial',
@@ -309,28 +346,19 @@ function parseNewsletter(pdfDoc, docTitle) {
             bodyLines: [],
             startPage: pi,
           };
-          // Try to use this first substantive line as title
-          if (isTitleCandidate(line)) {
-            const foundTitle = findTitle(lines, lineIdx);
-            if (foundTitle) {
-              current.title = foundTitle;
-              const titleWords = foundTitle.split(' ');
-              while (lineIdx < lines.length) {
-                const l = lines[lineIdx].trim();
-                if (l && foundTitle.includes(l.slice(0, 30))) {
-                  lineIdx++;
-                } else {
-                  break;
-                }
-              }
-              continue;
-            }
+
+          // Try to find a title starting from this line
+          const titleResult = findTitle(lines, lineIdx);
+          if (titleResult) {
+            current.title = titleResult.title;
+            lineIdx = titleResult.endIdx;
+            continue;
           }
         }
       }
 
       // Accumulate body text
-      if (current && line.length > 1 && !isSkipLine(line)) {
+      if (current && line.length > 1 && !isSkipLine(line) && !isAuthorLine(line)) {
         current.bodyLines.push(line);
       }
 
@@ -347,33 +375,20 @@ function parseNewsletter(pdfDoc, docTitle) {
     }
   }
 
-  // Post-process: merge tiny initial sections into the next section
-  const merged = [];
-  for (let i = 0; i < articles.length; i++) {
-    const art = articles[i];
-
-    // If this article has almost no body but has a title, and the next article
-    // has the same section name and no title, transfer the title
-    if (art.body.length < 80 && art.title && i + 1 < articles.length) {
-      const next = articles[i + 1];
-      if (!next.title || next.sectionName === art.sectionName) {
-        next.title = next.title || art.title;
-        next.startPage = Math.min(next.startPage, art.startPage);
-        continue; // skip this tiny article
-      }
-    }
-
-    merged.push(art);
-  }
-
-  // Final: set default titles for articles without titles
-  for (const art of merged) {
+  // Post-process: set fallback titles and filter
+  const result = [];
+  for (const art of articles) {
     if (!art.title) {
-      art.title = `${docTitle} - ${art.sectionName}`;
+      art.title = `${art.sectionName} - ${docTitle}`;
+    }
+
+    // Only keep articles with substantial body
+    if (art.body && art.body.length > 150) {
+      result.push(art);
     }
   }
 
-  return merged;
+  return result;
 }
 
 // ─── MAIN ───────────────────────────────────────────────────
@@ -397,7 +412,7 @@ async function main() {
   const authorId = admins.length > 0 ? admins[0].id : 1;
   console.log(`Author: #${authorId}\n`);
 
-  // 3. Fetch newsletter PDFs (NOT magazines — they're mostly graphical)
+  // 3. Fetch newsletter PDFs
   const [docs] = await db.query(`
     SELECT id, title, type, file_path, publication_date
     FROM document_resources
@@ -414,8 +429,7 @@ async function main() {
   for (const doc of docs) {
     const docTitle = doc.title || `Newsletter #${doc.id}`;
     const pdfPath = path.join(__dirname, '..', doc.file_path);
-    console.log(`\n${'─'.repeat(60)}`);
-    console.log(`${docTitle}`);
+    console.log(`\n--- ${docTitle} ---`);
 
     if (!fs.existsSync(pdfPath)) {
       console.log('  SKIP: file not found');
@@ -437,14 +451,8 @@ async function main() {
         ? new Date(doc.publication_date).toISOString().slice(0, 19).replace('T', ' ')
         : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-      // Parse into sections/articles
       const articles = parseNewsletter(pdfDoc, docTitle);
       console.log(`  Articles found: ${articles.length}`);
-
-      if (articles.length === 0) {
-        console.log('  SKIP: no articles extracted');
-        continue;
-      }
 
       for (const article of articles) {
         const title = article.title.replace(/\s+/g, ' ').trim().slice(0, 250);
@@ -455,21 +463,15 @@ async function main() {
           .map(p => p.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim())
           .filter(p => p.length > 15);
 
-        if (paragraphs.length === 0) {
-          console.log(`  SKIP [${article.sectionName}]: empty body after formatting`);
-          continue;
-        }
+        if (paragraphs.length === 0) continue;
 
         let htmlContent = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('\n');
-
-        // Add source attribution and link to full PDF
         htmlContent += `\n<hr/>\n<p><em>Source : ${escapeHtml(docTitle)}</em></p>`;
-        htmlContent += `\n<p><strong><a href="${escapeHtml(doc.file_path)}" target="_blank">📄 Lire la newsletter complète (PDF)</a></strong></p>`;
+        htmlContent += `\n<p><strong><a href="${escapeHtml(doc.file_path)}" target="_blank">Lire la newsletter complète (PDF)</a></strong></p>`;
 
         const excerpt = createExcerpt(article.body);
         const slug = await generateUniqueSlug(title);
 
-        // Render the article's starting page as featured image
         let featuredImage = null;
         try {
           const page = pdfDoc.loadPage(article.startPage);
@@ -491,7 +493,7 @@ async function main() {
         );
 
         allPosts.push({ id: result.insertId, title, pubDate, source: docTitle });
-        console.log(`  ✓ [${article.sectionName}] "${title.slice(0, 65)}..." (#${result.insertId})`);
+        console.log(`  + [${article.sectionName}] "${title.slice(0, 70)}" (#${result.insertId})`);
       }
 
     } catch (error) {
@@ -499,24 +501,20 @@ async function main() {
     }
   }
 
-  console.log(`\n${'═'.repeat(60)}`);
-  console.log(`Total articles created: ${allPosts.length}`);
-  console.log('═'.repeat(60));
+  console.log(`\n=== Total articles created: ${allPosts.length} ===`);
 
-  // 4. Mark top 10 as featured for homepage "À la Une"
+  // Mark top 10 as featured
   if (allPosts.length > 0) {
-    // Sort by publication date (newest first)
     allPosts.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     const allIds = allPosts.map(p => p.id);
     const top10 = allPosts.slice(0, 10).map(p => p.id);
 
-    // Reset all new posts to not featured, then set top 10
     await db.query(`UPDATE posts SET featured = 0 WHERE id IN (${allIds.map(() => '?').join(',')})`, allIds);
     await db.query(`UPDATE posts SET featured = 1 WHERE id IN (${top10.map(() => '?').join(',')})`, top10);
 
     console.log('\nFeatured (top 10):');
     allPosts.slice(0, 10).forEach(p =>
-      console.log(`  ⭐ #${p.id}: ${p.title.slice(0, 65)}`)
+      console.log(`  * #${p.id}: ${p.title.slice(0, 70)}`)
     );
   }
 
