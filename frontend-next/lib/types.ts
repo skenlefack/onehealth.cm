@@ -239,6 +239,8 @@ export interface OHWRDocument {
   content?: string;
   file_path?: string;
   file_url?: string;
+  file_type?: string;
+  file_size?: number;
   external_url?: string;
   thumbnail?: string;
   organization_id?: number;

@@ -6,7 +6,7 @@ import {
   FileText, Download, Eye, Calendar, Building2, Search,
   ExternalLink, BookOpen, FileCheck, GraduationCap, Newspaper,
   AlertCircle, BarChart3, FolderOpen, Grid3X3, List, X, Loader2,
-  ArrowRight, Layers, BookOpenCheck, Mail
+  ArrowRight, Layers, BookOpenCheck, Mail, ChevronLeft
 } from 'lucide-react';
 import { Language, OHWRDocument, OHWRStats } from '@/lib/types';
 import { getOHWRDocuments, getOHWRDocumentTypes, getOHWRStats } from '@/lib/api';
@@ -55,6 +55,7 @@ export default function ResourcesPage({ params }: PageProps) {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedDocument, setSelectedDocument] = useState<OHWRDocument | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,7 +89,13 @@ export default function ResourcesPage({ params }: PageProps) {
       browseByType: 'Parcourir par type',
       totalResources: 'Ressources disponibles',
       viewAll: 'Voir tout',
-      results: 'résultats'
+      results: 'résultats',
+      close: 'Fermer',
+      downloadDocument: 'Télécharger le document',
+      previewNotAvailable: 'L\'aperçu n\'est pas disponible pour ce type de fichier.',
+      clickToDownload: 'Cliquez sur le bouton ci-dessous pour télécharger.',
+      views: 'vues',
+      downloads: 'téléchargements'
     },
     en: {
       title: 'Resource Center',
@@ -114,7 +121,13 @@ export default function ResourcesPage({ params }: PageProps) {
       browseByType: 'Browse by type',
       totalResources: 'Available resources',
       viewAll: 'View all',
-      results: 'results'
+      results: 'results',
+      close: 'Close',
+      downloadDocument: 'Download document',
+      previewNotAvailable: 'Preview is not available for this file type.',
+      clickToDownload: 'Click the button below to download.',
+      views: 'views',
+      downloads: 'downloads'
     }
   };
 
@@ -168,10 +181,34 @@ export default function ResourcesPage({ params }: PageProps) {
     setCurrentPage(1);
   }, [selectedType, searchQuery]);
 
+  // Close modal on Escape key + prevent body scroll
+  useEffect(() => {
+    if (!selectedDocument) return;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedDocument(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedDocument]);
+
   // Get document count for a type
   const getTypeCount = (typeSlug: string): number => {
     if (!stats?.documents?.by_type) return 0;
     return stats.documents.by_type[typeSlug] || stats.documents.by_type[typeSlug.toLowerCase()] || 0;
+  };
+
+  const isPdf = (doc: OHWRDocument) => {
+    if (doc.file_type === 'pdf' || doc.file_type === 'application/pdf') return true;
+    if (doc.file_path?.toLowerCase().endsWith('.pdf')) return true;
+    return false;
+  };
+
+  const handleDocumentClick = (doc: OHWRDocument) => {
+    setSelectedDocument(doc);
   };
 
   const handleDownload = (doc: OHWRDocument) => {
@@ -449,7 +486,8 @@ export default function ResourcesPage({ params }: PageProps) {
                   return (
                     <div
                       key={doc.id}
-                      className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-all group"
+                      onClick={() => handleDocumentClick(doc)}
+                      className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-all group cursor-pointer"
                     >
                       {/* Thumbnail */}
                       <div className={cn('relative h-40', config.bgColor)}>
@@ -458,7 +496,7 @@ export default function ResourcesPage({ params }: PageProps) {
                             src={getImageUrl(doc.thumbnail)}
                             alt={getDocumentTitle(doc)}
                             fill
-                            className="object-cover"
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -478,6 +516,10 @@ export default function ResourcesPage({ params }: PageProps) {
                             {text.featured}
                           </div>
                         )}
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <Eye size={32} className="text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow-lg" />
+                        </div>
                       </div>
 
                       {/* Content */}
@@ -509,24 +551,20 @@ export default function ResourcesPage({ params }: PageProps) {
 
                         {/* Actions */}
                         <div className="flex gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDocumentClick(doc); }}
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#8B9A2D] text-white text-sm font-medium rounded-lg hover:bg-[#7A8928] transition-colors"
+                          >
+                            <Eye size={14} />
+                            {text.view}
+                          </button>
                           {(doc.file_path || doc.external_url) && (
                             <button
-                              onClick={() => handleDownload(doc)}
-                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#8B9A2D] text-white text-sm font-medium rounded-lg hover:bg-[#7A8928] transition-colors"
-                            >
-                              <Download size={14} />
-                              {text.download}
-                            </button>
-                          )}
-                          {doc.external_url && (
-                            <a
-                              href={doc.external_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              onClick={(e) => { e.stopPropagation(); handleDownload(doc); }}
                               className="flex items-center justify-center gap-2 px-3 py-2 border border-slate-300 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
                             >
-                              <ExternalLink size={14} />
-                            </a>
+                              <Download size={14} />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -543,7 +581,8 @@ export default function ResourcesPage({ params }: PageProps) {
                   return (
                     <div
                       key={doc.id}
-                      className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-lg transition-all flex gap-4"
+                      onClick={() => handleDocumentClick(doc)}
+                      className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-lg transition-all flex gap-4 cursor-pointer"
                     >
                       {/* Icon/Thumbnail */}
                       <div
@@ -594,13 +633,19 @@ export default function ResourcesPage({ params }: PageProps) {
 
                           {/* Actions */}
                           <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDocumentClick(doc); }}
+                              className="flex items-center gap-2 px-4 py-2 bg-[#8B9A2D] text-white text-sm font-medium rounded-lg hover:bg-[#7A8928] transition-colors"
+                            >
+                              <Eye size={14} />
+                              {text.view}
+                            </button>
                             {(doc.file_path || doc.external_url) && (
                               <button
-                                onClick={() => handleDownload(doc)}
-                                className="flex items-center gap-2 px-4 py-2 bg-[#8B9A2D] text-white text-sm font-medium rounded-lg hover:bg-[#7A8928] transition-colors"
+                                onClick={(e) => { e.stopPropagation(); handleDownload(doc); }}
+                                className="flex items-center gap-2 px-3 py-2 border border-slate-300 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
                               >
                                 <Download size={14} />
-                                {text.download}
                               </button>
                             )}
                           </div>
@@ -665,6 +710,142 @@ export default function ResourcesPage({ params }: PageProps) {
           </>
         )}
       </div>
+
+      {/* Document Viewer Modal */}
+      {selectedDocument && (() => {
+        const doc = selectedDocument;
+        const config = getDocumentTypeConfig(doc.type || 'other');
+        const Icon = config.icon;
+        const fileUrl = doc.file_path || doc.external_url;
+        const isDocPdf = isPdf(doc);
+
+        return (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex flex-col"
+            onClick={() => setSelectedDocument(null)}
+          >
+            {/* Modal content - prevent close on click inside */}
+            <div
+              className="flex flex-col h-full w-full max-w-6xl mx-auto my-4 md:my-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 md:px-6 py-3 bg-white rounded-t-2xl border-b border-slate-200 flex-shrink-0">
+                <button
+                  onClick={() => setSelectedDocument(null)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-700"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${config.color}15` }}
+                >
+                  <Icon size={16} style={{ color: config.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-slate-800 truncate text-sm md:text-base">
+                    {getDocumentTitle(doc)}
+                  </h2>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span
+                      className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                      style={{ backgroundColor: config.color }}
+                    >
+                      {doc.type}
+                    </span>
+                    {doc.publication_date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar size={10} />
+                        {formatDate(doc.publication_date)}
+                      </span>
+                    )}
+                    {doc.view_count !== undefined && doc.view_count > 0 && (
+                      <span className="hidden sm:flex items-center gap-1">
+                        <Eye size={10} />
+                        {doc.view_count} {text.views}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedDocument(null)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-700"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Document viewer */}
+              <div className="flex-1 bg-slate-100 overflow-hidden min-h-0">
+                {isDocPdf && fileUrl ? (
+                  <iframe
+                    src={getImageUrl(fileUrl)}
+                    className="w-full h-full border-0"
+                    title={getDocumentTitle(doc)}
+                  />
+                ) : fileUrl && doc.external_url ? (
+                  <iframe
+                    src={doc.external_url}
+                    className="w-full h-full border-0"
+                    title={getDocumentTitle(doc)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                    <Icon size={80} style={{ color: config.color }} className="opacity-20 mb-6" />
+                    {doc.thumbnail && (
+                      <div className="relative w-64 h-80 mb-6 rounded-xl overflow-hidden shadow-lg">
+                        <Image
+                          src={getImageUrl(doc.thumbnail)}
+                          alt={getDocumentTitle(doc)}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+                    <p className="text-lg font-medium text-slate-600 mb-2">{text.previewNotAvailable}</p>
+                    <p className="text-sm text-slate-400">{text.clickToDownload}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer with description & download */}
+              <div className="px-4 md:px-6 py-4 bg-white rounded-b-2xl border-t border-slate-200 flex-shrink-0">
+                {getDocumentDescription(doc) && (
+                  <p className="text-sm text-slate-500 mb-3 line-clamp-2">{getDocumentDescription(doc)}</p>
+                )}
+                <div className="flex items-center gap-3">
+                  {fileUrl && (
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-[#8B9A2D] text-white font-medium rounded-xl hover:bg-[#7A8928] transition-colors shadow-sm"
+                    >
+                      <Download size={18} />
+                      {text.downloadDocument}
+                    </button>
+                  )}
+                  {doc.external_url && (
+                    <a
+                      href={doc.external_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-4 py-3 border border-slate-300 text-slate-600 font-medium rounded-xl hover:bg-slate-50 transition-colors"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                  )}
+                  {doc.organization_name && (
+                    <span className="hidden sm:flex items-center gap-1 text-xs text-slate-400 ml-auto">
+                      <Building2 size={12} />
+                      {doc.organization_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
