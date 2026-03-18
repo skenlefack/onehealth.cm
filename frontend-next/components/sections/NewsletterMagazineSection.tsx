@@ -105,7 +105,7 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
       if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 10) {
         el.scrollTo({ left: 0, behavior: 'smooth' });
       } else {
-        el.scrollBy({ left: 320, behavior: 'smooth' });
+        el.scrollBy({ left: 220, behavior: 'smooth' });
       }
     }, 4000);
 
@@ -126,7 +126,7 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
-    const amount = direction === 'left' ? -400 : 400;
+    const amount = direction === 'left' ? -280 : 280;
     el.scrollBy({ left: amount, behavior: 'smooth' });
   };
 
@@ -149,14 +149,14 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
               <div className="h-4 w-40 bg-slate-200 rounded animate-pulse" />
             </div>
           </div>
-          <div className="flex gap-6 overflow-hidden">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex-shrink-0 w-[280px]">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="h-[360px] bg-slate-200 animate-pulse" />
-                  <div className="p-4">
-                    <div className="h-4 bg-slate-200 rounded animate-pulse mb-2 w-3/4" />
-                    <div className="h-3 bg-slate-200 rounded animate-pulse w-1/2" />
+          <div className="flex gap-4 overflow-hidden">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex-shrink-0 w-[180px]">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden h-[300px]">
+                  <div className="h-[220px] bg-slate-200 animate-pulse" />
+                  <div className="p-3">
+                    <div className="h-3 bg-slate-200 rounded animate-pulse mb-2 w-3/4" />
+                    <div className="h-2.5 bg-slate-200 rounded animate-pulse w-1/2" />
                   </div>
                 </div>
               </div>
@@ -171,17 +171,17 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
 
   return (
     <>
-      <section className="py-12 px-[5%] bg-gradient-to-b from-slate-50 to-white overflow-hidden">
+      <section className="py-8 px-[5%] bg-gradient-to-b from-slate-50 to-white overflow-hidden">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Mail size={24} className="text-white" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+                <Mail size={20} className="text-white" />
               </div>
               <div>
-                <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800">{text.title}</h2>
-                <p className="text-slate-500 text-sm mt-0.5">{text.subtitle}</p>
+                <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">{text.title}</h2>
+                <p className="text-slate-500 text-xs mt-0.5">{text.subtitle}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -190,16 +190,16 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
                 <button
                   onClick={() => scroll('left')}
                   disabled={!canScrollLeft}
-                  className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  <ChevronLeft size={20} />
+                  <ChevronLeft size={16} />
                 </button>
                 <button
                   onClick={() => scroll('right')}
                   disabled={!canScrollRight}
-                  className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  <ChevronRight size={20} />
+                  <ChevronRight size={16} />
                 </button>
               </div>
               {/* View all */}
@@ -218,7 +218,7 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
             ref={scrollRef}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
-            className="flex gap-5 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1 snap-x snap-mandatory"
+            className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1 snap-x snap-mandatory"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {documents.map((doc) => {
@@ -227,11 +227,11 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
                 <div
                   key={doc.id}
                   onClick={() => setSelectedDoc(doc)}
-                  className="flex-shrink-0 w-[260px] md:w-[280px] group cursor-pointer snap-start"
+                  className="flex-shrink-0 w-[180px] md:w-[200px] group cursor-pointer snap-start"
                 >
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-300">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-300 h-[300px] flex flex-col">
                     {/* Cover */}
-                    <div className="relative h-[360px] bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
+                    <div className="relative h-[220px] flex-shrink-0 bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
                       {doc.thumbnail ? (
                         <Image
                           src={getImageUrl(doc.thumbnail)}
@@ -242,36 +242,36 @@ export function NewsletterMagazineSection({ lang }: NewsletterMagazineSectionPro
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           {nl ? (
-                            <Mail size={56} className="text-blue-300" />
+                            <Mail size={40} className="text-blue-300" />
                           ) : (
-                            <BookOpenCheck size={56} className="text-pink-300" />
+                            <BookOpenCheck size={40} className="text-pink-300" />
                           )}
                         </div>
                       )}
 
                       {/* Type badge */}
-                      <div className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold text-white backdrop-blur-sm ${
+                      <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold text-white backdrop-blur-sm ${
                         nl ? 'bg-blue-500/90' : 'bg-pink-500/90'
                       }`}>
                         {nl ? text.newsletter : text.magazine}
                       </div>
 
                       {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                        <span className="text-white text-sm font-medium flex items-center gap-2">
-                          <Eye size={16} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                        <span className="text-white text-xs font-medium flex items-center gap-1.5">
+                          <Eye size={14} />
                           {text.view}
                         </span>
                       </div>
                     </div>
 
                     {/* Info */}
-                    <div className="p-4">
-                      <h3 className="font-semibold text-slate-800 text-sm line-clamp-2 group-hover:text-[#8B9A2D] transition-colors leading-snug">
+                    <div className="p-3 flex-1 flex flex-col justify-between">
+                      <h3 className="font-semibold text-slate-800 text-xs line-clamp-2 group-hover:text-[#8B9A2D] transition-colors leading-snug">
                         {getTitle(doc)}
                       </h3>
                       {doc.publication_date && (
-                        <p className="text-xs text-slate-400 mt-2">
+                        <p className="text-[10px] text-slate-400 mt-1">
                           {new Date(doc.publication_date).toLocaleDateString(
                             lang === 'fr' ? 'fr-FR' : 'en-US',
                             { year: 'numeric', month: 'short' }
