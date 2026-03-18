@@ -10,4 +10,5 @@ export { EditorNoteSection } from './EditorNoteSection';
 export { ImplementationStrategySection } from './ImplementationStrategySection';
 export { PartnersCarouselSection } from './PartnersCarouselSection';
 export { MinistriesSection } from './MinistriesSection';
+export { NewsletterMagazineSection } from './NewsletterMagazineSection';
 export { PageSectionRenderer } from './PageSectionRenderer';

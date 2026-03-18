@@ -13,6 +13,7 @@ import {
   EditorNoteSection,
   ImplementationStrategySection,
   PartnersCarouselSection,
+  NewsletterMagazineSection,
 } from '@/components/sections';
 
 interface PageProps {
@@ -88,6 +89,9 @@ export default async function HomePage({ params }: PageProps) {
           </div>
         </div>
       </section>
+
+      {/* Section: Newsletters & Magazines */}
+      <NewsletterMagazineSection lang={lang as Language} />
 
       {/* Section 2: À propos / Hero Section */}
       <HeroSection lang={lang as Language} t={t} content={getSection('hero')?.content} />
