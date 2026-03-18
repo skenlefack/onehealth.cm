@@ -100,7 +100,9 @@ function detectSectionMarker(line) {
 }
 
 function isDropCap(line) {
-  return /^[A-ZÀ-Ú]$/.test(line.trim());
+  // Single uppercase letter on its own line (PDF drop-cap rendering)
+  // Also match ² which appears as drop-cap artifact
+  return /^[A-ZÀ-Ú²]$/.test(line.trim());
 }
 
 function isAuthorLine(line) {
@@ -120,7 +122,8 @@ function isAuthorLine(line) {
  */
 function isTitleCandidate(line) {
   const t = line.trim();
-  if (t.length < 12 || t.length > 200) return false;
+  // Single-line titles are typically < 80 chars; longer lines are body text
+  if (t.length < 12 || t.length > 80) return false;
   if (isPageHeader(t)) return false;
   if (isSkipLine(t)) return false;
   if (isDropCap(t)) return false;
@@ -192,18 +195,25 @@ function cleanPageText(rawText) {
   // Strip page headers
   lines = lines.filter(l => !isPageHeader(l.trim()));
 
-  // Fix drop-caps: merge single uppercase letter with next non-empty line
+  // Fix drop-caps: merge single uppercase letter with next non-empty line,
+  // but ONLY if the continuation starts with lowercase/apostrophe
+  // (otherwise the drop-cap is before a title and should be skipped)
   const merged = [];
   for (let i = 0; i < lines.length; i++) {
     if (isDropCap(lines[i])) {
-      // Look ahead for the continuation, skipping empty lines
       let j = i + 1;
       while (j < lines.length && !lines[j].trim()) j++;
       if (j < lines.length) {
-        merged.push(lines[i].trim() + lines[j]);
-        i = j; // skip to the continuation line
-        continue;
+        const cont = lines[j].trim();
+        if (/^[a-zà-ú''ʼ]/.test(cont)) {
+          // Continuation starts with lowercase → merge (e.g., "D" + "'après" = "D'après")
+          merged.push(lines[i].trim() + lines[j]);
+          i = j;
+          continue;
+        }
       }
+      // Drop-cap before uppercase text (title) → skip the lone letter
+      continue;
     }
     merged.push(lines[i]);
   }
@@ -232,22 +242,20 @@ function findTitle(lines, startIdx) {
     if (isAuthorLine(line)) continue;
     if (detectSectionMarker(line)) break;
 
-    if (!isTitleCandidate(line)) {
-      if (title) break; // non-title line after title = end of title
-      continue; // non-title line before title = skip
-    }
-
     if (!title) {
+      // First title line: must be a proper title candidate (starts uppercase, < 80 chars)
+      if (!isTitleCandidate(line)) continue;
       title = line;
       linesUsed = 1;
       lastTitleIdx = i;
-    } else if (line.length < 80 && (title.length + line.length + 1) < 200) {
-      // Title continuation
+    } else {
+      // Continuation lines: more lenient — allow lowercase starts for
+      // wrapped titles like "Journée mondiale des zoonoses : une\ncélébration sur plusieurs fronts"
+      if (line.length > 65) break; // too long = body text
+      if ((title.length + line.length + 1) > 200) break;
       title += ' ' + line;
       linesUsed++;
       lastTitleIdx = i;
-    } else {
-      break;
     }
   }
 
