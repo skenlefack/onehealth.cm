@@ -1,12 +1,13 @@
 /**
- * Extract articles from newsletter/magazine PDFs and publish as posts.
+ * Extract articles from newsletter PDFs with REAL extractable text.
  *
  * Strategy:
- * - PDFs WITH extractable text: parse articles by headings, use text as content
- * - PDFs WITHOUT text (graphical): create articles per group of pages with rendered images
- * - All articles get a rendered page as featured image
- * - Published under "Actualités" (newsletters) or "Activités" (magazines)
- * - The 10 most recent are marked as featured for the homepage "À la Une"
+ * - ONLY process newsletters with extractable text (skip graphical PDFs & magazines)
+ * - Parse sections by section markers (EDITORIAL, EN BREF, DOSSIER, COORDINATION, etc.)
+ * - Extract real article titles from text following section markers
+ * - One article per section occurrence, with rendered PDF page as featured image
+ * - Published under "Actualités" category
+ * - 10 most recent marked as featured for homepage "À la Une"
  *
  * Usage: node backend/scripts/extract-newsletter-articles.js
  */
@@ -21,6 +22,44 @@ const { v4: uuidv4 } = require('uuid');
 
 const POSTS_IMAGES_DIR = path.join(__dirname, '..', 'uploads', 'posts');
 if (!fs.existsSync(POSTS_IMAGES_DIR)) fs.mkdirSync(POSTS_IMAGES_DIR, { recursive: true });
+
+// ─── Section marker patterns ───────────────────────────────
+
+const SECTION_MARKERS = [
+  { regex: /^E\s*D\s*I\s*T\s*O\s*R\s*I\s*A\s*L$/i, name: 'Éditorial' },
+  { regex: /^Edito$/i, name: 'Éditorial' },
+  { regex: /^Editorial$/i, name: 'Éditorial' },
+  { regex: /^E\s*N\s+B\s*R\s*E\s*F$/i, name: 'En bref' },
+  { regex: /^En bref$/i, name: 'En bref' },
+  { regex: /^D\s*O\s*S\s*S\s*I\s*E\s*R$/i, name: 'Dossier' },
+  { regex: /^DOSSIER$/i, name: 'Dossier' },
+  { regex: /^C\s*O\s*O\s*R\s*D\s*I\s*N\s*A\s*T\s*I\s*O\s*N$/i, name: 'Coordination' },
+  { regex: /^Coordination$/i, name: 'Coordination' },
+  { regex: /^F\s*O\s*R\s*M\s*A\s*T\s*I\s*O\s*N$/i, name: 'Formation' },
+  { regex: /^P\s*R\s*[EÉ]\s*P\s*A\s*R\s*A\s*T\s*I\s*O\s*N$/i, name: 'Préparation' },
+  { regex: /^VARIOLE DU SINGE$/i, name: 'Variole du singe' },
+  { regex: /^Focus YOHF$/i, name: 'Focus YOHF' },
+  { regex: /^Diplomatie$/i, name: 'Diplomatie' },
+  // Table of contents — skip
+  { regex: /^S\s*O\s*M\s*M\s*A\s*I\s*R\s*E$/i, name: '_SKIP_' },
+  { regex: /^Sommaire$/i, name: '_SKIP_' },
+];
+
+const PAGE_HEADER_PATTERNS = [
+  /^Page\s+\d+\s*\/.*$/i,
+  /^Une Seule Santé du Cameroun\s+(No|N°)\s*\d+.*$/i,
+  /^WWW\.ONEHEALTH\.CM$/i,
+  /^CAMEROON One Health Magazine.*$/i,
+  /^\d{1,2}$/, // standalone page numbers
+];
+
+const SKIP_LINE_PATTERNS = [
+  /^(Directeur de publication|Coordonnateurs?\s+(éditoriaux|de la)|Ont collaboré|Maquette|Crédit photo|Edition|Impression)/i,
+  /^\(?(MINCOM|MINSANTE|MINEPIA|PNPLZER|MINADER|ONACC|MINEPDED|MINFOF|GIZ|FAO|OMS|USAID)\)?$/i,
+  /^(Traducteur|Infograph)/i,
+  /\.{5,}/, // dotted lines (table of contents entries)
+  /^(•|·)\s/, // bullet points from table of contents
+];
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -43,9 +82,47 @@ function createExcerpt(text, maxLen = 200) {
   return clean.slice(0, maxLen).replace(/\s+\S*$/, '') + '...';
 }
 
-/**
- * Render a PDF page as a WebP image
- */
+function isPageHeader(line) {
+  return PAGE_HEADER_PATTERNS.some(p => p.test(line.trim()));
+}
+
+function isSkipLine(line) {
+  return SKIP_LINE_PATTERNS.some(p => p.test(line.trim()));
+}
+
+function detectSectionMarker(line) {
+  const trimmed = line.trim();
+  for (const marker of SECTION_MARKERS) {
+    if (marker.regex.test(trimmed)) return marker.name;
+  }
+  return null;
+}
+
+function isDropCap(line) {
+  // Single uppercase letter on its own line (PDF drop-cap rendering)
+  return /^[A-ZÀ-Ú]$/.test(line.trim());
+}
+
+function isAuthorLine(line) {
+  const t = line.trim();
+  return /^(Chef|Coordonnat|Secrétaire|Membre|Ministre|Directeur|Président)/i.test(t)
+    || /^(Dr\.|M\.|Mme|Mr\.|Mrs\.)\s/i.test(t)
+    || /^[A-Z]{2,}\s+[A-Z]{2,}/.test(t) // ALL CAPS name like "DJENY NGANDO Damaris"
+    || /\b(MINCOM|MINSANTE|MINEPIA|PNPLZER|MINADER|ONACC)\b/.test(t);
+}
+
+function isTitleCandidate(line) {
+  const t = line.trim();
+  if (t.length < 12 || t.length > 200) return false;
+  if (isPageHeader(t)) return false;
+  if (isSkipLine(t)) return false;
+  if (isDropCap(t)) return false;
+  if (isAuthorLine(t)) return false;
+  if (/^\d{1,2}$/.test(t)) return false;
+  if (detectSectionMarker(t)) return false;
+  return true;
+}
+
 async function renderPageAsImage(page, mupdf, pageIndex, docId) {
   try {
     const bounds = page.getBounds();
@@ -73,183 +150,277 @@ async function renderPageAsImage(page, mupdf, pageIndex, docId) {
   }
 }
 
-/**
- * Extract plain text from a page (returns empty string for graphical PDFs)
- */
 function getPageText(page) {
   try {
     return page.toStructuredText('preserve-whitespace').asText().trim();
   } catch { return ''; }
 }
 
-/**
- * Extract structured lines with font info from a page
- */
-function getStructuredLines(page) {
-  try {
-    const json = page.toStructuredText('preserve-whitespace').asJSON();
-    const data = JSON.parse(json);
-    const lines = [];
-    for (const block of data.blocks || []) {
-      for (const line of block.lines || []) {
-        let text = '';
-        let maxSize = 0;
-        let bold = false;
-        for (const span of line.spans || []) {
-          text += span.text || '';
-          const sz = span.font?.size || span.size || 12;
-          if (sz > maxSize) maxSize = sz;
-          if (span.font?.name?.match(/bold/i)) bold = true;
-        }
-        text = text.trim();
-        if (text) lines.push({ text, fontSize: maxSize, bold });
-      }
-    }
-    return lines;
-  } catch { return []; }
-}
-
-/**
- * Check if a PDF has extractable text (sample a few pages)
- */
-function hasExtractableText(pdfDoc, mupdf) {
+function hasExtractableText(pdfDoc) {
   const pc = pdfDoc.countPages();
-  const pagesToCheck = [0, 2, 5, Math.floor(pc / 2)].filter(i => i < pc);
   let totalChars = 0;
-  for (const pi of pagesToCheck) {
-    const page = pdfDoc.loadPage(pi);
-    totalChars += getPageText(page).length;
+  for (let i = 0; i < Math.min(pc, 5); i++) {
+    totalChars += getPageText(pdfDoc.loadPage(i)).length;
   }
-  return totalChars > 200; // At least 200 chars across sampled pages
+  return totalChars > 500;
 }
 
-// ─── Text-based article extraction ──────────────────────────
+// ─── Newsletter Parser ──────────────────────────────────────
 
-function extractTextArticles(pdfDoc, mupdf) {
+/**
+ * Clean page text: strip headers, fix drop-caps, normalize whitespace
+ */
+function cleanPageText(rawText) {
+  let lines = rawText.split('\n');
+
+  // Strip page headers
+  lines = lines.filter(l => !isPageHeader(l.trim()));
+
+  // Fix drop-caps: merge single uppercase letter with next line
+  const merged = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (isDropCap(lines[i]) && i + 1 < lines.length) {
+      merged.push(lines[i].trim() + lines[i + 1]);
+      i++; // skip next line
+    } else {
+      merged.push(lines[i]);
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Find article title from a list of lines starting at a given index.
+ * Returns { title, nextIndex } or null.
+ * May concatenate multiple short lines into one title.
+ */
+function findTitle(lines, startIdx) {
+  let title = '';
+  let linesUsed = 0;
+
+  for (let i = startIdx; i < lines.length && linesUsed < 4; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      if (title) break; // empty line after title = end of title
+      continue; // empty line before title = skip
+    }
+
+    if (isSkipLine(line)) continue;
+    if (isAuthorLine(line)) continue;
+    if (detectSectionMarker(line)) break; // another section marker
+    if (isDropCap(line)) break; // drop-cap = body text starting
+
+    if (!isTitleCandidate(line) && !title) continue;
+
+    if (!title) {
+      // First title line
+      title = line;
+      linesUsed = 1;
+    } else if (line.length < 80 && (title.length + line.length) < 200) {
+      // Title continuation (short line, total still reasonable)
+      title += ' ' + line;
+      linesUsed++;
+    } else {
+      break; // line too long = body text
+    }
+  }
+
+  return title.length >= 12 ? title : null;
+}
+
+/**
+ * Parse a newsletter PDF into article sections.
+ */
+function parseNewsletter(pdfDoc, docTitle) {
   const pc = pdfDoc.countPages();
   const articles = [];
   let current = null;
 
-  for (let pi = 0; pi < pc; pi++) {
+  // Start from page index 2 (page 3 in 1-indexed) to skip cover + credits
+  for (let pi = 2; pi < pc; pi++) {
     const page = pdfDoc.loadPage(pi);
-    const lines = getStructuredLines(page);
-    if (lines.length === 0) continue;
+    const rawText = getPageText(page);
+    if (rawText.length < 20) continue;
 
-    // Compute median font size for heading detection
-    const sizes = lines.map(l => l.fontSize).filter(s => s > 0);
-    const median = sizes.length > 0 ? sizes.sort((a, b) => a - b)[Math.floor(sizes.length / 2)] : 12;
-    const threshold = median * 1.2;
+    const lines = cleanPageText(rawText);
+    let lineIdx = 0;
 
-    for (const line of lines) {
-      const isHeading = (line.fontSize >= threshold || line.bold)
-        && line.text.length > 8
-        && line.text.length < 180
-        && !/^\d+$/.test(line.text)
-        && !/^page\s*\d+$/i.test(line.text)
-        && !/^une seule sant/i.test(line.text)
-        && !/^no\s*\d+/i.test(line.text);
+    while (lineIdx < lines.length) {
+      const line = lines[lineIdx].trim();
 
-      if (isHeading) {
-        if (current && current.body.length > 100) articles.push(current);
-        current = { title: line.text, body: '', startPage: pi };
-      } else if (current) {
-        current.body += line.text + '\n';
+      if (!line) { lineIdx++; continue; }
+
+      // Check for section marker
+      const sectionName = detectSectionMarker(line);
+
+      if (sectionName) {
+        if (sectionName === '_SKIP_') {
+          // Table of contents — skip this entire page
+          current = null;
+          break;
+        }
+
+        // Save previous article if it has substance
+        if (current && current.bodyLines.length > 0) {
+          const bodyText = current.bodyLines.join('\n').trim();
+          if (bodyText.length > 80) {
+            current.body = bodyText;
+            articles.push(current);
+          }
+        }
+
+        // Start new article section
+        current = {
+          sectionName,
+          title: null,
+          body: '',
+          bodyLines: [],
+          startPage: pi,
+        };
+
+        // Find title in the lines following the section marker
+        lineIdx++;
+        const foundTitle = findTitle(lines, lineIdx);
+        if (foundTitle) {
+          current.title = foundTitle;
+          // Skip past the title lines
+          const titleWords = foundTitle.split(' ');
+          while (lineIdx < lines.length) {
+            const l = lines[lineIdx].trim();
+            if (l && foundTitle.includes(l.slice(0, 30))) {
+              lineIdx++;
+            } else {
+              break;
+            }
+          }
+        }
+        continue;
+      }
+
+      // If no current article yet (text before any section marker on first pages),
+      // start a default "Éditorial" section
+      if (!current) {
+        if (line.length > 20 && !isSkipLine(line) && !isAuthorLine(line)) {
+          current = {
+            sectionName: 'Éditorial',
+            title: null,
+            body: '',
+            bodyLines: [],
+            startPage: pi,
+          };
+          // Try to use this first substantive line as title
+          if (isTitleCandidate(line)) {
+            const foundTitle = findTitle(lines, lineIdx);
+            if (foundTitle) {
+              current.title = foundTitle;
+              const titleWords = foundTitle.split(' ');
+              while (lineIdx < lines.length) {
+                const l = lines[lineIdx].trim();
+                if (l && foundTitle.includes(l.slice(0, 30))) {
+                  lineIdx++;
+                } else {
+                  break;
+                }
+              }
+              continue;
+            }
+          }
+        }
+      }
+
+      // Accumulate body text
+      if (current && line.length > 1 && !isSkipLine(line)) {
+        current.bodyLines.push(line);
+      }
+
+      lineIdx++;
+    }
+  }
+
+  // Save last article
+  if (current && current.bodyLines.length > 0) {
+    const bodyText = current.bodyLines.join('\n').trim();
+    if (bodyText.length > 80) {
+      current.body = bodyText;
+      articles.push(current);
+    }
+  }
+
+  // Post-process: merge tiny initial sections into the next section
+  const merged = [];
+  for (let i = 0; i < articles.length; i++) {
+    const art = articles[i];
+
+    // If this article has almost no body but has a title, and the next article
+    // has the same section name and no title, transfer the title
+    if (art.body.length < 80 && art.title && i + 1 < articles.length) {
+      const next = articles[i + 1];
+      if (!next.title || next.sectionName === art.sectionName) {
+        next.title = next.title || art.title;
+        next.startPage = Math.min(next.startPage, art.startPage);
+        continue; // skip this tiny article
       }
     }
+
+    merged.push(art);
   }
-  if (current && current.body.length > 100) articles.push(current);
 
-  return articles;
-}
-
-// ─── Visual/page-based article creation ─────────────────────
-
-function createVisualArticles(pdfDoc, docTitle, docDescription) {
-  const pc = pdfDoc.countPages();
-  const articles = [];
-
-  // Skip page 1 (cover) and last page (back cover), group content pages
-  const startPage = Math.min(1, pc - 1); // skip cover
-  const endPage = Math.max(startPage + 1, pc - 1); // skip back cover
-  const contentPages = endPage - startPage;
-
-  // Group into ~3-4 page sections
-  const groupSize = contentPages <= 8 ? 3 : 4;
-
-  for (let i = startPage; i < endPage; i += groupSize) {
-    const end = Math.min(i + groupSize, endPage);
-    const pageNum = i + 1;
-
-    let sectionTitle;
-    if (i === startPage) {
-      sectionTitle = `${docTitle} - Éditorial`;
-    } else {
-      sectionTitle = `${docTitle} - Section ${Math.floor((i - startPage) / groupSize) + 1}`;
+  // Final: set default titles for articles without titles
+  for (const art of merged) {
+    if (!art.title) {
+      art.title = `${docTitle} - ${art.sectionName}`;
     }
-
-    articles.push({
-      title: sectionTitle,
-      startPage: i,
-      endPage: end,
-      isVisual: true
-    });
   }
 
-  return articles;
+  return merged;
 }
 
 // ─── MAIN ───────────────────────────────────────────────────
 
 async function main() {
-  console.log('=== Newsletter Article Extractor ===\n');
+  console.log('=== Newsletter Article Extractor (Text-Only) ===\n');
 
   const mupdf = await import('mupdf');
 
-  // 1. Categories
-  const [categories] = await db.query("SELECT id, slug FROM categories WHERE slug IN ('actualites', 'activites')");
-  let actualitesId = null, activitesId = null;
-  for (const c of categories) {
-    if (c.slug === 'actualites') actualitesId = c.id;
-    if (c.slug === 'activites') activitesId = c.id;
+  // 1. Get Actualités category
+  const [categories] = await db.query("SELECT id, slug FROM categories WHERE slug = 'actualites'");
+  if (categories.length === 0) {
+    console.error('"Actualités" category not found!');
+    process.exit(1);
   }
-  if (!activitesId) {
-    const [r] = await db.query(
-      "INSERT INTO categories (name, name_fr, name_en, slug, description, description_fr, description_en, status) VALUES (?,?,?,?,?,?,?,'active')",
-      ['Activités', 'Activités', 'Activities', 'activites', 'Activités One Health', 'Activités One Health', 'One Health Activities']
-    );
-    activitesId = r.insertId;
-    console.log(`Created "Activités" category (#${activitesId})`);
-  }
-  if (!actualitesId) { console.error('"Actualités" category not found!'); process.exit(1); }
-  console.log(`Categories: Actualités=#${actualitesId}, Activités=#${activitesId}`);
+  const categoryId = categories[0].id;
+  console.log(`Category: Actualités #${categoryId}`);
 
   // 2. Admin author
   const [admins] = await db.query("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
   const authorId = admins.length > 0 ? admins[0].id : 1;
   console.log(`Author: #${authorId}\n`);
 
-  // 3. Fetch newsletter/magazine PDFs
+  // 3. Fetch newsletter PDFs (NOT magazines — they're mostly graphical)
   const [docs] = await db.query(`
-    SELECT id, title, type, file_path, publication_date, description, thumbnail
+    SELECT id, title, type, file_path, publication_date
     FROM document_resources
-    WHERE is_active = 1 AND type IN ('newsletter', 'magazine')
+    WHERE is_active = 1 AND type = 'newsletter'
       AND file_path IS NOT NULL
       AND (file_type = 'pdf' OR file_type = 'application/pdf' OR file_path LIKE '%.pdf')
-    ORDER BY publication_date DESC, created_at DESC
+    ORDER BY publication_date DESC
   `);
 
-  console.log(`Found ${docs.length} PDFs.\n`);
-  if (docs.length === 0) { process.exit(0); }
+  console.log(`Found ${docs.length} newsletter PDFs.\n`);
 
   const allPosts = [];
-  const API_BASE = process.env.API_URL || process.env.BACKEND_URL || '';
 
   for (const doc of docs) {
     const docTitle = doc.title || `Newsletter #${doc.id}`;
     const pdfPath = path.join(__dirname, '..', doc.file_path);
-    console.log(`\n--- ${docTitle} (${doc.type}) ---`);
+    console.log(`\n${'─'.repeat(60)}`);
+    console.log(`${docTitle}`);
 
-    if (!fs.existsSync(pdfPath)) { console.log('  SKIP: not found'); continue; }
+    if (!fs.existsSync(pdfPath)) {
+      console.log('  SKIP: file not found');
+      continue;
+    }
 
     try {
       const pdfBuffer = fs.readFileSync(pdfPath);
@@ -257,138 +428,70 @@ async function main() {
       const pc = pdfDoc.countPages();
       console.log(`  ${pc} pages`);
 
-      const hasText = hasExtractableText(pdfDoc, mupdf);
-      console.log(`  Text extractable: ${hasText}`);
+      if (!hasExtractableText(pdfDoc)) {
+        console.log('  SKIP: no extractable text (graphical PDF)');
+        continue;
+      }
 
-      const categoryId = doc.type === 'magazine' ? activitesId : actualitesId;
       const pubDate = doc.publication_date
         ? new Date(doc.publication_date).toISOString().slice(0, 19).replace('T', ' ')
         : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-      let articles;
+      // Parse into sections/articles
+      const articles = parseNewsletter(pdfDoc, docTitle);
+      console.log(`  Articles found: ${articles.length}`);
 
-      if (hasText) {
-        // ── Text-based extraction ──
-        articles = extractTextArticles(pdfDoc, mupdf);
-        console.log(`  Text articles found: ${articles.length}`);
+      if (articles.length === 0) {
+        console.log('  SKIP: no articles extracted');
+        continue;
+      }
 
-        // If heading-based parsing failed, group by pages with text
-        if (articles.length === 0) {
-          for (let pi = 1; pi < pc - 1; pi += 3) {
-            const endPi = Math.min(pi + 3, pc - 1);
-            let body = '';
-            for (let p = pi; p < endPi; p++) {
-              body += getPageText(pdfDoc.loadPage(p)) + '\n\n';
-            }
-            if (body.trim().length > 150) {
-              // Use first meaningful line as title
-              const firstLine = body.trim().split('\n').find(l => l.trim().length > 10 && l.trim().length < 150);
-              articles.push({
-                title: firstLine || `${docTitle} - Pages ${pi + 1}-${endPi}`,
-                body: body.trim(),
-                startPage: pi
-              });
-            }
-          }
+      for (const article of articles) {
+        const title = article.title.replace(/\s+/g, ' ').trim().slice(0, 250);
+
+        // Build HTML content from body
+        const paragraphs = article.body
+          .split(/\n{2,}/)
+          .map(p => p.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim())
+          .filter(p => p.length > 15);
+
+        if (paragraphs.length === 0) {
+          console.log(`  SKIP [${article.sectionName}]: empty body after formatting`);
+          continue;
         }
 
-        // Limit and filter
-        articles = articles.filter(a => a.body && a.body.replace(/\s/g, '').length > 80);
-        if (articles.length > 8) articles = articles.slice(0, 8);
+        let htmlContent = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('\n');
 
-        for (const art of articles) {
-          const title = art.title.replace(/\s+/g, ' ').trim().slice(0, 250);
-          if (title.length < 5) continue;
+        // Add source attribution and link to full PDF
+        htmlContent += `\n<hr/>\n<p><em>Source : ${escapeHtml(docTitle)}</em></p>`;
+        htmlContent += `\n<p><strong><a href="${escapeHtml(doc.file_path)}" target="_blank">📄 Lire la newsletter complète (PDF)</a></strong></p>`;
 
-          // Format body as HTML paragraphs
-          const paragraphs = art.body.split(/\n{2,}/)
-            .map(p => p.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim())
-            .filter(p => p.length > 30);
-          if (paragraphs.length === 0) continue;
+        const excerpt = createExcerpt(article.body);
+        const slug = await generateUniqueSlug(title);
 
-          const htmlContent = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('\n');
-
-          // Add link to full PDF at the end
-          const pdfLink = `<p><strong><a href="${escapeHtml(doc.file_path)}" target="_blank">📄 Lire la newsletter complète (PDF)</a></strong></p>`;
-          const fullHtml = htmlContent + '\n' + pdfLink;
-
-          const excerpt = createExcerpt(art.body);
-          const slug = await generateUniqueSlug(title);
-
-          // Render featured image
-          let featuredImage = null;
-          try {
-            const page = pdfDoc.loadPage(art.startPage);
-            featuredImage = await renderPageAsImage(page, mupdf, art.startPage, doc.id);
-          } catch (e) { featuredImage = doc.thumbnail || null; }
-
-          const [result] = await db.query(
-            `INSERT INTO posts (title, title_fr, title_en, slug, content, content_fr, content_en,
-             excerpt, excerpt_fr, excerpt_en, featured_image, author_id, category_id,
-             type, status, visibility, featured, allow_comments,
-             meta_description, meta_description_fr, meta_description_en,
-             published_at, created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'post','published','public',0,1,?,?,?,?,NOW())`,
-            [title, title, title, slug, fullHtml, fullHtml, fullHtml,
-             excerpt, excerpt, excerpt, featuredImage, authorId, categoryId,
-             excerpt, excerpt, excerpt, pubDate, pubDate]
-          );
-
-          allPosts.push({ id: result.insertId, title, pubDate, source: docTitle });
-          console.log(`  ✓ "${title.slice(0, 55)}..." (post #${result.insertId})`);
+        // Render the article's starting page as featured image
+        let featuredImage = null;
+        try {
+          const page = pdfDoc.loadPage(article.startPage);
+          featuredImage = await renderPageAsImage(page, mupdf, article.startPage, doc.id);
+        } catch (e) {
+          console.error(`  Image error: ${e.message}`);
         }
 
-      } else {
-        // ── Visual/graphical PDF → create articles from page renders ──
-        const visualArticles = createVisualArticles(pdfDoc, docTitle, doc.description);
-        console.log(`  Visual sections: ${visualArticles.length}`);
+        const [result] = await db.query(
+          `INSERT INTO posts (title, title_fr, title_en, slug, content, content_fr, content_en,
+           excerpt, excerpt_fr, excerpt_en, featured_image, author_id, category_id,
+           type, status, visibility, featured, allow_comments,
+           meta_description, meta_description_fr, meta_description_en,
+           published_at, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'post','published','public',0,1,?,?,?,?,NOW())`,
+          [title, title, title, slug, htmlContent, htmlContent, htmlContent,
+           excerpt, excerpt, excerpt, featuredImage, authorId, categoryId,
+           excerpt, excerpt, excerpt, pubDate]
+        );
 
-        for (const vart of visualArticles) {
-          const title = vart.title.slice(0, 250);
-          const slug = await generateUniqueSlug(title);
-
-          // Render all pages in this section as images
-          const imageUrls = [];
-          for (let pi = vart.startPage; pi < vart.endPage; pi++) {
-            const page = pdfDoc.loadPage(pi);
-            const imgUrl = await renderPageAsImage(page, mupdf, pi, doc.id);
-            if (imgUrl) imageUrls.push(imgUrl);
-          }
-
-          if (imageUrls.length === 0) continue;
-
-          // Build HTML content with rendered page images
-          let htmlContent = `<p><em>Extrait de : ${escapeHtml(docTitle)}</em></p>\n`;
-          if (doc.description) {
-            htmlContent += `<p>${escapeHtml(doc.description)}</p>\n`;
-          }
-          for (const imgUrl of imageUrls) {
-            htmlContent += `<figure><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(title)}" style="width:100%;max-width:800px;border-radius:8px;margin:10px 0" /></figure>\n`;
-          }
-          // Link to full PDF
-          htmlContent += `<p><strong><a href="${escapeHtml(doc.file_path)}" target="_blank">📄 Lire la publication complète (PDF)</a></strong></p>`;
-
-          const excerpt = doc.description
-            ? createExcerpt(doc.description)
-            : `Découvrez cette section de ${docTitle}. Cliquez pour consulter le contenu complet.`;
-
-          const featuredImage = imageUrls[0];
-
-          const [result] = await db.query(
-            `INSERT INTO posts (title, title_fr, title_en, slug, content, content_fr, content_en,
-             excerpt, excerpt_fr, excerpt_en, featured_image, author_id, category_id,
-             type, status, visibility, featured, allow_comments,
-             meta_description, meta_description_fr, meta_description_en,
-             published_at, created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'post','published','public',0,1,?,?,?,?,NOW())`,
-            [title, title, title, slug, htmlContent, htmlContent, htmlContent,
-             excerpt, excerpt, excerpt, featuredImage, authorId, categoryId,
-             excerpt, excerpt, excerpt, pubDate, pubDate]
-          );
-
-          allPosts.push({ id: result.insertId, title, pubDate, source: docTitle });
-          console.log(`  ✓ "${title.slice(0, 55)}..." (post #${result.insertId})`);
-        }
+        allPosts.push({ id: result.insertId, title, pubDate, source: docTitle });
+        console.log(`  ✓ [${article.sectionName}] "${title.slice(0, 65)}..." (#${result.insertId})`);
       }
 
     } catch (error) {
@@ -396,22 +499,28 @@ async function main() {
     }
   }
 
-  console.log(`\n=== Total articles created: ${allPosts.length} ===\n`);
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`Total articles created: ${allPosts.length}`);
+  console.log('═'.repeat(60));
 
-  // 4. Mark top 10 as featured
+  // 4. Mark top 10 as featured for homepage "À la Une"
   if (allPosts.length > 0) {
+    // Sort by publication date (newest first)
     allPosts.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     const allIds = allPosts.map(p => p.id);
     const top10 = allPosts.slice(0, 10).map(p => p.id);
 
+    // Reset all new posts to not featured, then set top 10
     await db.query(`UPDATE posts SET featured = 0 WHERE id IN (${allIds.map(() => '?').join(',')})`, allIds);
     await db.query(`UPDATE posts SET featured = 1 WHERE id IN (${top10.map(() => '?').join(',')})`, top10);
 
-    console.log('Featured (top 10):');
-    allPosts.slice(0, 10).forEach(p => console.log(`  ⭐ #${p.id}: ${p.title.slice(0, 60)}`));
+    console.log('\nFeatured (top 10):');
+    allPosts.slice(0, 10).forEach(p =>
+      console.log(`  ⭐ #${p.id}: ${p.title.slice(0, 65)}`)
+    );
   }
 
-  console.log('\n=== Done! ===');
+  console.log('\nDone!');
   process.exit(0);
 }
 
