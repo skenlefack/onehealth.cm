@@ -6,6 +6,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const { auth } = require('../middleware/auth');
+const { generatePdfThumbnail } = require('../services/pdfThumbnailService');
 
 // Ensure upload directories exist
 const uploadDirs = [
@@ -293,10 +294,17 @@ router.post('/document', auth, uploadDocument.single('file'), async (req, res) =
                      req.file.mimetype.includes('excel') || req.file.mimetype.includes('spreadsheet') ? 'excel' :
                      req.file.mimetype.includes('powerpoint') || req.file.mimetype.includes('presentation') ? 'powerpoint' : 'other';
 
+    // Generate PDF thumbnail if applicable
+    let thumbnail = null;
+    if (fileType === 'pdf') {
+      thumbnail = await generatePdfThumbnail(req.file.path);
+    }
+
     res.json({
       success: true,
       data: {
         url: fileUrl,
+        thumbnail,
         filename: req.file.filename,
         originalName: req.file.originalname,
         size: req.file.size,

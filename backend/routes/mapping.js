@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { generateThumbnailFromUrlPath } = require('../services/pdfThumbnailService');
 
 // =====================================================
 // MULTER CONFIGURATION FOR FILE UPLOADS
@@ -1336,6 +1337,14 @@ router.post('/documents', auth, async (req, res) => {
       access_level || 'public', is_featured || false
     ]);
 
+    // Auto-generate PDF thumbnail if none provided
+    if (!thumbnail && file_path && (file_type === 'pdf' || file_type === 'application/pdf' || (file_path && file_path.toLowerCase().endsWith('.pdf')))) {
+      const generatedThumb = await generateThumbnailFromUrlPath(file_path);
+      if (generatedThumb) {
+        await db.query('UPDATE document_resources SET thumbnail = ? WHERE id = ?', [generatedThumb, result.insertId]);
+      }
+    }
+
     const [newDoc] = await db.query('SELECT * FROM document_resources WHERE id = ?', [result.insertId]);
     res.status(201).json({ success: true, data: newDoc[0] });
   } catch (error) {
@@ -1373,8 +1382,18 @@ router.put('/documents/:id', auth, async (req, res) => {
     params.push(id);
     await db.query(`UPDATE document_resources SET ${updates.join(', ')} WHERE id = ?`, params);
 
-    const [updated] = await db.query('SELECT * FROM document_resources WHERE id = ?', [id]);
-    res.json({ success: true, data: updated[0] });
+    // Auto-generate PDF thumbnail if none set and file is PDF
+    const [doc] = await db.query('SELECT * FROM document_resources WHERE id = ?', [id]);
+    if (doc[0] && !doc[0].thumbnail && doc[0].file_path &&
+        (doc[0].file_type === 'pdf' || doc[0].file_type === 'application/pdf' || (doc[0].file_path && doc[0].file_path.toLowerCase().endsWith('.pdf')))) {
+      const generatedThumb = await generateThumbnailFromUrlPath(doc[0].file_path);
+      if (generatedThumb) {
+        await db.query('UPDATE document_resources SET thumbnail = ? WHERE id = ?', [generatedThumb, id]);
+        doc[0].thumbnail = generatedThumb;
+      }
+    }
+
+    res.json({ success: true, data: doc[0] });
   } catch (error) {
     console.error('Update document error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -1840,6 +1859,14 @@ router.post('/submit/document', auth, (req, res) => {
         publication_date || null, language || 'fr', JSON.stringify(themes || []), organization_id || null,
         userId, access_level || 'public'
       ]);
+
+      // Auto-generate PDF thumbnail if none uploaded
+      if (!thumbnailPath && filePath && (fileType === 'application/pdf' || (filePath && filePath.toLowerCase().endsWith('.pdf')))) {
+        const generatedThumb = await generateThumbnailFromUrlPath(filePath);
+        if (generatedThumb) {
+          await db.query('UPDATE document_resources SET thumbnail = ? WHERE id = ?', [generatedThumb, result.insertId]);
+        }
+      }
 
       await createNotification(
         'resource_submission',
