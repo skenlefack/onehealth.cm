@@ -1,0 +1,36 @@
+email,first_name,last_name,language
+sergeoken@gmail.com,Serge,Tchinda,en
+sergeofr@yahoo.fr,Serge,Kenlecack,fr
+
+
+
+Paramètres recommandés
+
+    Serveur IMAP entrant = mail.infomaniak.com
+    Port IMAP = 993 (avec SSL)
+    Serveur SMTP sortant = mail.infomaniak.com
+    Port SMTP & protocole de chiffrement et commande/méthode pour activer ce protocole:
+        Priorisez le port 587 + STARTTLS: il s'agit de la norme technique officielle et de la méthode la plus compatible avec la majorité des systèmes modernes pour la soumission authentifiée.
+        Tolérez le port 465 + SSL/TLS uniquement comme option de compatibilité ou alternative, en précisant qu'il s'agit d'un chiffrement implicite, mais que le 587 reste le choix recommandé.
+    Nom d'utilisateur/username = l'adresse mail complète & entière ( ? )
+    Mot de passe/password = celui généré pour l'adresse mail que vous voulez consulter
+    Authentification obligatoire pour l'envoi des e-mails:
+        Elle s'active dans les paramètres SMTP de votre application.
+        Cochez "utiliser les mêmes paramètres que le serveur entrant" ou selon les logiciels/clients de messagerie, remettez un nom d'utilisateur (= adresse mail complète & entière) et son mot de passe.
+
+Prenez connaissance de cet autre guide si vous recherchez des informations au sujet d'autres ports et protocoles de messagerie compatibles.
+En cas de problème
+
+
+https://welcome.infomaniak.com/iw/9OAF5DDxErHz9KIiQPEaFu143n68hLNh
+
+ Renseigner votre adresse mail contact@onehealth.cm . Cliquer ensuite sur Connexion .
+Choisissez IMAP .
+Renseigner l'adresse du serveur entrant mail.infomaniak.com avec comme port 993 et comme méthode de chiffrement SSL/TLS .
+Renseigner l'adresse du serveur sortant mail.infomaniak.com avec comme port 465 et comme méthode de chiffrement SSL/TLS .
+Générer et copier le mot de passe de cet appareil : c’est lui qui permettra d’accéder à vos e-mails. 
+
+**Wqsc78dFJjpzKq
+
+    Protocole POP3 non recommandé‍‍ (serveur POP = mail.infomaniak.com et port POP = 995 avec SSL).
+    Prenez connaissance de cet autre guide si vous rencontrez des erreurs, afin de vérifier les points essentiels !
