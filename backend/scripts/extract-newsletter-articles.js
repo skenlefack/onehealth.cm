@@ -226,6 +226,26 @@ function cleanPageText(rawText) {
  * Returns { title, endIdx } where endIdx is past the title lines,
  * or null if no good title found.
  */
+/**
+ * Detect if a "title" is actually body text (a sentence, not a headline).
+ */
+function titleIsBodyText(title) {
+  const t = title.trim();
+  // Sentence fragments ending with period
+  if (/\.\s*$/.test(t) && !/[!?]\s*$/.test(t)) return true;
+  // Very short fragments (likely broken text)
+  if (t.length < 15 && !/[!?:]/.test(t)) return true;
+  // Common sentence starters that aren't headline-style (when > 50 chars)
+  if (t.length > 50 && /^(Les |Des |Ces |Au |Il |Dans |Avec|D'après|Dawn |We |With |The |At |In |From )/i.test(t)) {
+    if (!/[!?:]/.test(t)) return true;
+  }
+  // Starts with typical body connectors
+  if (/^(Publique|Centre,|Cameroun |Seule |Ceci |Au chapitre|Au cours|Au niveau)/i.test(t)) return true;
+  // Just a generic word
+  if (/^(Remerciements|Source|Note|Suite|Conclusion)$/i.test(t)) return true;
+  return false;
+}
+
 function findTitle(lines, startIdx) {
   let title = '';
   let linesUsed = 0;
@@ -234,7 +254,7 @@ function findTitle(lines, startIdx) {
   for (let i = startIdx; i < lines.length && linesUsed < 4; i++) {
     const line = lines[i].trim();
     if (!line) {
-      if (title) break; // empty line after title = end of title
+      if (title) break;
       continue;
     }
 
@@ -243,15 +263,18 @@ function findTitle(lines, startIdx) {
     if (detectSectionMarker(line)) break;
 
     if (!title) {
-      // First title line: must be a proper title candidate (starts uppercase, < 80 chars)
+      // First title line: must be a proper title candidate
       if (!isTitleCandidate(line)) continue;
       title = line;
       linesUsed = 1;
       lastTitleIdx = i;
+      // Stop if title ends with terminal punctuation (! ? .)
+      if (/[!?.]\s*$/.test(title)) break;
     } else {
-      // Continuation lines: more lenient — allow lowercase starts for
-      // wrapped titles like "Journée mondiale des zoonoses : une\ncélébration sur plusieurs fronts"
-      if (line.length > 65) break; // too long = body text
+      // Don't continue past terminal punctuation
+      if (/[!?.]\s*$/.test(title)) break;
+      // Continuation: allow lowercase, check length
+      if (line.length > 65) break;
       if ((title.length + line.length + 1) > 200) break;
       title += ' ' + line;
       linesUsed++;
@@ -259,7 +282,8 @@ function findTitle(lines, startIdx) {
     }
   }
 
-  if (title.length >= 12) {
+  // Validate: reject body text masquerading as titles
+  if (title.length >= 12 && !titleIsBodyText(title)) {
     return { title, endIdx: lastTitleIdx + 1 };
   }
   return null;
