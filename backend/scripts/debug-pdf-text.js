@@ -5,6 +5,7 @@ const fs = require('fs');
 
 async function main() {
   const mupdf = await import('mupdf');
+  // Focus on PDFs with actual text
   const [docs] = await db.query(
     "SELECT id, title, file_path FROM document_resources WHERE type IN ('newsletter','magazine') AND file_path LIKE '%.pdf' ORDER BY publication_date DESC"
   );
@@ -17,48 +18,25 @@ async function main() {
     const pdfDoc = mupdf.Document.openDocument(buf, 'application/pdf');
     const pc = pdfDoc.countPages();
 
-    // Check total text
+    // Check if it has text
     let totalChars = 0;
     for (let i = 0; i < Math.min(pc, 5); i++) {
       totalChars += pdfDoc.loadPage(i).toStructuredText('preserve-whitespace').asText().length;
     }
-    if (totalChars < 200) {
-      console.log(`\n=== SKIP ${doc.title} (no text) ===`);
-      continue;
-    }
+    if (totalChars < 500) continue;
 
-    console.log(`\n========== ${doc.title} (${pc} pages, ~${totalChars} chars in first 5p) ==========`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`${doc.title} (${pc} pages)`);
+    console.log('='.repeat(80));
 
-    // Dump structured text with font info for pages 2-6
-    for (let pi = 1; pi < Math.min(pc, 7); pi++) {
+    // Dump raw text for pages 2-12 (skip cover)
+    for (let pi = 1; pi < Math.min(pc, 12); pi++) {
       const page = pdfDoc.loadPage(pi);
-      console.log(`\n--- Page ${pi + 1} ---`);
-      try {
-        const json = page.toStructuredText('preserve-whitespace').asJSON();
-        const data = JSON.parse(json);
-        for (const block of data.blocks || []) {
-          for (const line of block.lines || []) {
-            let text = '';
-            let sizes = [];
-            let fonts = [];
-            for (const span of line.spans || []) {
-              text += span.text || '';
-              if (span.font) {
-                sizes.push(Math.round((span.font.size || 0) * 10) / 10);
-                fonts.push(span.font.name || '?');
-              }
-            }
-            text = text.trim();
-            if (!text) continue;
-            const sz = sizes.length > 0 ? Math.max(...sizes) : 0;
-            const font = [...new Set(fonts)].join(',');
-            const tag = sz > 14 ? ' <<LARGE>>' : sz > 11 ? ' <<MED>>' : '';
-            console.log(`  [${sz}|${font.slice(0,20)}]${tag} ${text.slice(0, 120)}`);
-          }
-        }
-      } catch (e) {
-        console.log('  Error:', e.message);
-      }
+      const text = page.toStructuredText('preserve-whitespace').asText();
+      if (text.trim().length < 20) continue;
+      console.log(`\n>>> PAGE ${pi + 1} (${text.length} chars) <<<`);
+      console.log(text.slice(0, 800));
+      console.log('...');
     }
   }
   process.exit(0);
