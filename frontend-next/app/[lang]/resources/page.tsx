@@ -6,7 +6,7 @@ import {
   FileText, Download, Eye, Calendar, Building2, Search,
   ExternalLink, BookOpen, FileCheck, GraduationCap, Newspaper,
   AlertCircle, BarChart3, FolderOpen, Grid3X3, List, X, Loader2,
-  ArrowRight, Layers
+  ArrowRight, Layers, BookOpenCheck, Mail
 } from 'lucide-react';
 import { Language, OHWRDocument, OHWRStats } from '@/lib/types';
 import { getOHWRDocuments, getOHWRDocumentTypes, getOHWRStats } from '@/lib/api';
@@ -21,6 +21,8 @@ const documentTypeConfig: Record<string, { icon: typeof FileText; color: string;
   awareness: { icon: AlertCircle, color: '#E74C3C', bgColor: 'bg-red-50', gradient: 'from-red-500 to-rose-600' },
   training: { icon: GraduationCap, color: '#1ABC9C', bgColor: 'bg-teal-50', gradient: 'from-teal-500 to-cyan-600' },
   report: { icon: BarChart3, color: '#34495E', bgColor: 'bg-slate-50', gradient: 'from-slate-600 to-slate-700' },
+  newsletter: { icon: Mail, color: '#2196F3', bgColor: 'bg-blue-50', gradient: 'from-blue-500 to-indigo-600' },
+  magazine: { icon: BookOpenCheck, color: '#E91E63', bgColor: 'bg-pink-50', gradient: 'from-pink-500 to-rose-600' },
   other: { icon: FolderOpen, color: '#95A5A6', bgColor: 'bg-gray-50', gradient: 'from-gray-500 to-slate-600' }
 };
 
