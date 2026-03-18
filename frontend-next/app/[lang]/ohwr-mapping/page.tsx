@@ -860,127 +860,262 @@ export default function OHWRMappingPage({ params }: PageProps) {
       )}
 
       {/* Detail Modal */}
-      {selectedResult && detailData && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => { setSelectedResult(null); setDetailData(null); }}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div
-              className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between"
-            >
-              <span
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold"
-                style={{ background: `${getTypeColor(selectedResult.type)}15`, color: getTypeColor(selectedResult.type) }}
-              >
-                {(() => { const Icon = getTypeIcon(selectedResult.type); return <Icon size={14} />; })()}
-                {getTypeLabel(selectedResult.type)}
-              </span>
-              <button
-                onClick={() => { setSelectedResult(null); setDetailData(null); }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {selectedResult && detailData && (() => {
+        const isDocument = selectedResult.type === 'document';
+        const filePath = detailData.file_path;
+        const isDocPdf = filePath && (
+          detailData.file_type === 'pdf' ||
+          detailData.file_type === 'application/pdf' ||
+          filePath.toLowerCase().endsWith('.pdf')
+        );
 
-            {/* Modal Content */}
-            <div className="p-6">
-              <div className="flex gap-5 mb-6">
-                <div
-                  className="w-24 h-24 rounded-2xl flex-shrink-0 flex items-center justify-center"
-                  style={{
-                    background: selectedResult.image
-                      ? `url(${getImageUrl(selectedResult.image)}) center/cover`
-                      : `${getTypeColor(selectedResult.type)}15`
-                  }}
-                >
-                  {!selectedResult.image && (() => {
-                    const Icon = getTypeIcon(selectedResult.type);
-                    return <Icon size={40} color={getTypeColor(selectedResult.type)} />;
-                  })()}
+        // Large fullscreen modal for documents, standard modal for others
+        if (isDocument && filePath) {
+          return (
+            <div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex flex-col"
+              onClick={() => { setSelectedResult(null); setDetailData(null); }}
+            >
+              <div
+                className="flex flex-col h-full w-full max-w-6xl mx-auto my-4 md:my-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3 px-4 md:px-6 py-3 bg-white rounded-t-2xl border-b border-gray-200 flex-shrink-0">
+                  <button
+                    onClick={() => { setSelectedResult(null); setDetailData(null); }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
+                  >
+                    <ChevronRight size={20} className="rotate-180" />
+                  </button>
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${getTypeColor(selectedResult.type)}15` }}
+                  >
+                    {(() => { const Icon = getTypeIcon(selectedResult.type); return <Icon size={16} style={{ color: getTypeColor(selectedResult.type) }} />; })()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-semibold text-gray-800 truncate text-sm md:text-base">
+                      {selectedResult.title}
+                    </h2>
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                      <span
+                        className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                        style={{ backgroundColor: getTypeColor(selectedResult.type) }}
+                      >
+                        {getTypeLabel(selectedResult.type)}
+                      </span>
+                      {detailData.publication_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar size={10} />
+                          {new Date(detailData.publication_date).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </span>
+                      )}
+                      {detailData.organization_name && (
+                        <span className="hidden sm:flex items-center gap-1">
+                          <Building2 size={10} />
+                          {detailData.organization_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedResult(null); setDetailData(null); }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">{selectedResult.title}</h2>
-                  <p className="text-gray-500 text-lg">{selectedResult.subtitle}</p>
-                  {selectedResult.location && (
-                    <p className="flex items-center gap-2 text-gray-500 mt-2">
-                      <MapPin size={14} /> {selectedResult.location}
-                    </p>
+
+                {/* Document viewer */}
+                <div className="flex-1 bg-gray-100 overflow-hidden min-h-0">
+                  {isDocPdf ? (
+                    <iframe
+                      src={getImageUrl(filePath)}
+                      className="w-full h-full border-0"
+                      title={selectedResult.title}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                      {selectedResult.image ? (
+                        <div
+                          className="w-64 h-80 mb-6 rounded-xl bg-center bg-cover shadow-lg"
+                          style={{ backgroundImage: `url(${getImageUrl(selectedResult.image)})` }}
+                        />
+                      ) : (
+                        (() => { const Icon = getTypeIcon(selectedResult.type); return <Icon size={80} style={{ color: getTypeColor(selectedResult.type) }} className="opacity-20 mb-6" />; })()
+                      )}
+                      <p className="text-lg font-medium text-gray-600 mb-2">
+                        {lang === 'fr' ? "L'aperçu n'est pas disponible pour ce type de fichier." : 'Preview is not available for this file type.'}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {lang === 'fr' ? 'Cliquez sur le bouton ci-dessous pour télécharger.' : 'Click the button below to download.'}
+                      </p>
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {selectedResult.description && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-2">
-                    {lang === 'fr' ? 'Description' : 'Description'}
-                  </h3>
-                  <p className="text-gray-600 leading-relaxed">{selectedResult.description}</p>
-                </div>
-              )}
-
-              {/* Type-specific details */}
-              <div className="space-y-4">
-                {detailData.email && (
-                  <a href={`mailto:${detailData.email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <Mail size={18} className="text-gray-400" />
-                    <span className="text-gray-700">{detailData.email}</span>
-                  </a>
-                )}
-                {detailData.contact_email && (
-                  <a href={`mailto:${detailData.contact_email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <Mail size={18} className="text-gray-400" />
-                    <span className="text-gray-700">{detailData.contact_email}</span>
-                  </a>
-                )}
-                {(detailData.phone || detailData.contact_phone) && (
-                  <a href={`tel:${detailData.phone || detailData.contact_phone}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <Phone size={18} className="text-gray-400" />
-                    <span className="text-gray-700">{detailData.phone || detailData.contact_phone}</span>
-                  </a>
-                )}
-                {detailData.website && (
-                  <a href={detailData.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <Globe size={18} className="text-gray-400" />
-                    <span className="text-gray-700">{detailData.website}</span>
-                    <ExternalLink size={14} className="text-gray-400 ml-auto" />
-                  </a>
-                )}
-                {detailData.organization_name && (
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <Building2 size={18} className="text-gray-400" />
-                    <span className="text-gray-700">{detailData.organization_name}</span>
-                  </div>
-                )}
-                {detailData.file_path && (
-                  <a href={getImageUrl(detailData.file_path)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-oh-blue/10 text-oh-blue rounded-xl hover:bg-oh-blue/20 transition-colors font-semibold">
-                    <Download size={18} />
-                    <span>{lang === 'fr' ? 'Télécharger le document' : 'Download document'}</span>
-                  </a>
-                )}
-              </div>
-
-              {/* Tags */}
-              {selectedResult.tags && selectedResult.tags.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-100">
-                  <div className="flex flex-wrap gap-2">
-                    {selectedResult.tags.map((tag, i) => (
-                      <span key={i} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-600">
-                        {tag}
+                {/* Footer with download */}
+                <div className="px-4 md:px-6 py-4 bg-white rounded-b-2xl border-t border-gray-200 flex-shrink-0">
+                  {selectedResult.description && (
+                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">{selectedResult.description}</p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={getImageUrl(filePath)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-[#8B9A2D] text-white font-medium rounded-xl hover:bg-[#7A8928] transition-colors shadow-sm"
+                    >
+                      <Download size={18} />
+                      {lang === 'fr' ? 'Télécharger le document' : 'Download document'}
+                    </a>
+                    {detailData.external_url && (
+                      <a
+                        href={detailData.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
+                    )}
+                    {detailData.organization_name && (
+                      <span className="hidden sm:flex items-center gap-1 text-xs text-gray-400 ml-auto">
+                        <Building2 size={12} />
+                        {detailData.organization_name}
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
+          );
+        }
+
+        // Standard modal for non-document items (experts, organizations, materials)
+        return (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => { setSelectedResult(null); setDetailData(null); }}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div
+                className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between"
+              >
+                <span
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold"
+                  style={{ background: `${getTypeColor(selectedResult.type)}15`, color: getTypeColor(selectedResult.type) }}
+                >
+                  {(() => { const Icon = getTypeIcon(selectedResult.type); return <Icon size={14} />; })()}
+                  {getTypeLabel(selectedResult.type)}
+                </span>
+                <button
+                  onClick={() => { setSelectedResult(null); setDetailData(null); }}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6">
+                <div className="flex gap-5 mb-6">
+                  <div
+                    className="w-24 h-24 rounded-2xl flex-shrink-0 flex items-center justify-center"
+                    style={{
+                      background: selectedResult.image
+                        ? `url(${getImageUrl(selectedResult.image)}) center/cover`
+                        : `${getTypeColor(selectedResult.type)}15`
+                    }}
+                  >
+                    {!selectedResult.image && (() => {
+                      const Icon = getTypeIcon(selectedResult.type);
+                      return <Icon size={40} color={getTypeColor(selectedResult.type)} />;
+                    })()}
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">{selectedResult.title}</h2>
+                    <p className="text-gray-500 text-lg">{selectedResult.subtitle}</p>
+                    {selectedResult.location && (
+                      <p className="flex items-center gap-2 text-gray-500 mt-2">
+                        <MapPin size={14} /> {selectedResult.location}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {selectedResult.description && (
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-2">
+                      {lang === 'fr' ? 'Description' : 'Description'}
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">{selectedResult.description}</p>
+                  </div>
+                )}
+
+                {/* Type-specific details */}
+                <div className="space-y-4">
+                  {detailData.email && (
+                    <a href={`mailto:${detailData.email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <Mail size={18} className="text-gray-400" />
+                      <span className="text-gray-700">{detailData.email}</span>
+                    </a>
+                  )}
+                  {detailData.contact_email && (
+                    <a href={`mailto:${detailData.contact_email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <Mail size={18} className="text-gray-400" />
+                      <span className="text-gray-700">{detailData.contact_email}</span>
+                    </a>
+                  )}
+                  {(detailData.phone || detailData.contact_phone) && (
+                    <a href={`tel:${detailData.phone || detailData.contact_phone}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <Phone size={18} className="text-gray-400" />
+                      <span className="text-gray-700">{detailData.phone || detailData.contact_phone}</span>
+                    </a>
+                  )}
+                  {detailData.website && (
+                    <a href={detailData.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <Globe size={18} className="text-gray-400" />
+                      <span className="text-gray-700">{detailData.website}</span>
+                      <ExternalLink size={14} className="text-gray-400 ml-auto" />
+                    </a>
+                  )}
+                  {detailData.organization_name && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <Building2 size={18} className="text-gray-400" />
+                      <span className="text-gray-700">{detailData.organization_name}</span>
+                    </div>
+                  )}
+                  {detailData.file_path && (
+                    <a href={getImageUrl(detailData.file_path)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-oh-blue/10 text-oh-blue rounded-xl hover:bg-oh-blue/20 transition-colors font-semibold">
+                      <Download size={18} />
+                      <span>{lang === 'fr' ? 'Télécharger le document' : 'Download document'}</span>
+                    </a>
+                  )}
+                </div>
+
+                {/* Tags */}
+                {selectedResult.tags && selectedResult.tags.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-gray-100">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedResult.tags.map((tag, i) => (
+                        <span key={i} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-600">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
