@@ -279,7 +279,7 @@ async function main() {
 
   // 3. Fetch all newsletter/magazine PDFs
   const [docs] = await db.query(`
-    SELECT id, title, title_fr, title_en, type, file_path, publication_date, description, thumbnail
+    SELECT id, title, type, file_path, publication_date, description, thumbnail
     FROM document_resources
     WHERE is_active = 1
       AND type IN ('newsletter', 'magazine')
@@ -298,7 +298,7 @@ async function main() {
   const allCreatedPosts = [];
 
   for (const doc of docs) {
-    const docTitle = doc.title_fr || doc.title || doc.title_en || `Newsletter ${doc.id}`;
+    const docTitle = doc.title || `Newsletter ${doc.id}`;
     console.log(`\n--- Processing: ${docTitle} (${doc.type}) ---`);
 
     const pdfPath = path.join(__dirname, '..', doc.file_path);
