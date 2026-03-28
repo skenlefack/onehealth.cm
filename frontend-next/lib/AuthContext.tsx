@@ -48,7 +48,7 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = '/api';
 const TOKEN_KEY = 'oh_elearning_token';
 const USER_KEY = 'oh_elearning_user';
 

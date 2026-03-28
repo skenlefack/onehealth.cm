@@ -4,12 +4,10 @@ import { Language } from '@/lib/types';
 import { Translation } from '@/lib/translations';
 
 // Helper to get correct image URL (backend uploads vs frontend public images)
+// Uses relative URLs so nginx/Next.js rewrites handle routing to backend
 const getLogoUrl = (logoPath: string): string => {
   if (logoPath.startsWith('/uploads/')) {
-    // Uploaded images are served from backend (remove /api suffix if present)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    const baseUrl = apiUrl.replace(/\/api$/, '');
-    return `${baseUrl}${logoPath}`;
+    return logoPath;
   }
   // Public images are served from frontend
   return logoPath;

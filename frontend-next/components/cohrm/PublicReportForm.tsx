@@ -455,8 +455,7 @@ export default function PublicReportForm({ lang }: { lang: Language }) {
         photos: form.photoPreviews.slice(0, 3),
       };
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${API_URL}/cohrm/mobile/report`, {
+      const res = await fetch(`/api/cohrm/mobile/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

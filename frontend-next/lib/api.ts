@@ -8,14 +8,15 @@ import {
   QuizAttemptResult, QuizQuestionForStudent, UserLearningStats
 } from './types';
 
-// Use internal Docker URL for server-side, public URL for client-side
+// Use internal Docker URL for server-side, relative URL for client-side
+// Client-side uses /api which nginx (or Next.js rewrites) proxies to the backend
 const isServer = typeof window === 'undefined';
 const API_URL = isServer
   ? (process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000') + '/api'
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api');
+  : '/api';
 const API_BASE_URL = isServer
   ? (process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000')
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000');
+  : '';
 
 // Client API générique
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {

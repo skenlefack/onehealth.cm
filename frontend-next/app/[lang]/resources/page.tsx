@@ -167,7 +167,7 @@ export default function ResourcesPage({ params }: PageProps) {
       if (res.success) {
         setDocuments(res.data || []);
         if (res.pagination) {
-          setTotalPages(res.pagination.totalPages);
+          setTotalPages(res.pagination.totalPages || res.pagination.pages);
           setTotalDocuments(res.pagination.total);
         }
       }
