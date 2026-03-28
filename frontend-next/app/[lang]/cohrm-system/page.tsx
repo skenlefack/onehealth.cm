@@ -94,10 +94,8 @@ export default async function COHRMSystemPage({ params }: PageProps) {
       title: 'COHRM-SYSTEM',
       fullName: 'Cameroon One Health Rumor Management System',
       description: 'Système de détection précoce et de gestion des rumeurs sanitaires. Contribuez à la surveillance sanitaire nationale en signalant toute information suspecte concernant la santé humaine, animale ou environnementale.',
-      comingSoon: 'Bientôt disponible',
-      comingDesc: 'Le système COHRM est en cours de déploiement. Inscrivez-vous pour être notifié du lancement et pouvoir signaler des rumeurs.',
-      notify: 'Me notifier',
       report: 'Signaler une rumeur',
+      reportDesc: 'Vous avez observé un événement sanitaire suspect ? Signalez-le de manière anonyme ou identifiée pour contribuer à la surveillance sanitaire nationale.',
       processTitle: 'Comment ça marche',
       typesTitle: 'Types de rumeurs à signaler',
       whyTitle: 'Pourquoi signaler ?',
@@ -114,10 +112,8 @@ export default async function COHRMSystemPage({ params }: PageProps) {
       title: 'COHRM-SYSTEM',
       fullName: 'Cameroon One Health Rumor Management System',
       description: 'Early detection and health rumor management system. Contribute to national health surveillance by reporting any suspicious information concerning human, animal or environmental health.',
-      comingSoon: 'Coming Soon',
-      comingDesc: 'The COHRM system is being deployed. Sign up to be notified of the launch and to be able to report rumors.',
-      notify: 'Notify me',
       report: 'Report a rumor',
+      reportDesc: 'Have you observed a suspicious health event? Report it anonymously or with your identity to contribute to national health surveillance.',
       processTitle: 'How it works',
       typesTitle: 'Types of rumors to report',
       whyTitle: 'Why report?',
@@ -158,17 +154,20 @@ export default async function COHRMSystemPage({ params }: PageProps) {
             {c.description}
           </p>
 
-          {/* Coming Soon Card */}
+          {/* CTA Card */}
           <Card className="max-w-xl mx-auto p-8 bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-200">
             <div className="w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-6">
-              <AlertCircle size={40} className="text-orange-600" />
+              <Send size={40} className="text-orange-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-3">{c.comingSoon}</h2>
-            <p className="text-slate-600 mb-6">{c.comingDesc}</p>
+            <h2 className="text-2xl font-bold text-slate-800 mb-3">{c.report}</h2>
+            <p className="text-slate-600 mb-6">{c.reportDesc}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button variant="primary" size="lg" className="bg-orange-600 hover:bg-orange-700">
-                {c.notify}
-              </Button>
+              <Link href={`/${lang}/cohrm-system/report`}>
+                <Button variant="primary" size="lg" className="bg-orange-600 hover:bg-orange-700">
+                  <Send size={18} className="mr-2" />
+                  {c.report}
+                </Button>
+              </Link>
             </div>
           </Card>
         </div>
