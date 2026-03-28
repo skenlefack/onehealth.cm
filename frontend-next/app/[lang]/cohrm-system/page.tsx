@@ -5,6 +5,7 @@ import { Language } from '@/lib/types';
 import { getTranslation, isValidLanguage } from '@/lib/translations';
 import { notFound } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
+import { AuthGuard } from '@/components/auth';
 
 interface PageProps {
   params: Promise<{ lang: string }>;
@@ -133,6 +134,7 @@ export default async function COHRMSystemPage({ params }: PageProps) {
   const typesData = rumorTypes[language];
 
   return (
+    <AuthGuard lang={language}>
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
       {/* Hero Section */}
       <section className="pt-32 pb-16 px-[5%]">
@@ -266,5 +268,6 @@ export default async function COHRMSystemPage({ params }: PageProps) {
         </div>
       </section>
     </div>
+    </AuthGuard>
   );
 }

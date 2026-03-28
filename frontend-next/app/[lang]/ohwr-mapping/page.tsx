@@ -14,6 +14,7 @@ import {
 } from '@/lib/api';
 import { OHWRStats, OHWRRegion, OHWRExpert, OHWROrganization, OHWRMaterial, OHWRDocument, OHWRMapMarker } from '@/lib/types';
 import { cn, getImageUrl } from '@/lib/utils';
+import { AuthGuard } from '@/components/auth';
 
 // OHWR Colors
 const COLORS = {
@@ -332,6 +333,7 @@ export default function OHWRMappingPage({ params }: PageProps) {
   }, {} as Record<string, number>);
 
   return (
+    <AuthGuard lang={lang}>
     <div className="min-h-screen bg-white">
       {/* Hero Search Section */}
       <div className="relative overflow-hidden bg-white">
@@ -1117,5 +1119,6 @@ export default function OHWRMappingPage({ params }: PageProps) {
         );
       })()}
     </div>
+    </AuthGuard>
   );
 }
