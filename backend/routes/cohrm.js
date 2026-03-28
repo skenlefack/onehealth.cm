@@ -576,6 +576,85 @@ router.delete('/sms-codes/:id', auth, authorize('admin'), async (req, res) => {
   }
 });
 
+// GET /api/cohrm/sms-logs - Journal des SMS reçus
+router.get('/sms-logs', auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, sender, date_from, date_to } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    let where = '1=1';
+    const params = [];
+
+    if (status) {
+      where += ' AND l.status = ?';
+      params.push(status);
+    }
+    if (sender) {
+      where += ' AND l.sender LIKE ?';
+      params.push(`%${sender}%`);
+    }
+    if (date_from) {
+      where += ' AND l.created_at >= ?';
+      params.push(date_from);
+    }
+    if (date_to) {
+      where += ' AND l.created_at <= ?';
+      params.push(date_to + ' 23:59:59');
+    }
+
+    // Count total
+    const [countResult] = await db.query(
+      `SELECT COUNT(*) as total FROM cohrm_sms_logs l WHERE ${where}`, params
+    );
+
+    // Get logs with rumor info
+    const [logs] = await db.query(`
+      SELECT l.*, r.code as rumor_code, r.title as rumor_title
+      FROM cohrm_sms_logs l
+      LEFT JOIN cohrm_rumors r ON l.rumor_id = r.id
+      WHERE ${where}
+      ORDER BY l.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, parseInt(limit), offset]);
+
+    // Stats
+    const [stats] = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN status = 'invalid_format' THEN 1 ELSE 0 END) as error_count
+      FROM cohrm_sms_logs
+    `);
+
+    // Daily volume (last 14 days)
+    const [dailyVolume] = await db.query(`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM cohrm_sms_logs
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+
+    const total = countResult[0].total;
+
+    res.json({
+      success: true,
+      data: logs,
+      stats: stats[0],
+      dailyVolume,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get SMS logs error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 // POST /api/cohrm/decode-sms - Décoder un SMS
 router.post('/decode-sms', auth, async (req, res) => {
   try {
@@ -658,6 +737,45 @@ router.put('/settings', auth, authorize('admin'), async (req, res) => {
 // ============================================
 // API MOBILE
 // ============================================
+
+// POST /api/cohrm/mobile/login - Connexion mobile (authentifie l'agent et retourne sa région)
+router.post('/mobile/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email et mot de passe requis' });
+    }
+
+    // Check user by email/login and password
+    const [users] = await db.query(
+      'SELECT * FROM cohrm_mobile_agents WHERE (email = ? OR login = ?) AND password = ?',
+      [email, email, password]
+    );
+
+    if (users.length === 0) {
+      return res.status(401).json({ success: false, message: 'Identifiants incorrects' });
+    }
+
+    const agent = users[0];
+
+    // Update last login
+    await db.query('UPDATE cohrm_mobile_agents SET last_login = NOW() WHERE id = ?', [agent.id]);
+
+    res.json({
+      success: true,
+      data: {
+        name: agent.name || '',
+        email: agent.email || agent.login || '',
+        region: agent.region || '',
+        region_name: agent.region_name || '',
+      }
+    });
+  } catch (error) {
+    console.error('Mobile login error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
 
 // POST /api/cohrm/mobile/report - Signaler une rumeur depuis l'app mobile
 router.post('/mobile/report', async (req, res) => {
@@ -1186,6 +1304,100 @@ router.get('/themes', auth, async (req, res) => {
     res.json({ success: true, data: { themes, grouped } });
   } catch (error) {
     console.error('Get themes error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// POST /api/cohrm/themes - Créer un thème
+router.post('/themes', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { label_fr, label_en, category, description, color, icon, display_order } = req.body;
+
+    if (!label_fr || !category) {
+      return res.status(400).json({ success: false, message: 'Label FR et catégorie sont requis' });
+    }
+
+    const [maxOrder] = await db.query(
+      'SELECT COALESCE(MAX(display_order), 0) + 1 as next_order FROM cohrm_themes WHERE category = ?',
+      [category]
+    );
+
+    const [result] = await db.query(`
+      INSERT INTO cohrm_themes (label_fr, label_en, category, description, color, icon, display_order, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())
+    `, [label_fr, label_en || '', category, description || '', color || '#3498DB', icon || '', display_order ?? maxOrder[0].next_order]);
+
+    const [[theme]] = await db.query('SELECT * FROM cohrm_themes WHERE id = ?', [result.insertId]);
+    res.status(201).json({ success: true, data: theme });
+  } catch (error) {
+    console.error('Create theme error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/themes/:id - Modifier un thème
+router.put('/themes/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { label_fr, label_en, category, description, color, icon, display_order, is_active } = req.body;
+
+    const [[existing]] = await db.query('SELECT * FROM cohrm_themes WHERE id = ?', [req.params.id]);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Thème non trouvé' });
+    }
+
+    await db.query(`
+      UPDATE cohrm_themes SET
+        label_fr = COALESCE(?, label_fr),
+        label_en = COALESCE(?, label_en),
+        category = COALESCE(?, category),
+        description = COALESCE(?, description),
+        color = COALESCE(?, color),
+        icon = COALESCE(?, icon),
+        display_order = COALESCE(?, display_order),
+        is_active = COALESCE(?, is_active),
+        updated_at = NOW()
+      WHERE id = ?
+    `, [label_fr, label_en, category, description, color, icon, display_order, is_active, req.params.id]);
+
+    const [[theme]] = await db.query('SELECT * FROM cohrm_themes WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: theme });
+  } catch (error) {
+    console.error('Update theme error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/cohrm/themes/:id - Supprimer (désactiver) un thème
+router.delete('/themes/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const [[existing]] = await db.query('SELECT * FROM cohrm_themes WHERE id = ?', [req.params.id]);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Thème non trouvé' });
+    }
+
+    await db.query('UPDATE cohrm_themes SET is_active = 0, updated_at = NOW() WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Thème supprimé' });
+  } catch (error) {
+    console.error('Delete theme error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/cohrm/themes/reorder - Réordonner les thèmes
+router.put('/themes/reorder', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { order } = req.body; // Array of { id, display_order }
+    if (!Array.isArray(order)) {
+      return res.status(400).json({ success: false, message: 'Format invalide' });
+    }
+
+    for (const item of order) {
+      await db.query('UPDATE cohrm_themes SET display_order = ?, updated_at = NOW() WHERE id = ?', [item.display_order, item.id]);
+    }
+
+    res.json({ success: true, message: 'Ordre mis à jour' });
+  } catch (error) {
+    console.error('Reorder themes error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

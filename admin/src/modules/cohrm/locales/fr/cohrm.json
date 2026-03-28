@@ -1,0 +1,849 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "saving": "Enregistrement...",
+    "deleting": "Suppression...",
+    "error": "Erreur",
+    "success": "Succès",
+    "warning": "Attention",
+    "info": "Information",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "reset": "Réinitialiser",
+    "refresh": "Actualiser",
+    "export": "Exporter",
+    "import": "Importer",
+    "download": "Télécharger",
+    "upload": "Téléverser",
+    "view": "Voir",
+    "details": "Détails",
+    "actions": "Actions",
+    "yes": "Oui",
+    "no": "Non",
+    "all": "Tous",
+    "none": "Aucun",
+    "select": "Sélectionner",
+    "noData": "Aucune donnée disponible",
+    "noResults": "Aucun résultat trouvé",
+    "required": "Obligatoire",
+    "optional": "Optionnel",
+    "total": "Total",
+    "of": "sur",
+    "page": "Page",
+    "rows": "lignes",
+    "showing": "Affichage de",
+    "to": "à",
+    "results": "résultats",
+    "sortBy": "Trier par",
+    "ascending": "Croissant",
+    "descending": "Décroissant",
+    "createdAt": "Créé le",
+    "updatedAt": "Mis à jour le",
+    "status": "Statut",
+    "priority": "Priorité",
+    "source": "Source",
+    "region": "Région",
+    "description": "Description",
+    "title": "Titre",
+    "notes": "Notes",
+    "id": "Identifiant",
+    "date": "Date",
+    "time": "Heure",
+    "location": "Localisation",
+    "unknown": "Inconnu",
+    "notDefined": "Non défini",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cet élément ?",
+    "confirmDeleteDesc": "Cette action est irréversible. Toutes les données associées seront définitivement supprimées.",
+    "deleteSuccess": "Suppression effectuée avec succès",
+    "saveSuccess": "Enregistrement effectué avec succès",
+    "errorGeneric": "Une erreur est survenue. Veuillez réessayer.",
+    "errorNetwork": "Impossible de contacter le serveur. Vérifiez votre connexion.",
+    "errorPermission": "Vous n'avez pas les permissions nécessaires pour cette action.",
+    "errorSessionExpired": "Votre session a expiré. Veuillez vous reconnecter.",
+    "errorNotFound": "Ressource introuvable.",
+    "language": "Langue",
+    "french": "Français",
+    "english": "Anglais"
+  },
+
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "rumors": "Rumeurs",
+    "validation": "Validation",
+    "map": "Carte",
+    "risk": "Risques",
+    "sms": "SMS",
+    "scanner": "Scanner Web",
+    "actors": "Acteurs",
+    "export": "Export",
+    "settings": "Paramètres",
+    "backAdmin": "Retour Admin",
+    "collapse": "Réduire",
+    "expand": "Développer"
+  },
+
+  "sidebar": {
+    "title": "COHRM",
+    "subtitle": "Gestion des rumeurs",
+    "level": "Niveau {{level}}"
+  },
+
+  "dashboard": {
+    "title": "Tableau de bord COHRM",
+    "lastUpdate": "Dernière mise à jour",
+    "refresh": "Actualiser",
+    "loadingDashboard": "Chargement du tableau de bord...",
+
+    "kpi": {
+      "totalRumors": "Total rumeurs",
+      "pending": "En attente",
+      "confirmedThisMonth": "Confirmées ce mois",
+      "activeAlerts": "Alertes actives"
+    },
+
+    "charts": {
+      "trends7days": "Tendances (7 jours)",
+      "bySource": "Par source",
+      "topRegions": "Top régions",
+      "byRiskLevel": "Par niveau de risque",
+      "noTrendData": "Aucune donnée sur les 7 derniers jours",
+      "noSourceData": "Aucune donnée disponible",
+      "noRegionData": "Aucune donnée disponible",
+      "noRiskData": "Aucune évaluation de risque",
+      "rumors": "Rumeurs",
+      "count": "Nombre"
+    },
+
+    "map": {
+      "title": "Dernières rumeurs géolocalisées",
+      "noGeoData": "Aucune rumeur géolocalisée récente",
+      "viewDetail": "Voir le détail",
+      "legendLow": "Faible",
+      "legendModerate": "Modéré",
+      "legendHigh": "Élevé",
+      "legendVeryHigh": "Très élevé"
+    },
+
+    "recentRumors": {
+      "title": "Dernières rumeurs",
+      "noData": "Aucune rumeur récente",
+      "viewAll": "Voir toutes les rumeurs",
+      "column": {
+        "rumor": "Rumeur",
+        "status": "Statut",
+        "priority": "Priorité",
+        "region": "Région",
+        "date": "Date"
+      }
+    },
+
+    "notifications": {
+      "title": "Notifications rapides",
+      "noNotifications": "Aucune notification récente",
+      "critical": "CRITIQUE",
+      "alert": "ALERTE",
+      "confirmed": "Confirmée"
+    },
+
+    "quickActions": {
+      "title": "Actions rapides",
+      "newRumor": "Nouvelle rumeur",
+      "validationQueue": "File de validation",
+      "viewMap": "Voir la carte"
+    }
+  },
+
+  "rumors": {
+    "title": "Gestion des rumeurs",
+    "list": "Liste des rumeurs",
+    "create": "Créer une rumeur",
+    "edit": "Modifier la rumeur",
+    "detail": "Détail de la rumeur",
+    "noRumors": "Aucune rumeur enregistrée",
+    "noRumorsFiltered": "Aucune rumeur ne correspond à vos filtres",
+    "code": "Code",
+
+    "status": {
+      "pending": "En attente",
+      "investigating": "En investigation",
+      "confirmed": "Confirmée",
+      "false_alarm": "Fausse alerte",
+      "closed": "Clôturée"
+    },
+
+    "priority": {
+      "low": "Basse",
+      "medium": "Moyenne",
+      "high": "Haute",
+      "critical": "Critique"
+    },
+
+    "source": {
+      "direct": "Signalement direct",
+      "field": "Agent de terrain",
+      "sms": "SMS",
+      "mobile": "Application mobile",
+      "web": "Formulaire web",
+      "scanner": "Scanner web",
+      "social_media": "Réseaux sociaux",
+      "media": "Médias"
+    },
+
+    "category": {
+      "human_health": "Santé humaine",
+      "animal_health": "Santé animale",
+      "environmental": "Santé environnement",
+      "safety": "Sécurité",
+      "disaster": "Catastrophe",
+      "other": "Autre"
+    },
+
+    "form": {
+      "titleLabel": "Titre de la rumeur",
+      "titlePlaceholder": "Décrivez brièvement la rumeur",
+      "descriptionLabel": "Description détaillée",
+      "descriptionPlaceholder": "Décrivez les circonstances, les observations, les faits...",
+      "sourceLabel": "Source de l'information",
+      "categoryLabel": "Catégorie",
+      "priorityLabel": "Niveau de priorité",
+      "regionLabel": "Région",
+      "departmentLabel": "Département",
+      "districtLabel": "District",
+      "locationLabel": "Localité précise",
+      "locationPlaceholder": "Nom du village, quartier, lieu-dit...",
+      "gpsLabel": "Coordonnées GPS",
+      "latitudePlaceholder": "Latitude",
+      "longitudePlaceholder": "Longitude",
+      "speciesLabel": "Espèce concernée",
+      "symptomsLabel": "Symptômes observés",
+      "affectedCountLabel": "Nombre de cas/animaux affectés",
+      "reporterNameLabel": "Nom du déclarant",
+      "reporterPhoneLabel": "Téléphone du déclarant",
+      "reporterEmailLabel": "Email du déclarant",
+      "dateReportedLabel": "Date de signalement",
+      "assignedToLabel": "Assigné à",
+      "notesLabel": "Notes internes",
+      "notesPlaceholder": "Ajoutez des notes de suivi...",
+      "privateNoteLabel": "Note privée (visible uniquement par les valideurs)",
+      "submitCreate": "Créer la rumeur",
+      "submitUpdate": "Mettre à jour",
+      "addNote": "Ajouter une note"
+    },
+
+    "filters": {
+      "searchPlaceholder": "Rechercher par titre, description, code...",
+      "allStatuses": "Tous les statuts",
+      "allPriorities": "Toutes les priorités",
+      "allSources": "Toutes les sources",
+      "allRegions": "Toutes les régions",
+      "allSpecies": "Toutes les espèces",
+      "dateFrom": "Date début",
+      "dateTo": "Date fin",
+      "clearFilters": "Effacer les filtres",
+      "activeFilters": "{{count}} filtre(s) actif(s)"
+    },
+
+    "columns": {
+      "code": "Code",
+      "title": "Titre",
+      "status": "Statut",
+      "priority": "Priorité",
+      "source": "Source",
+      "region": "Région",
+      "species": "Espèce",
+      "date": "Date",
+      "assignedTo": "Assigné à",
+      "validationLevel": "Niveau validation",
+      "riskLevel": "Risque"
+    },
+
+    "actions": {
+      "view": "Voir le détail",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "validate": "Valider",
+      "escalate": "Escalader",
+      "reject": "Rejeter",
+      "assignTo": "Assigner à",
+      "addNote": "Ajouter une note",
+      "sendFeedback": "Envoyer un feedback",
+      "exportRumor": "Exporter cette rumeur"
+    },
+
+    "detail": {
+      "information": "Informations",
+      "history": "Historique",
+      "validations": "Validations",
+      "notes": "Notes",
+      "feedback": "Rétro-information",
+      "riskAssessment": "Évaluation des risques",
+      "timeline": "Chronologie",
+      "reportedBy": "Signalé par",
+      "assignedTo": "Assigné à",
+      "validationLevel": "Niveau de validation",
+      "lastUpdated": "Dernière mise à jour",
+      "createdOn": "Créée le",
+      "noNotes": "Aucune note pour cette rumeur",
+      "noValidations": "Aucune validation enregistrée",
+      "noFeedback": "Aucun feedback envoyé"
+    }
+  },
+
+  "validation": {
+    "title": "File de validation",
+    "queue": "File d'attente",
+    "stats": "Statistiques de validation",
+    "pending": "{{count}} rumeur(s) en attente",
+    "noPending": "Aucune rumeur en attente de validation",
+
+    "levels": {
+      "1": {
+        "name": "Collecte communautaire",
+        "role": "Agent communautaire",
+        "description": "Collecte et premier tri des rumeurs au niveau local"
+      },
+      "2": {
+        "name": "Vérification",
+        "role": "Responsable district",
+        "description": "Vérification des informations et investigation terrain"
+      },
+      "3": {
+        "name": "Évaluation des risques",
+        "role": "Expert santé publique",
+        "description": "Évaluation approfondie des risques sanitaires"
+      },
+      "4": {
+        "name": "Coordination régionale",
+        "role": "Coordinateur régional",
+        "description": "Coordination de la réponse au niveau régional"
+      },
+      "5": {
+        "name": "Supervision centrale",
+        "role": "Superviseur national",
+        "description": "Supervision nationale et décision stratégique"
+      }
+    },
+
+    "actions": {
+      "validate": "Valider et passer au niveau suivant",
+      "escalate": "Escalader directement",
+      "reject": "Rejeter",
+      "requestInfo": "Demander des informations",
+      "addNotes": "Ajouter des notes de validation"
+    },
+
+    "form": {
+      "actionLabel": "Action de validation",
+      "notesLabel": "Notes de validation",
+      "notesPlaceholder": "Ajoutez vos observations et conclusions...",
+      "rejectionReasonLabel": "Motif de rejet",
+      "rejectionReasonPlaceholder": "Expliquez pourquoi cette rumeur est rejetée...",
+      "actorLabel": "Valideur"
+    },
+
+    "messages": {
+      "validateSuccess": "Rumeur validée avec succès au niveau {{level}}",
+      "escalateSuccess": "Rumeur escaladée au niveau {{level}}",
+      "rejectSuccess": "Rumeur rejetée avec succès",
+      "alreadyValidated": "Cette rumeur a déjà été validée à ce niveau"
+    },
+
+    "stats": {
+      "title": "Statistiques de validation",
+      "byLevel": "Rumeurs par niveau",
+      "avgTime": "Temps moyen de validation",
+      "topValidators": "Valideurs les plus actifs",
+      "hours": "heures",
+      "validationCount": "Validations effectuées"
+    }
+  },
+
+  "risk": {
+    "title": "Tableau de risques",
+    "dashboard": "Vue d'ensemble des risques",
+    "assessment": "Évaluation des risques",
+    "noAssessment": "Aucune évaluation de risque enregistrée",
+
+    "levels": {
+      "unknown": "Non évalué",
+      "low": "Faible",
+      "moderate": "Modéré",
+      "high": "Élevé",
+      "very_high": "Très élevé"
+    },
+
+    "form": {
+      "riskLevelLabel": "Niveau de risque",
+      "descriptionLabel": "Description du risque",
+      "descriptionPlaceholder": "Décrivez la nature et l'ampleur du risque...",
+      "contextLabel": "Contexte épidémiologique",
+      "contextPlaceholder": "Historique des cas similaires, facteurs environnementaux...",
+      "exposureLabel": "Population exposée",
+      "exposurePlaceholder": "Nombre et type de personnes/animaux à risque...",
+      "submit": "Soumettre l'évaluation"
+    },
+
+    "dashboard": {
+      "byRisk": "Répartition par risque",
+      "byCategory": "Répartition par catégorie",
+      "highRiskRegions": "Régions à haut risque",
+      "riskTrend": "Évolution des risques",
+      "totalAssessed": "Total évalué",
+      "highRiskCount": "Risque élevé/très élevé"
+    },
+
+    "messages": {
+      "assessmentSuccess": "Évaluation des risques enregistrée avec succès",
+      "assessmentError": "Erreur lors de l'enregistrement de l'évaluation"
+    }
+  },
+
+  "map": {
+    "title": "Carte des rumeurs",
+    "loading": "Chargement de la carte...",
+    "controls": {
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "resetView": "Réinitialiser la vue",
+      "fullscreen": "Plein écran",
+      "layers": "Couches"
+    },
+    "layers": {
+      "standard": "Standard",
+      "satellite": "Satellite",
+      "terrain": "Terrain",
+      "dark": "Sombre"
+    },
+    "legend": {
+      "title": "Légende",
+      "riskLow": "Risque faible",
+      "riskModerate": "Risque modéré",
+      "riskHigh": "Risque élevé",
+      "riskVeryHigh": "Risque très élevé",
+      "pending": "En attente",
+      "confirmed": "Confirmée"
+    },
+    "filters": {
+      "period": "Période",
+      "last7days": "7 derniers jours",
+      "last30days": "30 derniers jours",
+      "last90days": "90 derniers jours",
+      "allTime": "Depuis le début",
+      "showBy": "Afficher par",
+      "riskLevel": "Niveau de risque",
+      "status": "Statut",
+      "category": "Catégorie"
+    },
+    "popup": {
+      "viewDetail": "Voir le détail",
+      "status": "Statut",
+      "priority": "Priorité",
+      "risk": "Risque",
+      "reported": "Signalé"
+    },
+    "cluster": {
+      "rumors": "rumeurs dans cette zone"
+    }
+  },
+
+  "sms": {
+    "title": "Gestionnaire SMS",
+    "decoder": {
+      "title": "Décodeur SMS",
+      "inputLabel": "Message SMS reçu",
+      "inputPlaceholder": "Collez le SMS au format COHRM ici...",
+      "senderLabel": "Numéro de l'expéditeur",
+      "senderPlaceholder": "+237 6XX XXX XXX",
+      "decode": "Décoder",
+      "result": "Résultat du décodage",
+      "createRumor": "Créer une rumeur à partir de ce SMS",
+      "invalidFormat": "Format SMS non reconnu. Format attendu : CODE*LOCALITE*SYMPTOMES*ESPECE*NOMBRE*DETAILS",
+      "formatHelp": "Format SMS"
+    },
+    "codes": {
+      "title": "Codes SMS actifs",
+      "addCode": "Ajouter un code",
+      "category": "Catégorie",
+      "code": "Code",
+      "labelFr": "Libellé français",
+      "labelEn": "Libellé anglais"
+    },
+    "symptoms": {
+      "FI": "Fièvre",
+      "VO": "Vomissements",
+      "DI": "Diarrhée",
+      "TO": "Toux",
+      "ER": "Éruption cutanée",
+      "HE": "Hémorragie",
+      "PA": "Paralysie",
+      "MO": "Mortalité",
+      "AB": "Avortement",
+      "RE": "Problèmes respiratoires",
+      "NE": "Symptômes neurologiques",
+      "OE": "Œdèmes"
+    },
+    "species": {
+      "HUM": "Humain",
+      "BOV": "Bovin",
+      "OVI": "Ovin/Caprin",
+      "VOL": "Volaille",
+      "POR": "Porcin",
+      "SAU": "Faune sauvage",
+      "CHI": "Chien/Chat",
+      "AUT": "Autre"
+    },
+    "events": {
+      "MAL": "Maladie suspecte",
+      "MOR": "Mortalité anormale",
+      "EPI": "Épidémie suspectée",
+      "ZOO": "Zoonose suspectée",
+      "INT": "Intoxication",
+      "ENV": "Événement environnemental"
+    }
+  },
+
+  "scanner": {
+    "title": "Scanner Web",
+    "runScan": "Lancer un scan",
+    "history": "Historique des scans",
+    "form": {
+      "sourceLabel": "Source à scanner",
+      "sourcePlaceholder": "URL ou nom de la source",
+      "keywordsLabel": "Mots-clés",
+      "keywordsPlaceholder": "épidémie, mortalité, maladie...",
+      "submit": "Lancer le scan"
+    },
+    "results": {
+      "title": "Résultats du scan",
+      "noResults": "Aucun résultat trouvé",
+      "foundItems": "{{count}} élément(s) trouvé(s)",
+      "relevance": "Pertinence",
+      "convertToRumor": "Convertir en rumeur",
+      "markReviewed": "Marquer comme examiné",
+      "dismiss": "Ignorer"
+    },
+    "status": {
+      "running": "En cours",
+      "completed": "Terminé",
+      "failed": "Échoué",
+      "pending": "En attente"
+    }
+  },
+
+  "actors": {
+    "title": "Gestion des acteurs",
+    "list": "Liste des acteurs",
+    "create": "Créer un acteur",
+    "edit": "Modifier l'acteur",
+    "detail": "Profil de l'acteur",
+    "noActors": "Aucun acteur enregistré",
+
+    "form": {
+      "firstNameLabel": "Prénom",
+      "lastNameLabel": "Nom",
+      "emailLabel": "Email",
+      "phoneLabel": "Téléphone",
+      "organizationLabel": "Organisation",
+      "organizationPlaceholder": "Nom de l'organisation ou structure",
+      "actorTypeLabel": "Type d'acteur",
+      "levelLabel": "Niveau hiérarchique",
+      "regionLabel": "Région d'affectation",
+      "isActiveLabel": "Acteur actif",
+      "submit": "Enregistrer l'acteur"
+    },
+
+    "columns": {
+      "name": "Nom complet",
+      "type": "Type",
+      "level": "Niveau",
+      "region": "Région",
+      "organization": "Organisation",
+      "status": "Statut",
+      "validations": "Validations",
+      "lastActive": "Dernière activité"
+    },
+
+    "profile": {
+      "info": "Informations",
+      "activity": "Activité",
+      "validationHistory": "Historique de validation",
+      "stats": "Statistiques",
+      "totalValidations": "Total validations",
+      "avgResponseTime": "Temps de réponse moyen",
+      "activeRumors": "Rumeurs en cours",
+      "active": "Actif",
+      "inactive": "Inactif"
+    },
+
+    "types": {
+      "community_health_worker": "Agent de santé communautaire",
+      "community_animal_health_worker": "Agent de santé animale communautaire",
+      "community_leader": "Leader communautaire",
+      "traditional_healer": "Tradipraticien",
+      "district_health_officer": "Responsable santé district",
+      "district_vet_officer": "Responsable vétérinaire district",
+      "district_environment_officer": "Responsable environnement district",
+      "epidemiologist": "Épidémiologiste",
+      "veterinarian": "Vétérinaire",
+      "lab_technician": "Technicien de laboratoire",
+      "public_health_expert": "Expert en santé publique",
+      "regional_health_delegate": "Délégué régional de santé",
+      "regional_vet_delegate": "Délégué régional de l'élevage",
+      "regional_coordinator": "Coordinateur régional One Health",
+      "national_coordinator": "Coordinateur national One Health",
+      "director_epidemiology": "Directeur de l'épidémiologie",
+      "director_vet_services": "Directeur des services vétérinaires",
+      "minister_delegate": "Délégué ministériel"
+    }
+  },
+
+  "publicForm": {
+    "title": "Signalement public",
+    "subtitle": "Signalez un événement sanitaire suspect dans votre communauté",
+
+    "steps": {
+      "event": "Type d'événement",
+      "location": "Localisation",
+      "details": "Détails",
+      "contact": "Contact",
+      "confirmation": "Confirmation"
+    },
+
+    "step1": {
+      "title": "Quel type d'événement souhaitez-vous signaler ?",
+      "eventTypes": {
+        "suspected_disease": "Maladie suspecte",
+        "abnormal_mortality": "Mortalité anormale",
+        "suspected_epidemic": "Épidémie suspectée",
+        "suspected_zoonosis": "Zoonose suspectée",
+        "intoxication": "Intoxication",
+        "environmental_event": "Événement environnemental"
+      },
+      "speciesLabel": "Espèce concernée",
+      "speciesOptions": {
+        "human": "Humain",
+        "bovine": "Bovin",
+        "sheep_goat": "Ovin/Caprin",
+        "poultry": "Volaille",
+        "swine": "Porcin",
+        "wildlife": "Faune sauvage",
+        "dog_cat": "Chien/Chat",
+        "other": "Autre"
+      }
+    },
+
+    "step2": {
+      "title": "Où l'événement a-t-il été observé ?",
+      "regionLabel": "Région",
+      "departmentLabel": "Département",
+      "districtLabel": "District sanitaire",
+      "locationLabel": "Localité / Village / Quartier",
+      "locationPlaceholder": "Précisez le lieu exact",
+      "gpsLabel": "Coordonnées GPS (optionnel)",
+      "useMyLocation": "Utiliser ma position actuelle"
+    },
+
+    "step3": {
+      "title": "Décrivez l'événement",
+      "symptomsLabel": "Symptômes observés",
+      "symptomsOptions": {
+        "fever": "Fièvre",
+        "vomiting": "Vomissements",
+        "diarrhea": "Diarrhée",
+        "cough": "Toux",
+        "skin_rash": "Éruption cutanée",
+        "hemorrhage": "Hémorragie",
+        "paralysis": "Paralysie",
+        "mortality": "Mortalité",
+        "abortion": "Avortement",
+        "respiratory": "Problèmes respiratoires",
+        "neurological": "Symptômes neurologiques",
+        "edema": "Œdèmes"
+      },
+      "affectedCountLabel": "Nombre de cas affectés",
+      "dateObservedLabel": "Date de l'observation",
+      "descriptionLabel": "Description libre",
+      "descriptionPlaceholder": "Décrivez ce que vous avez observé avec le maximum de détails..."
+    },
+
+    "step4": {
+      "title": "Vos coordonnées (optionnel)",
+      "subtitle": "Ces informations nous permettront de vous recontacter si besoin",
+      "nameLabel": "Votre nom",
+      "phoneLabel": "Votre numéro de téléphone",
+      "emailLabel": "Votre adresse email",
+      "anonymous": "Rester anonyme"
+    },
+
+    "step5": {
+      "title": "Récapitulatif du signalement",
+      "subtitle": "Vérifiez les informations avant de soumettre",
+      "submit": "Envoyer le signalement",
+      "successTitle": "Signalement envoyé avec succès !",
+      "successMessage": "Votre signalement a été enregistré sous le code {{code}}. Il sera examiné par nos équipes dans les plus brefs délais.",
+      "trackingCode": "Code de suivi"
+    }
+  },
+
+  "feedback": {
+    "title": "Rétro-information",
+    "send": "Envoyer un feedback",
+    "history": "Historique des feedbacks",
+    "noFeedback": "Aucun feedback envoyé pour cette rumeur",
+
+    "types": {
+      "acknowledgment": "Accusé de réception",
+      "status_update": "Mise à jour du statut",
+      "clarification": "Demande de clarification",
+      "response_action": "Action de réponse",
+      "alert": "Alerte",
+      "correction": "Correction d'information"
+    },
+
+    "form": {
+      "typeLabel": "Type de feedback",
+      "recipientTypeLabel": "Type de destinataire",
+      "recipientPhoneLabel": "Téléphone du destinataire",
+      "recipientEmailLabel": "Email du destinataire",
+      "channelLabel": "Canal d'envoi",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Rédigez votre message de rétro-information...",
+      "submit": "Envoyer le feedback"
+    },
+
+    "channels": {
+      "system": "Plateforme web",
+      "sms": "SMS",
+      "phone": "Appel téléphonique",
+      "email": "Email",
+      "whatsapp": "WhatsApp",
+      "radio": "Radio communautaire"
+    },
+
+    "timeline": {
+      "sentBy": "Envoyé par",
+      "sentTo": "Envoyé à",
+      "via": "via",
+      "at": "le"
+    },
+
+    "messages": {
+      "sendSuccess": "Feedback envoyé avec succès",
+      "sendError": "Erreur lors de l'envoi du feedback"
+    }
+  },
+
+  "export": {
+    "title": "Export de données",
+    "description": "Exportez les données COHRM aux formats JSON ou CSV",
+    "formatLabel": "Format d'export",
+    "formatJSON": "JSON (données structurées)",
+    "formatCSV": "CSV (tableur)",
+    "filtersLabel": "Filtres d'export",
+    "dateRange": "Période",
+    "statusFilter": "Statut",
+    "allData": "Toutes les données",
+    "filteredData": "Données filtrées",
+    "exportBtn": "Exporter",
+    "exporting": "Export en cours...",
+    "exportSuccess": "Export réalisé avec succès",
+    "exportError": "Erreur lors de l'export",
+    "noDataToExport": "Aucune donnée à exporter avec les filtres sélectionnés"
+  },
+
+  "settings": {
+    "title": "Paramètres COHRM",
+    "sections": {
+      "general": "Général",
+      "notifications": "Notifications",
+      "sms": "Configuration SMS",
+      "validation": "Workflow de validation",
+      "risk": "Évaluation des risques",
+      "scanner": "Scanner web",
+      "themes": "Thèmes et catégories"
+    },
+    "labels": {
+      "systemName": "Nom du système",
+      "defaultLanguage": "Langue par défaut",
+      "autoRefreshInterval": "Intervalle de rafraîchissement auto (secondes)",
+      "enableNotifications": "Activer les notifications email",
+      "enableSMS": "Activer les notifications SMS",
+      "smsGateway": "Passerelle SMS",
+      "smsApiKey": "Clé API SMS",
+      "validationLevels": "Niveaux de validation actifs",
+      "autoEscalation": "Escalade automatique après (heures)",
+      "riskThresholds": "Seuils de risque",
+      "scanFrequency": "Fréquence de scan (heures)",
+      "scanSources": "Sources à scanner"
+    },
+    "messages": {
+      "saveSuccess": "Paramètres enregistrés avec succès",
+      "saveError": "Erreur lors de l'enregistrement des paramètres"
+    }
+  },
+
+  "regions": {
+    "AD": "Adamaoua",
+    "CE": "Centre",
+    "ES": "Est",
+    "EN": "Extrême-Nord",
+    "LT": "Littoral",
+    "NO": "Nord",
+    "NW": "Nord-Ouest",
+    "OU": "Ouest",
+    "SU": "Sud",
+    "SW": "Sud-Ouest"
+  },
+
+  "dates": {
+    "justNow": "À l'instant",
+    "minutesAgo": "Il y a {{count}} min",
+    "hoursAgo": "Il y a {{count}}h",
+    "yesterday": "Hier",
+    "daysAgo": "Il y a {{count}} jours",
+    "weeksAgo": "Il y a {{count}} sem.",
+    "monthsAgo": "Il y a {{count}} mois",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "thisWeek": "Cette semaine",
+    "lastWeek": "Semaine dernière",
+    "thisMonth": "Ce mois-ci",
+    "lastMonth": "Mois dernier"
+  },
+
+  "formValidation": {
+    "required": "Ce champ est obligatoire",
+    "invalidEmail": "Adresse email invalide",
+    "invalidPhone": "Numéro de téléphone invalide",
+    "invalidGPS": "Coordonnées GPS invalides",
+    "invalidGPSRange": "Les coordonnées doivent être situées au Cameroun",
+    "minLength": "Minimum {{min}} caractères requis",
+    "maxLength": "Maximum {{max}} caractères autorisés",
+    "invalidFormat": "Format invalide",
+    "invalidDate": "Date invalide",
+    "dateFuture": "La date ne peut pas être dans le futur",
+    "numberMin": "La valeur minimum est {{min}}",
+    "numberMax": "La valeur maximum est {{max}}",
+    "numberPositive": "La valeur doit être positive",
+    "selectRequired": "Veuillez sélectionner une option",
+    "fileSize": "Le fichier dépasse la taille maximale autorisée ({{max}})",
+    "fileType": "Type de fichier non autorisé"
+  },
+
+  "placeholder": {
+    "title": "Phase 2 - En développement",
+    "message": "Cette section sera implémentée dans la prochaine phase de développement. L'infrastructure et les API sont déjà prêtes."
+  }
+}

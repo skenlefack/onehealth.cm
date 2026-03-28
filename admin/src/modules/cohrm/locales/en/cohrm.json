@@ -1,0 +1,849 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "deleting": "Deleting...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "add": "Add",
+    "remove": "Remove",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "reset": "Reset",
+    "refresh": "Refresh",
+    "export": "Export",
+    "import": "Import",
+    "download": "Download",
+    "upload": "Upload",
+    "view": "View",
+    "details": "Details",
+    "actions": "Actions",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "none": "None",
+    "select": "Select",
+    "noData": "No data available",
+    "noResults": "No results found",
+    "required": "Required",
+    "optional": "Optional",
+    "total": "Total",
+    "of": "of",
+    "page": "Page",
+    "rows": "rows",
+    "showing": "Showing",
+    "to": "to",
+    "results": "results",
+    "sortBy": "Sort by",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "createdAt": "Created on",
+    "updatedAt": "Updated on",
+    "status": "Status",
+    "priority": "Priority",
+    "source": "Source",
+    "region": "Region",
+    "description": "Description",
+    "title": "Title",
+    "notes": "Notes",
+    "id": "ID",
+    "date": "Date",
+    "time": "Time",
+    "location": "Location",
+    "unknown": "Unknown",
+    "notDefined": "Not defined",
+    "confirmDelete": "Are you sure you want to delete this item?",
+    "confirmDeleteDesc": "This action cannot be undone. All associated data will be permanently deleted.",
+    "deleteSuccess": "Successfully deleted",
+    "saveSuccess": "Successfully saved",
+    "errorGeneric": "An error occurred. Please try again.",
+    "errorNetwork": "Unable to reach the server. Please check your connection.",
+    "errorPermission": "You do not have the required permissions for this action.",
+    "errorSessionExpired": "Your session has expired. Please log in again.",
+    "errorNotFound": "Resource not found.",
+    "language": "Language",
+    "french": "French",
+    "english": "English"
+  },
+
+  "nav": {
+    "dashboard": "Dashboard",
+    "rumors": "Rumors",
+    "validation": "Validation",
+    "map": "Map",
+    "risk": "Risk",
+    "sms": "SMS",
+    "scanner": "Web Scanner",
+    "actors": "Actors",
+    "export": "Export",
+    "settings": "Settings",
+    "backAdmin": "Back to Admin",
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
+
+  "sidebar": {
+    "title": "COHRM",
+    "subtitle": "Rumor Management",
+    "level": "Level {{level}}"
+  },
+
+  "dashboard": {
+    "title": "COHRM Dashboard",
+    "lastUpdate": "Last updated",
+    "refresh": "Refresh",
+    "loadingDashboard": "Loading dashboard...",
+
+    "kpi": {
+      "totalRumors": "Total rumors",
+      "pending": "Pending",
+      "confirmedThisMonth": "Confirmed this month",
+      "activeAlerts": "Active alerts"
+    },
+
+    "charts": {
+      "trends7days": "Trends (7 days)",
+      "bySource": "By source",
+      "topRegions": "Top regions",
+      "byRiskLevel": "By risk level",
+      "noTrendData": "No data for the last 7 days",
+      "noSourceData": "No data available",
+      "noRegionData": "No data available",
+      "noRiskData": "No risk assessment recorded",
+      "rumors": "Rumors",
+      "count": "Count"
+    },
+
+    "map": {
+      "title": "Latest geolocated rumors",
+      "noGeoData": "No geolocated rumors available",
+      "viewDetail": "View details",
+      "legendLow": "Low",
+      "legendModerate": "Moderate",
+      "legendHigh": "High",
+      "legendVeryHigh": "Very high"
+    },
+
+    "recentRumors": {
+      "title": "Latest rumors",
+      "noData": "No recent rumors",
+      "viewAll": "View all rumors",
+      "column": {
+        "rumor": "Rumor",
+        "status": "Status",
+        "priority": "Priority",
+        "region": "Region",
+        "date": "Date"
+      }
+    },
+
+    "notifications": {
+      "title": "Quick notifications",
+      "noNotifications": "No recent notifications",
+      "critical": "CRITICAL",
+      "alert": "ALERT",
+      "confirmed": "Confirmed"
+    },
+
+    "quickActions": {
+      "title": "Quick actions",
+      "newRumor": "New rumor",
+      "validationQueue": "Validation queue",
+      "viewMap": "View map"
+    }
+  },
+
+  "rumors": {
+    "title": "Rumor Management",
+    "list": "Rumor list",
+    "create": "Create a rumor",
+    "edit": "Edit rumor",
+    "detail": "Rumor details",
+    "noRumors": "No rumors recorded",
+    "noRumorsFiltered": "No rumors match your filters",
+    "code": "Code",
+
+    "status": {
+      "pending": "Pending",
+      "investigating": "Under investigation",
+      "confirmed": "Confirmed",
+      "false_alarm": "False alarm",
+      "closed": "Closed"
+    },
+
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+
+    "source": {
+      "direct": "Direct report",
+      "field": "Field agent",
+      "sms": "SMS",
+      "mobile": "Mobile app",
+      "web": "Web form",
+      "scanner": "Web scanner",
+      "social_media": "Social media",
+      "media": "Media"
+    },
+
+    "category": {
+      "human_health": "Human health",
+      "animal_health": "Animal health",
+      "environmental": "Environmental health",
+      "safety": "Safety",
+      "disaster": "Disaster",
+      "other": "Other"
+    },
+
+    "form": {
+      "titleLabel": "Rumor title",
+      "titlePlaceholder": "Briefly describe the rumor",
+      "descriptionLabel": "Detailed description",
+      "descriptionPlaceholder": "Describe the circumstances, observations, and facts...",
+      "sourceLabel": "Information source",
+      "categoryLabel": "Category",
+      "priorityLabel": "Priority level",
+      "regionLabel": "Region",
+      "departmentLabel": "Department",
+      "districtLabel": "District",
+      "locationLabel": "Specific location",
+      "locationPlaceholder": "Village name, neighborhood, landmark...",
+      "gpsLabel": "GPS coordinates",
+      "latitudePlaceholder": "Latitude",
+      "longitudePlaceholder": "Longitude",
+      "speciesLabel": "Species involved",
+      "symptomsLabel": "Observed symptoms",
+      "affectedCountLabel": "Number of affected cases/animals",
+      "reporterNameLabel": "Reporter name",
+      "reporterPhoneLabel": "Reporter phone number",
+      "reporterEmailLabel": "Reporter email",
+      "dateReportedLabel": "Date reported",
+      "assignedToLabel": "Assigned to",
+      "notesLabel": "Internal notes",
+      "notesPlaceholder": "Add follow-up notes...",
+      "privateNoteLabel": "Private note (visible to validators only)",
+      "submitCreate": "Create rumor",
+      "submitUpdate": "Update",
+      "addNote": "Add a note"
+    },
+
+    "filters": {
+      "searchPlaceholder": "Search by title, description, code...",
+      "allStatuses": "All statuses",
+      "allPriorities": "All priorities",
+      "allSources": "All sources",
+      "allRegions": "All regions",
+      "allSpecies": "All species",
+      "dateFrom": "From date",
+      "dateTo": "To date",
+      "clearFilters": "Clear filters",
+      "activeFilters": "{{count}} active filter(s)"
+    },
+
+    "columns": {
+      "code": "Code",
+      "title": "Title",
+      "status": "Status",
+      "priority": "Priority",
+      "source": "Source",
+      "region": "Region",
+      "species": "Species",
+      "date": "Date",
+      "assignedTo": "Assigned to",
+      "validationLevel": "Validation level",
+      "riskLevel": "Risk"
+    },
+
+    "actions": {
+      "view": "View details",
+      "edit": "Edit",
+      "delete": "Delete",
+      "validate": "Validate",
+      "escalate": "Escalate",
+      "reject": "Reject",
+      "assignTo": "Assign to",
+      "addNote": "Add a note",
+      "sendFeedback": "Send feedback",
+      "exportRumor": "Export this rumor"
+    },
+
+    "detail": {
+      "information": "Information",
+      "history": "History",
+      "validations": "Validations",
+      "notes": "Notes",
+      "feedback": "Feedback",
+      "riskAssessment": "Risk assessment",
+      "timeline": "Timeline",
+      "reportedBy": "Reported by",
+      "assignedTo": "Assigned to",
+      "validationLevel": "Validation level",
+      "lastUpdated": "Last updated",
+      "createdOn": "Created on",
+      "noNotes": "No notes for this rumor",
+      "noValidations": "No validation records",
+      "noFeedback": "No feedback sent"
+    }
+  },
+
+  "validation": {
+    "title": "Validation Queue",
+    "queue": "Queue",
+    "stats": "Validation statistics",
+    "pending": "{{count}} rumor(s) pending validation",
+    "noPending": "No rumors pending validation",
+
+    "levels": {
+      "1": {
+        "name": "Community collection",
+        "role": "Community agent",
+        "description": "Collection and initial triage of rumors at the community level"
+      },
+      "2": {
+        "name": "Verification",
+        "role": "District officer",
+        "description": "Information verification and field investigation"
+      },
+      "3": {
+        "name": "Risk assessment",
+        "role": "Public health expert",
+        "description": "Comprehensive health risk assessment"
+      },
+      "4": {
+        "name": "Regional coordination",
+        "role": "Regional coordinator",
+        "description": "Coordination of the regional response"
+      },
+      "5": {
+        "name": "Central supervision",
+        "role": "National supervisor",
+        "description": "National-level oversight and strategic decision-making"
+      }
+    },
+
+    "actions": {
+      "validate": "Validate and advance to next level",
+      "escalate": "Escalate directly",
+      "reject": "Reject",
+      "requestInfo": "Request additional information",
+      "addNotes": "Add validation notes"
+    },
+
+    "form": {
+      "actionLabel": "Validation action",
+      "notesLabel": "Validation notes",
+      "notesPlaceholder": "Add your observations and findings...",
+      "rejectionReasonLabel": "Rejection reason",
+      "rejectionReasonPlaceholder": "Explain why this rumor is being rejected...",
+      "actorLabel": "Validator"
+    },
+
+    "messages": {
+      "validateSuccess": "Rumor successfully validated at level {{level}}",
+      "escalateSuccess": "Rumor escalated to level {{level}}",
+      "rejectSuccess": "Rumor successfully rejected",
+      "alreadyValidated": "This rumor has already been validated at this level"
+    },
+
+    "stats": {
+      "title": "Validation Statistics",
+      "byLevel": "Rumors by level",
+      "avgTime": "Average validation time",
+      "topValidators": "Top validators",
+      "hours": "hours",
+      "validationCount": "Validations completed"
+    }
+  },
+
+  "risk": {
+    "title": "Risk Dashboard",
+    "dashboard": "Risk overview",
+    "assessment": "Risk Assessment",
+    "noAssessment": "No risk assessment recorded",
+
+    "levels": {
+      "unknown": "Not assessed",
+      "low": "Low",
+      "moderate": "Moderate",
+      "high": "High",
+      "very_high": "Very high"
+    },
+
+    "form": {
+      "riskLevelLabel": "Risk level",
+      "descriptionLabel": "Risk description",
+      "descriptionPlaceholder": "Describe the nature and extent of the risk...",
+      "contextLabel": "Epidemiological context",
+      "contextPlaceholder": "History of similar cases, environmental factors...",
+      "exposureLabel": "Exposed population",
+      "exposurePlaceholder": "Number and type of people/animals at risk...",
+      "submit": "Submit assessment"
+    },
+
+    "dashboard": {
+      "byRisk": "Breakdown by risk level",
+      "byCategory": "Breakdown by category",
+      "highRiskRegions": "High-risk regions",
+      "riskTrend": "Risk trends",
+      "totalAssessed": "Total assessed",
+      "highRiskCount": "High/very high risk"
+    },
+
+    "messages": {
+      "assessmentSuccess": "Risk assessment successfully recorded",
+      "assessmentError": "Error recording the risk assessment"
+    }
+  },
+
+  "map": {
+    "title": "Rumor Map",
+    "loading": "Loading map...",
+    "controls": {
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "resetView": "Reset view",
+      "fullscreen": "Full screen",
+      "layers": "Layers"
+    },
+    "layers": {
+      "standard": "Standard",
+      "satellite": "Satellite",
+      "terrain": "Terrain",
+      "dark": "Dark"
+    },
+    "legend": {
+      "title": "Legend",
+      "riskLow": "Low risk",
+      "riskModerate": "Moderate risk",
+      "riskHigh": "High risk",
+      "riskVeryHigh": "Very high risk",
+      "pending": "Pending",
+      "confirmed": "Confirmed"
+    },
+    "filters": {
+      "period": "Time period",
+      "last7days": "Last 7 days",
+      "last30days": "Last 30 days",
+      "last90days": "Last 90 days",
+      "allTime": "All time",
+      "showBy": "Display by",
+      "riskLevel": "Risk level",
+      "status": "Status",
+      "category": "Category"
+    },
+    "popup": {
+      "viewDetail": "View details",
+      "status": "Status",
+      "priority": "Priority",
+      "risk": "Risk",
+      "reported": "Reported"
+    },
+    "cluster": {
+      "rumors": "rumors in this area"
+    }
+  },
+
+  "sms": {
+    "title": "SMS Manager",
+    "decoder": {
+      "title": "SMS Decoder",
+      "inputLabel": "Received SMS message",
+      "inputPlaceholder": "Paste the COHRM-format SMS here...",
+      "senderLabel": "Sender number",
+      "senderPlaceholder": "+237 6XX XXX XXX",
+      "decode": "Decode",
+      "result": "Decoding result",
+      "createRumor": "Create a rumor from this SMS",
+      "invalidFormat": "Unrecognized SMS format. Expected format: CODE*LOCATION*SYMPTOMS*SPECIES*COUNT*DETAILS",
+      "formatHelp": "SMS Format"
+    },
+    "codes": {
+      "title": "Active SMS codes",
+      "addCode": "Add a code",
+      "category": "Category",
+      "code": "Code",
+      "labelFr": "French label",
+      "labelEn": "English label"
+    },
+    "symptoms": {
+      "FI": "Fever",
+      "VO": "Vomiting",
+      "DI": "Diarrhea",
+      "TO": "Cough",
+      "ER": "Skin rash",
+      "HE": "Hemorrhage",
+      "PA": "Paralysis",
+      "MO": "Mortality",
+      "AB": "Abortion",
+      "RE": "Respiratory distress",
+      "NE": "Neurological symptoms",
+      "OE": "Edema"
+    },
+    "species": {
+      "HUM": "Human",
+      "BOV": "Bovine",
+      "OVI": "Sheep/Goat",
+      "VOL": "Poultry",
+      "POR": "Swine",
+      "SAU": "Wildlife",
+      "CHI": "Dog/Cat",
+      "AUT": "Other"
+    },
+    "events": {
+      "MAL": "Suspected disease",
+      "MOR": "Abnormal mortality",
+      "EPI": "Suspected epidemic",
+      "ZOO": "Suspected zoonosis",
+      "INT": "Intoxication",
+      "ENV": "Environmental event"
+    }
+  },
+
+  "scanner": {
+    "title": "Web Scanner",
+    "runScan": "Run scan",
+    "history": "Scan history",
+    "form": {
+      "sourceLabel": "Source to scan",
+      "sourcePlaceholder": "URL or source name",
+      "keywordsLabel": "Keywords",
+      "keywordsPlaceholder": "epidemic, mortality, disease...",
+      "submit": "Start scan"
+    },
+    "results": {
+      "title": "Scan results",
+      "noResults": "No results found",
+      "foundItems": "{{count}} item(s) found",
+      "relevance": "Relevance",
+      "convertToRumor": "Convert to rumor",
+      "markReviewed": "Mark as reviewed",
+      "dismiss": "Dismiss"
+    },
+    "status": {
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "pending": "Pending"
+    }
+  },
+
+  "actors": {
+    "title": "Actor Management",
+    "list": "Actor list",
+    "create": "Create an actor",
+    "edit": "Edit actor",
+    "detail": "Actor profile",
+    "noActors": "No actors registered",
+
+    "form": {
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone",
+      "organizationLabel": "Organization",
+      "organizationPlaceholder": "Organization or agency name",
+      "actorTypeLabel": "Actor type",
+      "levelLabel": "Hierarchical level",
+      "regionLabel": "Assigned region",
+      "isActiveLabel": "Active actor",
+      "submit": "Save actor"
+    },
+
+    "columns": {
+      "name": "Full name",
+      "type": "Type",
+      "level": "Level",
+      "region": "Region",
+      "organization": "Organization",
+      "status": "Status",
+      "validations": "Validations",
+      "lastActive": "Last active"
+    },
+
+    "profile": {
+      "info": "Information",
+      "activity": "Activity",
+      "validationHistory": "Validation history",
+      "stats": "Statistics",
+      "totalValidations": "Total validations",
+      "avgResponseTime": "Average response time",
+      "activeRumors": "Active rumors",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+
+    "types": {
+      "community_health_worker": "Community health worker",
+      "community_animal_health_worker": "Community animal health worker",
+      "community_leader": "Community leader",
+      "traditional_healer": "Traditional healer",
+      "district_health_officer": "District health officer",
+      "district_vet_officer": "District veterinary officer",
+      "district_environment_officer": "District environment officer",
+      "epidemiologist": "Epidemiologist",
+      "veterinarian": "Veterinarian",
+      "lab_technician": "Laboratory technician",
+      "public_health_expert": "Public health expert",
+      "regional_health_delegate": "Regional health delegate",
+      "regional_vet_delegate": "Regional livestock delegate",
+      "regional_coordinator": "Regional One Health coordinator",
+      "national_coordinator": "National One Health coordinator",
+      "director_epidemiology": "Director of epidemiology",
+      "director_vet_services": "Director of veterinary services",
+      "minister_delegate": "Ministerial delegate"
+    }
+  },
+
+  "publicForm": {
+    "title": "Public Report",
+    "subtitle": "Report a suspected health event in your community",
+
+    "steps": {
+      "event": "Event type",
+      "location": "Location",
+      "details": "Details",
+      "contact": "Contact",
+      "confirmation": "Confirmation"
+    },
+
+    "step1": {
+      "title": "What type of event would you like to report?",
+      "eventTypes": {
+        "suspected_disease": "Suspected disease",
+        "abnormal_mortality": "Abnormal mortality",
+        "suspected_epidemic": "Suspected epidemic",
+        "suspected_zoonosis": "Suspected zoonosis",
+        "intoxication": "Intoxication",
+        "environmental_event": "Environmental event"
+      },
+      "speciesLabel": "Species involved",
+      "speciesOptions": {
+        "human": "Human",
+        "bovine": "Bovine",
+        "sheep_goat": "Sheep/Goat",
+        "poultry": "Poultry",
+        "swine": "Swine",
+        "wildlife": "Wildlife",
+        "dog_cat": "Dog/Cat",
+        "other": "Other"
+      }
+    },
+
+    "step2": {
+      "title": "Where was the event observed?",
+      "regionLabel": "Region",
+      "departmentLabel": "Department",
+      "districtLabel": "Health district",
+      "locationLabel": "Locality / Village / Neighborhood",
+      "locationPlaceholder": "Specify the exact location",
+      "gpsLabel": "GPS coordinates (optional)",
+      "useMyLocation": "Use my current location"
+    },
+
+    "step3": {
+      "title": "Describe the event",
+      "symptomsLabel": "Observed symptoms",
+      "symptomsOptions": {
+        "fever": "Fever",
+        "vomiting": "Vomiting",
+        "diarrhea": "Diarrhea",
+        "cough": "Cough",
+        "skin_rash": "Skin rash",
+        "hemorrhage": "Hemorrhage",
+        "paralysis": "Paralysis",
+        "mortality": "Mortality",
+        "abortion": "Abortion",
+        "respiratory": "Respiratory distress",
+        "neurological": "Neurological symptoms",
+        "edema": "Edema"
+      },
+      "affectedCountLabel": "Number of affected cases",
+      "dateObservedLabel": "Date of observation",
+      "descriptionLabel": "Free text description",
+      "descriptionPlaceholder": "Describe what you observed with as much detail as possible..."
+    },
+
+    "step4": {
+      "title": "Your contact information (optional)",
+      "subtitle": "This information allows us to follow up with you if needed",
+      "nameLabel": "Your name",
+      "phoneLabel": "Your phone number",
+      "emailLabel": "Your email address",
+      "anonymous": "Remain anonymous"
+    },
+
+    "step5": {
+      "title": "Report summary",
+      "subtitle": "Review the information before submitting",
+      "submit": "Submit report",
+      "successTitle": "Report submitted successfully!",
+      "successMessage": "Your report has been registered under code {{code}}. It will be reviewed by our teams as soon as possible.",
+      "trackingCode": "Tracking code"
+    }
+  },
+
+  "feedback": {
+    "title": "Feedback",
+    "send": "Send feedback",
+    "history": "Feedback history",
+    "noFeedback": "No feedback sent for this rumor",
+
+    "types": {
+      "acknowledgment": "Acknowledgment",
+      "status_update": "Status update",
+      "clarification": "Clarification request",
+      "response_action": "Response action",
+      "alert": "Alert",
+      "correction": "Information correction"
+    },
+
+    "form": {
+      "typeLabel": "Feedback type",
+      "recipientTypeLabel": "Recipient type",
+      "recipientPhoneLabel": "Recipient phone",
+      "recipientEmailLabel": "Recipient email",
+      "channelLabel": "Delivery channel",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Write your feedback message...",
+      "submit": "Send feedback"
+    },
+
+    "channels": {
+      "system": "Web platform",
+      "sms": "SMS",
+      "phone": "Phone call",
+      "email": "Email",
+      "whatsapp": "WhatsApp",
+      "radio": "Community radio"
+    },
+
+    "timeline": {
+      "sentBy": "Sent by",
+      "sentTo": "Sent to",
+      "via": "via",
+      "at": "on"
+    },
+
+    "messages": {
+      "sendSuccess": "Feedback sent successfully",
+      "sendError": "Error sending feedback"
+    }
+  },
+
+  "export": {
+    "title": "Data Export",
+    "description": "Export COHRM data in JSON or CSV format",
+    "formatLabel": "Export format",
+    "formatJSON": "JSON (structured data)",
+    "formatCSV": "CSV (spreadsheet)",
+    "filtersLabel": "Export filters",
+    "dateRange": "Date range",
+    "statusFilter": "Status",
+    "allData": "All data",
+    "filteredData": "Filtered data",
+    "exportBtn": "Export",
+    "exporting": "Exporting...",
+    "exportSuccess": "Export completed successfully",
+    "exportError": "Export failed",
+    "noDataToExport": "No data to export with selected filters"
+  },
+
+  "settings": {
+    "title": "COHRM Settings",
+    "sections": {
+      "general": "General",
+      "notifications": "Notifications",
+      "sms": "SMS Configuration",
+      "validation": "Validation Workflow",
+      "risk": "Risk Assessment",
+      "scanner": "Web Scanner",
+      "themes": "Themes & Categories"
+    },
+    "labels": {
+      "systemName": "System name",
+      "defaultLanguage": "Default language",
+      "autoRefreshInterval": "Auto-refresh interval (seconds)",
+      "enableNotifications": "Enable email notifications",
+      "enableSMS": "Enable SMS notifications",
+      "smsGateway": "SMS gateway",
+      "smsApiKey": "SMS API key",
+      "validationLevels": "Active validation levels",
+      "autoEscalation": "Auto-escalation after (hours)",
+      "riskThresholds": "Risk thresholds",
+      "scanFrequency": "Scan frequency (hours)",
+      "scanSources": "Sources to scan"
+    },
+    "messages": {
+      "saveSuccess": "Settings saved successfully",
+      "saveError": "Error saving settings"
+    }
+  },
+
+  "regions": {
+    "AD": "Adamawa",
+    "CE": "Centre",
+    "ES": "East",
+    "EN": "Far North",
+    "LT": "Littoral",
+    "NO": "North",
+    "NW": "Northwest",
+    "OU": "West",
+    "SU": "South",
+    "SW": "Southwest"
+  },
+
+  "dates": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}}h ago",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago",
+    "weeksAgo": "{{count}} weeks ago",
+    "monthsAgo": "{{count}} months ago",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "thisWeek": "This week",
+    "lastWeek": "Last week",
+    "thisMonth": "This month",
+    "lastMonth": "Last month"
+  },
+
+  "formValidation": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "invalidPhone": "Invalid phone number",
+    "invalidGPS": "Invalid GPS coordinates",
+    "invalidGPSRange": "Coordinates must be located within Cameroon",
+    "minLength": "Minimum {{min}} characters required",
+    "maxLength": "Maximum {{max}} characters allowed",
+    "invalidFormat": "Invalid format",
+    "invalidDate": "Invalid date",
+    "dateFuture": "Date cannot be in the future",
+    "numberMin": "Minimum value is {{min}}",
+    "numberMax": "Maximum value is {{max}}",
+    "numberPositive": "Value must be positive",
+    "selectRequired": "Please select an option",
+    "fileSize": "File exceeds the maximum allowed size ({{max}})",
+    "fileType": "File type not allowed"
+  },
+
+  "placeholder": {
+    "title": "Phase 2 - Under Development",
+    "message": "This section will be implemented in the next development phase. The infrastructure and APIs are already in place."
+  }
+}
