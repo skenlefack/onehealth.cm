@@ -28,7 +28,7 @@ const RumorEdit = ({ isDark = false, user }) => {
       fetchRumor(selectedRumorId);
     }
     return () => clearCurrentRumor();
-  }, [selectedRumorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedRumorId]); // eslint-disable-line
 
   // Handler de soumission (mise à jour)
   const handleSubmit = async (payload) => {

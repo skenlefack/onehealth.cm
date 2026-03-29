@@ -67,7 +67,7 @@ const RumorsList = ({ isDark = false, user }) => {
   // Charger les rumeurs au montage
   useEffect(() => {
     fetchRumors();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line
 
   // Persister le mode de vue
   const handleViewChange = useCallback((mode) => {

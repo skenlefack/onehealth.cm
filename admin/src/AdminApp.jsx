@@ -1,5 +1,6 @@
 import PageBuilderPage from './PageBuilderPage';
 import COHRMSystemPage from './COHRMSystemPage';
+import CohrmModule from './modules/cohrm';
 import NewsletterPage from './NewsletterPage';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline, Polygon, Autocomplete } from '@react-google-maps/api';
@@ -22160,7 +22161,7 @@ export default function AdminApp() {
       case 'profile': return <ProfilePage isDark={isDark} token={token} user={user} setUser={setUser} />;
       case 'ohwr-mapping': return <OHWRMappingPage isDark={isDark} token={token} />;
       case 'oh-elearning': return <OHELearningPage isDark={isDark} token={token} />;
-      case 'cohrm-system': return <COHRMSystemPage isDark={isDark} token={token} />;
+      case 'cohrm-system': return <CohrmModule isDark={isDark} token={token} user={user} onBack={() => setActivePage('dashboard')} />;
       case 'newsletter': return <NewsletterPage isDark={isDark} token={token} />;
       default: return <Dashboard isDark={isDark} token={token} />;
     }

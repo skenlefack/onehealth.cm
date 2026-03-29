@@ -738,8 +738,11 @@ router.put('/settings', auth, authorize('admin'), async (req, res) => {
 // API MOBILE
 // ============================================
 
-// POST /api/cohrm/mobile/login - Connexion mobile (authentifie l'agent et retourne sa région)
+// POST /api/cohrm/mobile/login - Connexion mobile (auth via users + infos acteur COHRM)
 router.post('/mobile/login', async (req, res) => {
+  const bcrypt = require('bcryptjs');
+  const jwt = require('jsonwebtoken');
+
   try {
     const { email, password } = req.body;
 
@@ -747,28 +750,115 @@ router.post('/mobile/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email et mot de passe requis' });
     }
 
-    // Check user by email/login and password
+    // 1. Find user by email or username
     const [users] = await db.query(
-      'SELECT * FROM cohrm_mobile_agents WHERE (email = ? OR login = ?) AND password = ?',
-      [email, email, password]
+      'SELECT * FROM users WHERE email = ? OR username = ?',
+      [email, email]
     );
 
     if (users.length === 0) {
       return res.status(401).json({ success: false, message: 'Identifiants incorrects' });
     }
 
-    const agent = users[0];
+    const user = users[0];
 
-    // Update last login
-    await db.query('UPDATE cohrm_mobile_agents SET last_login = NOW() WHERE id = ?', [agent.id]);
+    // 2. Check account active
+    if (user.status !== 'active') {
+      return res.status(401).json({ success: false, message: 'Compte désactivé' });
+    }
+
+    // 3. Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Identifiants incorrects' });
+    }
+
+    // 4. Get user permissions
+    const [permissions] = await db.query(`
+      SELECT DISTINCT p.slug FROM permissions p
+      INNER JOIN group_permissions gp ON p.id = gp.permission_id
+      INNER JOIN user_groups ug ON gp.group_id = ug.group_id
+      WHERE ug.user_id = ?
+    `, [user.id]);
+    const permSlugs = permissions.map(p => p.slug);
+
+    // 5. Check if user has COHRM access (admin role or cohrm-related permission)
+    const isAdmin = user.role === 'admin';
+    const hasCohrmAccess = isAdmin || permSlugs.some(p => p.includes('cohrm'));
+
+    // 6. Get COHRM actor info if exists
+    let actor = null;
+    const [actors] = await db.query(
+      'SELECT * FROM cohrm_actors WHERE user_id = ? AND is_active = 1',
+      [user.id]
+    );
+    if (actors.length > 0) {
+      actor = actors[0];
+    }
+
+    // 7. User must be admin or have a COHRM actor profile
+    if (!isAdmin && !actor && !hasCohrmAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès non autorisé. Vous devez être administrateur COHRM ou agent communautaire One Health.'
+      });
+    }
+
+    // 8. Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '30d' }
+    );
+
+    // 9. Update last login
+    await db.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+
+    // 10. Determine actor level and type
+    const actorLevel = actor ? actor.actor_level : (isAdmin ? 5 : 0);
+    const actorLevelLabels = {
+      1: 'Agent communautaire',
+      2: 'Vérificateur',
+      3: 'Évaluateur',
+      4: 'Coordonnateur régional',
+      5: 'Superviseur / Administrateur',
+    };
 
     res.json({
       success: true,
+      message: 'Connexion réussie',
       data: {
-        name: agent.name || '',
-        email: agent.email || agent.login || '',
-        region: agent.region || '',
-        region_name: agent.region_name || '',
+        user: {
+          id: user.id,
+          name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+          avatar: user.avatar,
+          permissions: permSlugs,
+        },
+        actor: actor ? {
+          id: actor.id,
+          level: actor.actor_level,
+          level_label: actorLevelLabels[actor.actor_level] || 'Inconnu',
+          type: actor.actor_type,
+          region: actor.region || '',
+          department: actor.department || '',
+          district: actor.district || '',
+          organization: actor.organization || '',
+          phone: actor.phone || '',
+        } : isAdmin ? {
+          id: null,
+          level: 5,
+          level_label: actorLevelLabels[5],
+          type: 'admin',
+          region: '',
+          department: '',
+          district: '',
+          organization: 'Administration centrale',
+          phone: '',
+        } : null,
+        token,
       }
     });
   } catch (error) {
@@ -901,6 +991,89 @@ router.post('/mobile/sms', async (req, res) => {
     });
   } catch (error) {
     console.error('SMS webhook error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/mobile/dashboard - Dashboard data for mobile app
+router.get('/mobile/dashboard', auth, async (req, res) => {
+  try {
+    const { region, period } = req.query;
+
+    let regionFilter = '';
+    const regionParams = [];
+    if (region) {
+      regionFilter = ' AND region = ?';
+      regionParams.push(region);
+    }
+
+    // Stats
+    const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM cohrm_rumors WHERE 1=1${regionFilter}`, regionParams);
+    const [[{ pending }]] = await db.query(`SELECT COUNT(*) as pending FROM cohrm_rumors WHERE status = 'pending'${regionFilter}`, regionParams);
+    const [[{ investigating }]] = await db.query(`SELECT COUNT(*) as investigating FROM cohrm_rumors WHERE status = 'investigating'${regionFilter}`, regionParams);
+    const [[{ confirmed }]] = await db.query(`SELECT COUNT(*) as confirmed FROM cohrm_rumors WHERE status = 'confirmed'${regionFilter}`, regionParams);
+    const [[{ false_alarm }]] = await db.query(`SELECT COUNT(*) as false_alarm FROM cohrm_rumors WHERE status = 'false_alarm'${regionFilter}`, regionParams);
+    const [[{ closed }]] = await db.query(`SELECT COUNT(*) as closed FROM cohrm_rumors WHERE status = 'closed'${regionFilter}`, regionParams);
+    const [[{ high_priority }]] = await db.query(`SELECT COUNT(*) as high_priority FROM cohrm_rumors WHERE priority = 'high' AND status != 'closed'${regionFilter}`, regionParams);
+    const [[{ critical }]] = await db.query(`SELECT COUNT(*) as critical FROM cohrm_rumors WHERE priority = 'critical' AND status != 'closed'${regionFilter}`, regionParams);
+    const [[{ today_count }]] = await db.query(`SELECT COUNT(*) as today_count FROM cohrm_rumors WHERE DATE(created_at) = CURDATE()${regionFilter}`, regionParams);
+    const [[{ week_count }]] = await db.query(`SELECT COUNT(*) as week_count FROM cohrm_rumors WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)${regionFilter}`, regionParams);
+    const [[{ month_count }]] = await db.query(`SELECT COUNT(*) as month_count FROM cohrm_rumors WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())${regionFilter}`, regionParams);
+
+    // By region
+    const [byRegion] = await db.query(`SELECT region as \`key\`, region as label, COUNT(*) as value FROM cohrm_rumors WHERE region IS NOT NULL AND region != '' GROUP BY region ORDER BY value DESC`);
+
+    // By category
+    const [byCategory] = await db.query(`SELECT category as \`key\`, category as label, COUNT(*) as value FROM cohrm_rumors WHERE category IS NOT NULL${regionFilter} GROUP BY category ORDER BY value DESC`, regionParams);
+
+    // By status
+    const [byStatus] = await db.query(`SELECT status as \`key\`, status as label, COUNT(*) as value FROM cohrm_rumors WHERE 1=1${regionFilter} GROUP BY status ORDER BY value DESC`, regionParams);
+
+    // By source
+    const [bySource] = await db.query(`SELECT source as \`key\`, source as label, COUNT(*) as value FROM cohrm_rumors WHERE source IS NOT NULL${regionFilter} GROUP BY source ORDER BY value DESC`, regionParams);
+
+    // By priority
+    const [byPriority] = await db.query(`SELECT priority as \`key\`, priority as label, COUNT(*) as value FROM cohrm_rumors WHERE priority IS NOT NULL${regionFilter} GROUP BY priority ORDER BY value DESC`, regionParams);
+
+    // By risk level
+    const [byRisk] = await db.query(`SELECT risk_level as \`key\`, risk_level as label, COUNT(*) as value FROM cohrm_rumors WHERE risk_level IS NOT NULL${regionFilter} GROUP BY risk_level ORDER BY value DESC`, regionParams);
+
+    // Trends (last 30 days)
+    const [trends] = await db.query(`SELECT DATE(created_at) as date, COUNT(*) as count FROM cohrm_rumors WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)${regionFilter} GROUP BY DATE(created_at) ORDER BY date ASC`, regionParams);
+
+    // Recent rumors
+    const [recentRumors] = await db.query(`
+      SELECT id, code, title, category, status, priority, risk_level as riskLevel, source, region, department,
+        CONCAT(reporter.first_name, ' ', reporter.last_name) as reporter_name,
+        r.created_at
+      FROM cohrm_rumors r
+      LEFT JOIN users reporter ON r.reported_by = reporter.id
+      WHERE 1=1${regionFilter ? regionFilter.replace(/region/g, 'r.region') : ''}
+      ORDER BY r.created_at DESC
+      LIMIT 20
+    `, regionParams);
+
+    res.json({
+      success: true,
+      data: {
+        stats: { total, pending, investigating, confirmed, false_alarm, closed, high_priority, critical, today_count, week_count, month_count },
+        by_region: byRegion,
+        by_category: byCategory,
+        by_status: byStatus,
+        by_source: bySource,
+        by_priority: byPriority,
+        by_risk: byRisk,
+        trends: trends.map(t => ({ date: t.date, count: t.count })),
+        recent_rumors: recentRumors.map(r => ({
+          id: r.id, code: r.code, title: r.title, category: r.category,
+          status: r.status, priority: r.priority, risk: r.riskLevel || 'unknown',
+          source: r.source, region: r.region, department: r.department,
+          created_at: r.created_at, reporter_name: r.reporter_name
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Mobile dashboard error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

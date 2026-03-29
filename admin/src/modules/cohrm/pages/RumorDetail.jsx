@@ -86,7 +86,7 @@ const RumorDetail = ({ isDark = false, user }) => {
       fetchRumor(selectedRumorId);
     }
     return () => clearCurrentRumor();
-  }, [selectedRumorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedRumorId]); // eslint-disable-line
 
   // Charger validations et feedbacks quand on change d'onglet
   useEffect(() => {
