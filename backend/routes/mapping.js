@@ -1306,6 +1306,19 @@ router.post('/documents', auth, async (req, res) => {
       pages_count, video_url, video_duration, access_level, is_featured
     } = req.body;
 
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Le titre est requis' });
+    }
+
+    // Helper: convert undefined / empty string to null (for nullable INT/DATE columns)
+    const nz = (v) => (v === undefined || v === '' ? null : v);
+    const nzInt = (v) => {
+      const n = nz(v);
+      if (n === null) return null;
+      const parsed = parseInt(n, 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    };
+
     // Generate slug
     const slug = title.toLowerCase()
       .replace(/[àáâãäå]/g, 'a')
@@ -1329,12 +1342,13 @@ router.post('/documents', auth, async (req, res) => {
        pages_count, video_url, video_duration, access_level, is_featured)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      title, finalSlug, type, description, content, file_path, file_type, file_size, thumbnail,
+      title, finalSlug, type || 'article',
+      nz(description), nz(content), nz(file_path), nz(file_type), nzInt(file_size), nz(thumbnail),
       JSON.stringify(authors || []),
-      organization_id, publication_date, language || 'fr',
+      nzInt(organization_id), nz(publication_date), language || 'fr',
       JSON.stringify(themes || []),
-      doi, isbn, pages_count, video_url, video_duration,
-      access_level || 'public', is_featured || false
+      nz(doi), nz(isbn), nzInt(pages_count), nz(video_url), nzInt(video_duration),
+      access_level || 'public', is_featured ? 1 : 0
     ]);
 
     // Auto-generate PDF thumbnail if none provided
@@ -1367,11 +1381,27 @@ router.put('/documents/:id', auth, async (req, res) => {
 
     const updates = [];
     const params = [];
+    const intFields = ['file_size', 'organization_id', 'pages_count', 'video_duration', 'is_featured', 'is_active', 'version'];
+    const dateFields = ['publication_date'];
 
     for (const [key, value] of Object.entries(fields)) {
       if (allowedFields.includes(key)) {
         updates.push(`${key} = ?`);
-        params.push(['authors', 'themes'].includes(key) ? JSON.stringify(value) : value);
+        if (['authors', 'themes'].includes(key)) {
+          params.push(JSON.stringify(value || []));
+        } else if (value === undefined || value === '') {
+          // Empty strings would fail INT/DATE columns; coerce to null
+          params.push(intFields.includes(key) || dateFields.includes(key) ? null : value === undefined ? null : value);
+        } else if (intFields.includes(key)) {
+          if (key === 'is_featured' || key === 'is_active') {
+            params.push(value ? 1 : 0);
+          } else {
+            const n = parseInt(value, 10);
+            params.push(Number.isNaN(n) ? null : n);
+          }
+        } else {
+          params.push(value);
+        }
       }
     }
 
