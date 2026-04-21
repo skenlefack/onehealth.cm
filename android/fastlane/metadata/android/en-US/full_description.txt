@@ -1,0 +1,21 @@
+COHRM - One Health Rumor Management System Cameroon
+
+The COHRM mobile application enables community health workers and health professionals to report, track, and manage health events in Cameroon using the One Health approach.
+
+KEY FEATURES:
+
+- Quick Reporting: Multi-step form for reporting health events (human, animal, environmental)
+- GPS Location: Automatic geolocation of reports on the map
+- Offline Mode: Works without internet connection, with automatic synchronization
+- Dashboard: Real-time statistics and trends
+- Rumor Management: 5-level validation cycle tracking
+- Web Scanner: Automatic detection of health rumors online
+- Notifications: Real-time alerts for critical events
+- SMS: Structured SMS reporting for areas without internet
+
+SECURITY:
+- Secure JWT authentication
+- Encryption of sensitive data
+- Reporter confidentiality protection
+
+Developed by the Ministry of Public Health of Cameroon as part of the One Health program.

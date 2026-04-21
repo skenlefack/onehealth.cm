@@ -1,0 +1,362 @@
+/* Localizable.strings (English)
+   COHRM Cameroon - Health reporting application */
+
+// ========================================
+// TABS
+// ========================================
+"tab.home" = "Home";
+"tab.history" = "History";
+"tab.settings" = "Settings";
+
+// ========================================
+// ONBOARDING
+// ========================================
+"onboarding.page1.title" = "Protect your community";
+"onboarding.page1.subtitle" = "Participate in One Health surveillance by reporting health events in your region.";
+"onboarding.page2.title" = "Report quickly";
+"onboarding.page2.subtitle" = "In a few simple steps, transmit essential information to health authorities.";
+"onboarding.page3.title" = "Even without internet";
+"onboarding.page3.subtitle" = "Your reports are saved locally and automatically synchronized when the network becomes available.";
+"onboarding.next" = "Next";
+"onboarding.start" = "Get Started";
+"onboarding.skip" = "Skip";
+
+// ========================================
+// HOME
+// ========================================
+"home.title" = "COHRM Cameroon";
+"home.subtitle" = "One Health surveillance";
+"home.report_button" = "Report an event";
+"home.sms_button" = "SMS Report";
+"home.stats.total" = "Total reports";
+"home.stats.pending" = "Pending sync";
+"home.stats.synced" = "Synchronized";
+"home.recent" = "Recent reports";
+"home.no_reports" = "No reports";
+"home.no_reports_desc" = "Report a health event to get started.";
+"home.offline_banner" = "Offline mode — Reports will be sent when the network returns.";
+
+// ========================================
+// REPORT - STEPS
+// ========================================
+"report.title" = "New report";
+"report.step" = "Step %d of %d";
+"report.step1.title" = "Event type";
+"report.step1.subtitle" = "Select the health event category";
+"report.step1.species" = "Species involved";
+"report.step2.title" = "Location";
+"report.step2.subtitle" = "Indicate the event location";
+"report.step2.locate" = "Locate me";
+"report.step2.region" = "Region";
+"report.step2.department" = "Department";
+"report.step2.district" = "Health district";
+"report.step2.locality" = "Locality / Village";
+"report.step2.description" = "Location description";
+"report.step2.select_region" = "Select a region";
+"report.step2.select_department" = "Select a department";
+"report.step3.title" = "Details";
+"report.step3.subtitle" = "Describe the event in detail";
+"report.step3.event_title" = "Report title";
+"report.step3.event_title_placeholder" = "E.g.: Suspected hemorrhagic fever cases";
+"report.step3.description" = "Description";
+"report.step3.description_placeholder" = "Describe the situation observed, circumstances, context...";
+"report.step3.symptoms" = "Observed symptoms";
+"report.step3.affected_count" = "Number of cases / affected people";
+"report.step3.date_started" = "Start date";
+"report.step3.photos" = "Photos";
+"report.step3.add_photos" = "Add photos";
+"report.step3.photos_hint" = "Maximum 3 photos (optional)";
+"report.step4.title" = "Your information";
+"report.step4.subtitle" = "This information remains confidential";
+"report.step4.anonymous" = "Anonymous report";
+"report.step4.anonymous_hint" = "Your identity will not be shared publicly.";
+"report.step4.name" = "Full name";
+"report.step4.name_placeholder" = "First and Last Name";
+"report.step4.phone" = "Phone";
+"report.step4.phone_placeholder" = "6XX XXX XXX";
+"report.step4.email" = "Email (optional)";
+"report.step4.email_placeholder" = "example@email.com";
+"report.step4.privacy_notice" = "Your personal information is protected and will only be used to contact you if necessary.";
+"report.step5.title" = "Confirmation";
+"report.step5.subtitle" = "Review the information before sending";
+"report.step5.section.event" = "Event";
+"report.step5.section.location" = "Location";
+"report.step5.section.details" = "Details";
+"report.step5.section.photos" = "Photos";
+"report.step5.section.personal" = "Personal information";
+"report.step5.anonymous" = "Anonymous";
+"report.step5.submit" = "Submit report";
+"report.step5.submitting" = "Sending...";
+"report.step5.offline_notice" = "No connection — The report will be saved and sent automatically.";
+"report.success.title" = "Report sent";
+"report.success.message" = "Your report has been successfully transmitted. Thank you for your contribution to health surveillance.";
+"report.saved.title" = "Report saved";
+"report.saved.message" = "Your report has been saved locally and will be synchronized when the network becomes available.";
+"report.error.title" = "Error";
+"report.error.message" = "An error occurred during sending. The report has been saved locally.";
+"report.cancel.title" = "Abandon?";
+"report.cancel.message" = "Do you want to abandon this report? Entered data will be lost.";
+"report.cancel.confirm" = "Abandon";
+"report.cancel.continue" = "Continue";
+"report.next" = "Next";
+"report.previous" = "Previous";
+
+// ========================================
+// EVENT TYPES
+// ========================================
+"event.human_health" = "Human health";
+"event.animal_health" = "Animal health";
+"event.environmental" = "Environment";
+"event.safety" = "Safety";
+"event.disaster" = "Disaster";
+"event.other" = "Other";
+
+// ========================================
+// SYMPTOMS
+// ========================================
+"symptom.fever" = "Fever";
+"symptom.vomiting" = "Vomiting";
+"symptom.diarrhea" = "Diarrhea";
+"symptom.cough" = "Cough";
+"symptom.rash" = "Skin rash";
+"symptom.hemorrhage" = "Hemorrhage";
+"symptom.paralysis" = "Paralysis";
+"symptom.mortality" = "Mortality";
+"symptom.abortion" = "Abortion";
+"symptom.respiratory" = "Respiratory issues";
+"symptom.neurological" = "Neurological symptoms";
+"symptom.edema" = "Edema";
+
+// ========================================
+// SPECIES
+// ========================================
+"species.human" = "Human";
+"species.bovine" = "Bovine";
+"species.sheep_goat" = "Sheep/Goat";
+"species.poultry" = "Poultry";
+"species.swine" = "Swine";
+"species.wildlife" = "Wildlife";
+"species.dog_cat" = "Dog/Cat";
+"species.other" = "Other";
+
+// ========================================
+// PRIORITIES
+// ========================================
+"priority.low" = "Low";
+"priority.medium" = "Medium";
+"priority.high" = "High";
+"priority.critical" = "Critical";
+
+// ========================================
+// SYNC STATUS
+// ========================================
+"status.draft" = "Draft";
+"status.pending" = "Pending";
+"status.syncing" = "Syncing...";
+"status.synced" = "Synced";
+"status.error" = "Error";
+
+// ========================================
+// HISTORY
+// ========================================
+"history.title" = "History";
+"history.search" = "Search reports";
+"history.filter.all" = "All";
+"history.filter.pending" = "Pending";
+"history.filter.synced" = "Synced";
+"history.filter.error" = "Errors";
+"history.empty" = "No reports";
+"history.empty_desc" = "Your reports will appear here.";
+"history.delete.title" = "Delete?";
+"history.delete.message" = "This action is irreversible. The report will be deleted locally.";
+"history.delete.confirm" = "Delete";
+"history.retry" = "Retry sync";
+
+// ========================================
+// SMS
+// ========================================
+"sms.title" = "SMS Report";
+"sms.subtitle" = "Send a structured SMS report";
+"sms.category" = "Category";
+"sms.species" = "Species";
+"sms.symptoms" = "Symptoms";
+"sms.region" = "Region";
+"sms.description" = "Short description";
+"sms.description_placeholder" = "Briefly describe the situation (max 100 chars)";
+"sms.preview" = "SMS Preview";
+"sms.send" = "Send by SMS";
+"sms.unavailable" = "SMS sending is not available on this device.";
+
+// ========================================
+// SETTINGS
+// ========================================
+"settings.title" = "Settings";
+"settings.language" = "Language";
+"settings.language.fr" = "Français";
+"settings.language.en" = "English";
+"settings.server" = "Server";
+"settings.server.url" = "Server URL";
+"settings.server.hint" = "COHRM server address";
+"settings.notifications" = "Notifications";
+"settings.notifications.push" = "Push notifications";
+"settings.storage" = "Storage";
+"settings.storage.cache_size" = "Cache size";
+"settings.storage.clear_cache" = "Clear photo cache";
+"settings.storage.clear_confirm" = "Do you want to delete all cached photos?";
+"settings.about" = "About";
+"settings.about.version" = "Version";
+"settings.about.build" = "Build";
+"settings.about.description" = "COHRM Cameroon is a One Health surveillance application developed for Cameroon. It enables rapid reporting of public health, animal, and environmental events.";
+"settings.data" = "Data";
+"settings.data.export" = "Export data";
+"settings.data.reset" = "Reset data";
+"settings.data.reset_confirm" = "Do you want to delete all local reports? This action is irreversible.";
+
+// ========================================
+// LOCATION
+// ========================================
+"location.permission_denied" = "Location access was denied. Enable it in Settings > Privacy > Location Services.";
+"location.locating" = "Locating...";
+
+// ========================================
+// ERRORS
+// ========================================
+"error.invalid_url" = "Invalid URL";
+"error.invalid_response" = "Invalid server response";
+"error.unauthorized" = "Session expired";
+"error.forbidden" = "Access denied";
+"error.not_found" = "Resource not found";
+"error.validation" = "Invalid data";
+"error.server %d" = "Server error (%d)";
+"error.http %d" = "HTTP error (%d)";
+"error.encoding" = "Encoding error";
+"error.decoding" = "Decoding error";
+"error.network" = "No internet connection";
+
+// ========================================
+// COMMON
+// ========================================
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.delete" = "Delete";
+"common.confirm" = "Confirm";
+"common.save" = "Save";
+"common.close" = "Close";
+"common.retry" = "Retry";
+"common.loading" = "Loading...";
+"common.error" = "Error";
+"common.success" = "Success";
+"common.no_data" = "No data";
+
+// ========================================
+// TABS (NEW)
+// ========================================
+"tab.dashboard" = "Dashboard";
+"tab.rumors" = "Rumors";
+
+// ========================================
+// DASHBOARD
+// ========================================
+"dashboard.title" = "Dashboard";
+"dashboard.subtitle" = "COHRM system overview";
+"dashboard.total" = "Total";
+"dashboard.pending" = "Pending";
+"dashboard.investigating" = "Investigating";
+"dashboard.confirmed" = "Confirmed";
+"dashboard.false_alarm" = "False alarms";
+"dashboard.closed" = "Closed";
+"dashboard.high_priority" = "High priority";
+"dashboard.critical" = "Critical";
+"dashboard.today" = "Today";
+"dashboard.this_week" = "This week";
+"dashboard.this_month" = "This month";
+"dashboard.trends" = "Trends (7 days)";
+"dashboard.by_status" = "By status";
+"dashboard.by_region" = "By region";
+"dashboard.by_category" = "By category";
+"dashboard.by_source" = "By source";
+"dashboard.recent_rumors" = "Recent rumors";
+"dashboard.no_data" = "No data available";
+"dashboard.load_error" = "Loading error";
+
+// ========================================
+// RUMORS
+// ========================================
+"rumors.title" = "Rumors";
+"rumors.search" = "Search rumors";
+"rumors.filter.all" = "All";
+"rumors.filter.pending" = "Pending";
+"rumors.filter.investigating" = "Investigating";
+"rumors.filter.confirmed" = "Confirmed";
+"rumors.filter.false_alarm" = "False alarms";
+"rumors.filter.closed" = "Closed";
+"rumors.empty" = "No rumors";
+"rumors.empty_desc" = "No rumors match the criteria.";
+"rumors.load_more" = "Load more";
+"rumors.detail.title" = "Rumor detail";
+"rumors.detail.description" = "Description";
+"rumors.detail.category" = "Category";
+"rumors.detail.species" = "Species";
+"rumors.detail.symptoms" = "Symptoms";
+"rumors.detail.affected" = "Reported cases";
+"rumors.detail.deaths" = "Deaths";
+"rumors.detail.location" = "Location";
+"rumors.detail.region" = "Region";
+"rumors.detail.department" = "Department";
+"rumors.detail.reporter" = "Reporter";
+"rumors.detail.risk_level" = "Risk level";
+"rumors.detail.validation" = "Validation history";
+"rumors.detail.notes" = "Notes";
+"rumors.detail.photos" = "Photos";
+"rumors.detail.add_note" = "Add a note";
+"rumors.detail.note_placeholder" = "Write a note...";
+"rumors.detail.send_note" = "Send";
+"rumors.detail.no_validation" = "No validations";
+"rumors.detail.no_notes" = "No notes";
+"rumors.status.pending" = "Pending";
+"rumors.status.investigating" = "Investigating";
+"rumors.status.confirmed" = "Confirmed";
+"rumors.status.false_alarm" = "False alarm";
+"rumors.status.closed" = "Closed";
+
+// ========================================
+// SCANNER
+// ========================================
+"scanner.title" = "Web Scanner";
+"scanner.subtitle" = "Detect health rumors online";
+"scanner.source" = "Source";
+"scanner.source.all" = "All sources";
+"scanner.source.google" = "Google";
+"scanner.source.twitter" = "Twitter/X";
+"scanner.source.facebook" = "Facebook";
+"scanner.keywords" = "Keywords";
+"scanner.keywords_placeholder" = "E.g.: epidemic, fever, mortality...";
+"scanner.run" = "Run scan";
+"scanner.scanning" = "Scanning...";
+"scanner.history" = "Scan history";
+"scanner.no_scans" = "No scans";
+"scanner.no_scans_desc" = "Run a scan to detect rumors.";
+"scanner.results" = "Results";
+"scanner.results_count" = "%d result(s)";
+"scanner.rumors_created" = "%d rumor(s) created";
+"scanner.detail.title" = "Scan detail";
+"scanner.detail.matched" = "Matched keywords";
+"scanner.detail.relevance" = "Relevance";
+"scanner.detail.converted" = "Converted to rumor";
+
+// ========================================
+// NOTIFICATIONS
+// ========================================
+"notifications.title" = "Notifications";
+"notifications.empty" = "No notifications";
+"notifications.empty_desc" = "You have no notifications yet.";
+"notifications.type.new_rumor" = "New rumor";
+"notifications.type.escalation" = "Escalation";
+"notifications.type.validation" = "Validation";
+"notifications.type.rejection" = "Rejection";
+"notifications.type.risk_assessment" = "Risk assessment";
+"notifications.type.reminder" = "Reminder";
+"notifications.type.system" = "System";
+"notifications.status.sent" = "Sent";
+"notifications.status.failed" = "Failed";
+"notifications.status.pending" = "Pending";

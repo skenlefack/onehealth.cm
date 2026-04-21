@@ -1,0 +1,362 @@
+/* Localizable.strings (Français)
+   COHRM Cameroun - Application de signalement sanitaire */
+
+// ========================================
+// ONGLETS
+// ========================================
+"tab.home" = "Accueil";
+"tab.history" = "Historique";
+"tab.settings" = "Paramètres";
+
+// ========================================
+// ONBOARDING
+// ========================================
+"onboarding.page1.title" = "Protégez votre communauté";
+"onboarding.page1.subtitle" = "Participez à la surveillance sanitaire One Health en signalant les événements de santé dans votre région.";
+"onboarding.page2.title" = "Signalez rapidement";
+"onboarding.page2.subtitle" = "En quelques étapes simples, transmettez les informations essentielles aux autorités sanitaires.";
+"onboarding.page3.title" = "Même sans internet";
+"onboarding.page3.subtitle" = "Vos signalements sont sauvegardés localement et synchronisés automatiquement dès que le réseau est disponible.";
+"onboarding.next" = "Suivant";
+"onboarding.start" = "Commencer";
+"onboarding.skip" = "Passer";
+
+// ========================================
+// ACCUEIL
+// ========================================
+"home.title" = "COHRM Cameroun";
+"home.subtitle" = "Surveillance sanitaire One Health";
+"home.report_button" = "Signaler un événement";
+"home.sms_button" = "Signalement SMS";
+"home.stats.total" = "Total signalements";
+"home.stats.pending" = "En attente de sync";
+"home.stats.synced" = "Synchronisés";
+"home.recent" = "Derniers signalements";
+"home.no_reports" = "Aucun signalement";
+"home.no_reports_desc" = "Signalez un événement sanitaire pour commencer.";
+"home.offline_banner" = "Mode hors-ligne — Les signalements seront envoyés dès le retour du réseau.";
+
+// ========================================
+// SIGNALEMENT - ÉTAPES
+// ========================================
+"report.title" = "Nouveau signalement";
+"report.step" = "Étape %d sur %d";
+"report.step1.title" = "Type d'événement";
+"report.step1.subtitle" = "Sélectionnez la catégorie de l'événement sanitaire";
+"report.step1.species" = "Espèce concernée";
+"report.step2.title" = "Localisation";
+"report.step2.subtitle" = "Indiquez le lieu de l'événement";
+"report.step2.locate" = "Me localiser";
+"report.step2.region" = "Région";
+"report.step2.department" = "Département";
+"report.step2.district" = "District de santé";
+"report.step2.locality" = "Localité / Village";
+"report.step2.description" = "Description du lieu";
+"report.step2.select_region" = "Sélectionner une région";
+"report.step2.select_department" = "Sélectionner un département";
+"report.step3.title" = "Détails";
+"report.step3.subtitle" = "Décrivez l'événement en détail";
+"report.step3.event_title" = "Titre du signalement";
+"report.step3.event_title_placeholder" = "Ex: Cas suspects de fièvre hémorragique";
+"report.step3.description" = "Description";
+"report.step3.description_placeholder" = "Décrivez la situation observée, les circonstances, le contexte...";
+"report.step3.symptoms" = "Symptômes observés";
+"report.step3.affected_count" = "Nombre de cas / personnes affectées";
+"report.step3.date_started" = "Date de début";
+"report.step3.photos" = "Photos";
+"report.step3.add_photos" = "Ajouter des photos";
+"report.step3.photos_hint" = "Maximum 3 photos (optionnel)";
+"report.step4.title" = "Vos informations";
+"report.step4.subtitle" = "Ces informations restent confidentielles";
+"report.step4.anonymous" = "Signalement anonyme";
+"report.step4.anonymous_hint" = "Votre identité ne sera pas partagée publiquement.";
+"report.step4.name" = "Nom complet";
+"report.step4.name_placeholder" = "Prénom et Nom";
+"report.step4.phone" = "Téléphone";
+"report.step4.phone_placeholder" = "6XX XXX XXX";
+"report.step4.email" = "Email (optionnel)";
+"report.step4.email_placeholder" = "exemple@email.com";
+"report.step4.privacy_notice" = "Vos informations personnelles sont protégées et ne seront utilisées que pour vous recontacter si nécessaire.";
+"report.step5.title" = "Confirmation";
+"report.step5.subtitle" = "Vérifiez les informations avant envoi";
+"report.step5.section.event" = "Événement";
+"report.step5.section.location" = "Localisation";
+"report.step5.section.details" = "Détails";
+"report.step5.section.photos" = "Photos";
+"report.step5.section.personal" = "Informations personnelles";
+"report.step5.anonymous" = "Anonyme";
+"report.step5.submit" = "Envoyer le signalement";
+"report.step5.submitting" = "Envoi en cours...";
+"report.step5.offline_notice" = "Pas de connexion — Le signalement sera sauvegardé et envoyé automatiquement.";
+"report.success.title" = "Signalement envoyé";
+"report.success.message" = "Votre signalement a été transmis avec succès. Merci pour votre contribution à la surveillance sanitaire.";
+"report.saved.title" = "Signalement sauvegardé";
+"report.saved.message" = "Votre signalement a été enregistré localement et sera synchronisé dès que le réseau sera disponible.";
+"report.error.title" = "Erreur";
+"report.error.message" = "Une erreur est survenue lors de l'envoi. Le signalement a été sauvegardé localement.";
+"report.cancel.title" = "Abandonner ?";
+"report.cancel.message" = "Voulez-vous abandonner ce signalement ? Les données saisies seront perdues.";
+"report.cancel.confirm" = "Abandonner";
+"report.cancel.continue" = "Continuer";
+"report.next" = "Suivant";
+"report.previous" = "Précédent";
+
+// ========================================
+// TYPES D'ÉVÉNEMENTS
+// ========================================
+"event.human_health" = "Santé humaine";
+"event.animal_health" = "Santé animale";
+"event.environmental" = "Environnement";
+"event.safety" = "Sécurité";
+"event.disaster" = "Catastrophe";
+"event.other" = "Autre";
+
+// ========================================
+// SYMPTÔMES
+// ========================================
+"symptom.fever" = "Fièvre";
+"symptom.vomiting" = "Vomissements";
+"symptom.diarrhea" = "Diarrhée";
+"symptom.cough" = "Toux";
+"symptom.rash" = "Éruption cutanée";
+"symptom.hemorrhage" = "Hémorragie";
+"symptom.paralysis" = "Paralysie";
+"symptom.mortality" = "Mortalité";
+"symptom.abortion" = "Avortement";
+"symptom.respiratory" = "Problèmes respiratoires";
+"symptom.neurological" = "Symptômes neurologiques";
+"symptom.edema" = "Oedèmes";
+
+// ========================================
+// ESPÈCES
+// ========================================
+"species.human" = "Humain";
+"species.bovine" = "Bovin";
+"species.sheep_goat" = "Ovin/Caprin";
+"species.poultry" = "Volaille";
+"species.swine" = "Porcin";
+"species.wildlife" = "Faune sauvage";
+"species.dog_cat" = "Chien/Chat";
+"species.other" = "Autre";
+
+// ========================================
+// PRIORITÉS
+// ========================================
+"priority.low" = "Basse";
+"priority.medium" = "Moyenne";
+"priority.high" = "Haute";
+"priority.critical" = "Critique";
+
+// ========================================
+// STATUTS DE SYNCHRONISATION
+// ========================================
+"status.draft" = "Brouillon";
+"status.pending" = "En attente";
+"status.syncing" = "Synchronisation...";
+"status.synced" = "Synchronisé";
+"status.error" = "Erreur";
+
+// ========================================
+// HISTORIQUE
+// ========================================
+"history.title" = "Historique";
+"history.search" = "Rechercher un signalement";
+"history.filter.all" = "Tous";
+"history.filter.pending" = "En attente";
+"history.filter.synced" = "Synchronisés";
+"history.filter.error" = "Erreurs";
+"history.empty" = "Aucun signalement";
+"history.empty_desc" = "Vos signalements apparaîtront ici.";
+"history.delete.title" = "Supprimer ?";
+"history.delete.message" = "Cette action est irréversible. Le signalement sera supprimé localement.";
+"history.delete.confirm" = "Supprimer";
+"history.retry" = "Resynchroniser";
+
+// ========================================
+// SMS
+// ========================================
+"sms.title" = "Signalement SMS";
+"sms.subtitle" = "Envoyez un signalement par SMS structuré";
+"sms.category" = "Catégorie";
+"sms.species" = "Espèce";
+"sms.symptoms" = "Symptômes";
+"sms.region" = "Région";
+"sms.description" = "Description courte";
+"sms.description_placeholder" = "Décrivez brièvement la situation (max 100 car.)";
+"sms.preview" = "Aperçu du SMS";
+"sms.send" = "Envoyer par SMS";
+"sms.unavailable" = "L'envoi de SMS n'est pas disponible sur cet appareil.";
+
+// ========================================
+// PARAMÈTRES
+// ========================================
+"settings.title" = "Paramètres";
+"settings.language" = "Langue";
+"settings.language.fr" = "Français";
+"settings.language.en" = "English";
+"settings.server" = "Serveur";
+"settings.server.url" = "URL du serveur";
+"settings.server.hint" = "Adresse du serveur COHRM";
+"settings.notifications" = "Notifications";
+"settings.notifications.push" = "Notifications push";
+"settings.storage" = "Stockage";
+"settings.storage.cache_size" = "Taille du cache";
+"settings.storage.clear_cache" = "Vider le cache photos";
+"settings.storage.clear_confirm" = "Voulez-vous supprimer toutes les photos en cache ?";
+"settings.about" = "À propos";
+"settings.about.version" = "Version";
+"settings.about.build" = "Build";
+"settings.about.description" = "COHRM Cameroun est une application de surveillance sanitaire One Health développée pour le Cameroun. Elle permet le signalement rapide d'événements de santé publique, animale et environnementale.";
+"settings.data" = "Données";
+"settings.data.export" = "Exporter les données";
+"settings.data.reset" = "Réinitialiser les données";
+"settings.data.reset_confirm" = "Voulez-vous supprimer tous les signalements locaux ? Cette action est irréversible.";
+
+// ========================================
+// LOCALISATION
+// ========================================
+"location.permission_denied" = "L'accès à la localisation a été refusé. Activez-le dans Réglages > Confidentialité > Service de localisation.";
+"location.locating" = "Localisation en cours...";
+
+// ========================================
+// ERREURS
+// ========================================
+"error.invalid_url" = "URL invalide";
+"error.invalid_response" = "Réponse invalide du serveur";
+"error.unauthorized" = "Session expirée";
+"error.forbidden" = "Accès refusé";
+"error.not_found" = "Ressource introuvable";
+"error.validation" = "Données invalides";
+"error.server %d" = "Erreur serveur (%d)";
+"error.http %d" = "Erreur HTTP (%d)";
+"error.encoding" = "Erreur d'encodage";
+"error.decoding" = "Erreur de décodage";
+"error.network" = "Pas de connexion internet";
+
+// ========================================
+// COMMUN
+// ========================================
+"common.ok" = "OK";
+"common.cancel" = "Annuler";
+"common.delete" = "Supprimer";
+"common.confirm" = "Confirmer";
+"common.save" = "Enregistrer";
+"common.close" = "Fermer";
+"common.retry" = "Réessayer";
+"common.loading" = "Chargement...";
+"common.error" = "Erreur";
+"common.success" = "Succès";
+"common.no_data" = "Aucune donnée";
+
+// ========================================
+// ONGLETS (NOUVEAUX)
+// ========================================
+"tab.dashboard" = "Dashboard";
+"tab.rumors" = "Rumeurs";
+
+// ========================================
+// TABLEAU DE BORD
+// ========================================
+"dashboard.title" = "Tableau de bord";
+"dashboard.subtitle" = "Vue d'ensemble du système COHRM";
+"dashboard.total" = "Total";
+"dashboard.pending" = "En attente";
+"dashboard.investigating" = "Investigation";
+"dashboard.confirmed" = "Confirmées";
+"dashboard.false_alarm" = "Fausses alertes";
+"dashboard.closed" = "Clôturées";
+"dashboard.high_priority" = "Haute priorité";
+"dashboard.critical" = "Critiques";
+"dashboard.today" = "Aujourd'hui";
+"dashboard.this_week" = "Cette semaine";
+"dashboard.this_month" = "Ce mois";
+"dashboard.trends" = "Tendances (7 jours)";
+"dashboard.by_status" = "Par statut";
+"dashboard.by_region" = "Par région";
+"dashboard.by_category" = "Par catégorie";
+"dashboard.by_source" = "Par source";
+"dashboard.recent_rumors" = "Rumeurs récentes";
+"dashboard.no_data" = "Aucune donnée disponible";
+"dashboard.load_error" = "Erreur de chargement";
+
+// ========================================
+// RUMEURS
+// ========================================
+"rumors.title" = "Rumeurs";
+"rumors.search" = "Rechercher une rumeur";
+"rumors.filter.all" = "Toutes";
+"rumors.filter.pending" = "En attente";
+"rumors.filter.investigating" = "Investigation";
+"rumors.filter.confirmed" = "Confirmées";
+"rumors.filter.false_alarm" = "Fausses alertes";
+"rumors.filter.closed" = "Clôturées";
+"rumors.empty" = "Aucune rumeur";
+"rumors.empty_desc" = "Aucune rumeur ne correspond aux critères.";
+"rumors.load_more" = "Charger plus";
+"rumors.detail.title" = "Détail de la rumeur";
+"rumors.detail.description" = "Description";
+"rumors.detail.category" = "Catégorie";
+"rumors.detail.species" = "Espèce";
+"rumors.detail.symptoms" = "Symptômes";
+"rumors.detail.affected" = "Cas signalés";
+"rumors.detail.deaths" = "Décès";
+"rumors.detail.location" = "Localisation";
+"rumors.detail.region" = "Région";
+"rumors.detail.department" = "Département";
+"rumors.detail.reporter" = "Rapporteur";
+"rumors.detail.risk_level" = "Niveau de risque";
+"rumors.detail.validation" = "Historique de validation";
+"rumors.detail.notes" = "Notes";
+"rumors.detail.photos" = "Photos";
+"rumors.detail.add_note" = "Ajouter une note";
+"rumors.detail.note_placeholder" = "Écrire une note...";
+"rumors.detail.send_note" = "Envoyer";
+"rumors.detail.no_validation" = "Aucune validation";
+"rumors.detail.no_notes" = "Aucune note";
+"rumors.status.pending" = "En attente";
+"rumors.status.investigating" = "Investigation";
+"rumors.status.confirmed" = "Confirmée";
+"rumors.status.false_alarm" = "Fausse alerte";
+"rumors.status.closed" = "Clôturée";
+
+// ========================================
+// SCANNER
+// ========================================
+"scanner.title" = "Scanner Web";
+"scanner.subtitle" = "Détecter les rumeurs sanitaires en ligne";
+"scanner.source" = "Source";
+"scanner.source.all" = "Toutes les sources";
+"scanner.source.google" = "Google";
+"scanner.source.twitter" = "Twitter/X";
+"scanner.source.facebook" = "Facebook";
+"scanner.keywords" = "Mots-clés";
+"scanner.keywords_placeholder" = "Ex: épidémie, fièvre, mortalité...";
+"scanner.run" = "Lancer le scan";
+"scanner.scanning" = "Scan en cours...";
+"scanner.history" = "Historique des scans";
+"scanner.no_scans" = "Aucun scan";
+"scanner.no_scans_desc" = "Lancez un scan pour détecter des rumeurs.";
+"scanner.results" = "Résultats";
+"scanner.results_count" = "%d résultat(s)";
+"scanner.rumors_created" = "%d rumeur(s) créée(s)";
+"scanner.detail.title" = "Détail du scan";
+"scanner.detail.matched" = "Mots-clés trouvés";
+"scanner.detail.relevance" = "Pertinence";
+"scanner.detail.converted" = "Converti en rumeur";
+
+// ========================================
+// NOTIFICATIONS
+// ========================================
+"notifications.title" = "Notifications";
+"notifications.empty" = "Aucune notification";
+"notifications.empty_desc" = "Vous n'avez pas encore de notifications.";
+"notifications.type.new_rumor" = "Nouvelle rumeur";
+"notifications.type.escalation" = "Escalade";
+"notifications.type.validation" = "Validation";
+"notifications.type.rejection" = "Rejet";
+"notifications.type.risk_assessment" = "Évaluation risque";
+"notifications.type.reminder" = "Rappel";
+"notifications.type.system" = "Système";
+"notifications.status.sent" = "Envoyée";
+"notifications.status.failed" = "Échouée";
+"notifications.status.pending" = "En attente";

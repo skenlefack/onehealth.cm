@@ -1,0 +1,3 @@
+app_identifier("cm.onehealth.cohrm")
+apple_id(ENV["APPLE_ID"] || "developer@onehealth.cm")
+team_id(ENV["TEAM_ID"])

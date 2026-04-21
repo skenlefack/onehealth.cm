@@ -1,0 +1,49 @@
+default_platform(:android)
+
+platform :android do
+  desc "Run unit tests"
+  lane :test do
+    gradle(task: "testDebugUnitTest", project_dir: ".")
+  end
+
+  desc "Build debug APK"
+  lane :build_debug do
+    gradle(task: "assembleDebug", project_dir: ".")
+  end
+
+  desc "Build release AAB"
+  lane :build_release do
+    gradle(
+      task: "bundleRelease",
+      project_dir: ".",
+      properties: {
+        "android.injected.signing.store.file" => ENV["KEYSTORE_PATH"] || "app/cohrm-release.jks",
+        "android.injected.signing.store.password" => ENV["KEYSTORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["KEY_PASSWORD"]
+      }
+    )
+  end
+
+  desc "Deploy to Firebase App Distribution"
+  lane :distribute do
+    build_debug
+    firebase_app_distribution(
+      app: ENV["FIREBASE_APP_ID"],
+      groups: "beta-testers",
+      release_notes: "COHRM Mobile - Build #{Time.now.strftime('%Y%m%d%H%M')}"
+    )
+  end
+
+  desc "Deploy to Play Store (internal track)"
+  lane :deploy_internal do
+    build_release
+    upload_to_play_store(
+      track: "internal",
+      aab: "app/build/outputs/bundle/release/app-release.aab",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end

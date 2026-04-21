@@ -1,0 +1,21 @@
+COHRM - Systeme de Gestion des Rumeurs One Health Cameroun
+
+L'application mobile COHRM permet aux agents communautaires et aux professionnels de sante de signaler, suivre et gerer les evenements sanitaires au Cameroun selon l'approche One Health.
+
+FONCTIONNALITES PRINCIPALES :
+
+- Signalement rapide : Formulaire multi-etapes pour rapporter des evenements sanitaires (humains, animaux, environnementaux)
+- Localisation GPS : Geolocalisation automatique des signalements sur la carte
+- Mode hors-ligne : Fonctionnement sans connexion internet, synchronisation automatique
+- Tableau de bord : Statistiques en temps reel et tendances
+- Gestion des rumeurs : Suivi du cycle de validation a 5 niveaux
+- Scanner web : Detection automatique de rumeurs sanitaires en ligne
+- Notifications : Alertes en temps reel sur les evenements critiques
+- SMS : Signalement par SMS structure pour les zones sans internet
+
+SECURITE :
+- Authentification JWT securisee
+- Chiffrement des donnees sensibles
+- Respect de la confidentialite des rapporteurs
+
+Developpe par le Ministere de la Sante Publique du Cameroun dans le cadre du programme One Health.
