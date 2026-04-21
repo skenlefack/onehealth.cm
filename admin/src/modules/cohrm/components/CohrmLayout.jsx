@@ -25,7 +25,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 // Mapping des noms d'icônes vers les composants Lucide
 const ICON_MAP = {
   BarChart3, Megaphone, CheckCircle, Map, Shield, MessageCircle,
-  Globe, Users, Download, Settings,
+  Globe, Users, Download, Settings, Bell,
 };
 
 /**

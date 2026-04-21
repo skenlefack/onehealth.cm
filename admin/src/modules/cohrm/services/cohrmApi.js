@@ -424,6 +424,61 @@ export const downloadCSV = (params = {}) => {
 export const testSMSGateway = (data) => cohrmClient.post('/sms/test', data);
 
 // ============================================
+// NOTIFICATIONS
+// ============================================
+
+/**
+ * Récupère l'historique des notifications avec filtres et pagination
+ * @param {object} params - { page, limit, type, status, rumor_id, user_id, startDate, endDate }
+ */
+export const getNotifications = (params = {}) => {
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+  );
+  return cohrmClient.get('/notifications', { params: cleanParams });
+};
+
+/**
+ * Récupère les notifications de l'utilisateur connecté
+ * @param {object} params - { page, limit }
+ */
+export const getMyNotifications = (params = {}) => cohrmClient.get('/notifications/my', { params });
+
+/**
+ * Récupère les statistiques des notifications (30 derniers jours)
+ */
+export const getNotificationStats = () => cohrmClient.get('/notifications/stats');
+
+/**
+ * Relance une notification échouée
+ * @param {number|string} id - ID de la notification
+ */
+export const retryNotification = (id) => cohrmClient.post(`/notifications/retry/${id}`);
+
+/**
+ * Envoie les rappels de validation en attente
+ */
+export const sendReminders = () => cohrmClient.post('/notifications/send-reminders');
+
+/**
+ * Envoie une notification de test
+ * @param {string} type - Type de notification (new_rumor, escalation, validation, rejection, risk_assessment, reminder)
+ */
+export const sendTestNotification = (type = 'new_rumor') =>
+  cohrmClient.post('/notifications/test', { type });
+
+/**
+ * Récupère les préférences de notification de l'utilisateur
+ */
+export const getNotificationPreferences = () => cohrmClient.get('/notification-preferences');
+
+/**
+ * Met à jour les préférences de notification
+ * @param {object} data - Préférences à mettre à jour
+ */
+export const updateNotificationPreferences = (data) => cohrmClient.put('/notification-preferences', data);
+
+// ============================================
 // EXPORT PAR DÉFAUT
 // ============================================
 
@@ -485,6 +540,15 @@ const cohrmApi = {
   downloadCSV,
   // SMS test
   testSMSGateway,
+  // Notifications
+  getNotifications,
+  getMyNotifications,
+  getNotificationStats,
+  retryNotification,
+  sendReminders,
+  sendTestNotification,
+  getNotificationPreferences,
+  updateNotificationPreferences,
 };
 
 export default cohrmApi;

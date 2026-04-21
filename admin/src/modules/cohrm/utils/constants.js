@@ -302,6 +302,7 @@ export const COHRM_NAV_ITEMS = [
   { id: 'sms', label: 'SMS', icon: 'MessageCircle', minLevel: 3 },
   { id: 'scanner', label: 'Scanner Web', icon: 'Globe', minLevel: 3 },
   { id: 'actors', label: 'Acteurs', icon: 'Users', minLevel: 4 },
+  { id: 'notifications', label: 'Notifications', icon: 'Bell', minLevel: 3 },
   { id: 'export', label: 'Export', icon: 'Download', minLevel: 2 },
   { id: 'settings', label: 'Paramètres', icon: 'Settings', minLevel: 5 },
 ];

@@ -26,6 +26,7 @@ import CohrmSettings from './CohrmSettings';
 import ActorsList from './ActorsList';
 import ActorForm from './ActorForm';
 import ActorDetail from './ActorDetail';
+import NotificationsCenter from './NotificationsCenter';
 
 /**
  * Composant de routing COHRM
@@ -154,6 +155,14 @@ const CohrmRoutes = ({ user, isDark }) => {
         return (
           <ProtectedRoute user={user} section="actor-detail" isDark={isDark}>
             <ActorDetail isDark={isDark} user={user} />
+          </ProtectedRoute>
+        );
+
+      // ---- Notifications (niveau 3+) ----
+      case 'notifications':
+        return (
+          <ProtectedRoute user={user} section="notifications" isDark={isDark}>
+            <NotificationsCenter isDark={isDark} user={user} />
           </ProtectedRoute>
         );
 
