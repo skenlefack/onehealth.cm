@@ -884,7 +884,16 @@ router.post('/mobile/report', async (req, res) => {
       reporter_name,
       reporter_phone,
       device_id,
-      photos
+      photos,
+      date_detection,
+      message_received,
+      category,
+      themes,
+      gravity_comment,
+      source_type,
+      arrondissement,
+      commune,
+      aire_sante
     } = req.body;
 
     if (!title || !region) {
@@ -902,13 +911,19 @@ router.post('/mobile/report', async (req, res) => {
         region, location, latitude, longitude,
         species, symptoms, affected_count, priority, status,
         reporter_name, reporter_phone, reporter_type,
-        device_id, created_at
-      ) VALUES (?, ?, ?, 'mobile', ?, ?, ?, ?, ?, ?, ?, ?, 'medium', 'pending', ?, ?, 'agent', ?, NOW())
+        device_id, date_detection, message_received,
+        category, themes, gravity_comment, source_type,
+        arrondissement, commune, aire_sante, created_at
+      ) VALUES (?, ?, ?, 'mobile', ?, ?, ?, ?, ?, ?, ?, ?, 'medium', 'pending', ?, ?, 'agent', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `, [
       code, title, description, device_id,
       region, location, latitude, longitude,
       species, symptoms, affected_count,
-      reporter_name, reporter_phone, device_id
+      reporter_name, reporter_phone, device_id,
+      date_detection || null, message_received || null,
+      category || 'human_health', themes ? JSON.stringify(themes) : null,
+      gravity_comment || null, source_type || 'mobile_app',
+      arrondissement || null, commune || null, aire_sante || null
     ]);
 
     // Sauvegarder les photos si fournies
@@ -920,6 +935,15 @@ router.post('/mobile/report', async (req, res) => {
         `, [result.insertId, photo]);
       }
     }
+
+    // Notify about the new rumor
+    try {
+      await cohrmNotificationService.notifyNewRumor({
+        id: result.insertId, code, title, region,
+        category: category || 'human_health',
+        priority: 'medium', status: 'pending'
+      });
+    } catch (e) {}
 
     res.status(201).json({
       success: true,
@@ -1014,7 +1038,7 @@ router.get('/mobile/dashboard', auth, async (req, res) => {
     const [[{ confirmed }]] = await db.query(`SELECT COUNT(*) as confirmed FROM cohrm_rumors WHERE status = 'confirmed'${regionFilter}`, regionParams);
     const [[{ false_alarm }]] = await db.query(`SELECT COUNT(*) as false_alarm FROM cohrm_rumors WHERE status = 'false_alarm'${regionFilter}`, regionParams);
     const [[{ closed }]] = await db.query(`SELECT COUNT(*) as closed FROM cohrm_rumors WHERE status = 'closed'${regionFilter}`, regionParams);
-    const [[{ high_priority }]] = await db.query(`SELECT COUNT(*) as high_priority FROM cohrm_rumors WHERE priority = 'high' AND status != 'closed'${regionFilter}`, regionParams);
+    const [[{ high_priority }]] = await db.query(`SELECT COUNT(*) as \`high_priority\` FROM cohrm_rumors WHERE priority = 'high' AND status != 'closed'${regionFilter}`, regionParams);
     const [[{ critical }]] = await db.query(`SELECT COUNT(*) as critical FROM cohrm_rumors WHERE priority = 'critical' AND status != 'closed'${regionFilter}`, regionParams);
     const [[{ today_count }]] = await db.query(`SELECT COUNT(*) as today_count FROM cohrm_rumors WHERE DATE(created_at) = CURDATE()${regionFilter}`, regionParams);
     const [[{ week_count }]] = await db.query(`SELECT COUNT(*) as week_count FROM cohrm_rumors WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)${regionFilter}`, regionParams);
@@ -1043,7 +1067,7 @@ router.get('/mobile/dashboard', auth, async (req, res) => {
 
     // Recent rumors
     const [recentRumors] = await db.query(`
-      SELECT id, code, title, category, status, priority, risk_level as riskLevel, source, region, department,
+      SELECT r.id, r.code, r.title, r.category, r.status, r.priority, r.risk_level as riskLevel, r.source, r.region, r.department,
         CONCAT(reporter.first_name, ' ', reporter.last_name) as reporter_name,
         r.created_at
       FROM cohrm_rumors r
