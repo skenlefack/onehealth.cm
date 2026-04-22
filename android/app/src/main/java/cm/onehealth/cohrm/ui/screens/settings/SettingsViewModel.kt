@@ -16,6 +16,8 @@ import cm.onehealth.cohrm.data.remote.AuthInterceptor
 import cm.onehealth.cohrm.domain.repository.SyncRepository
 import cm.onehealth.cohrm.ui.screens.login.LoginViewModel
 import cm.onehealth.cohrm.util.DeviceHelper
+import cm.onehealth.cohrm.util.SyncEvent
+import cm.onehealth.cohrm.util.SyncStatusBroadcaster
 import cm.onehealth.cohrm.worker.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,10 +34,12 @@ class SettingsViewModel @Inject constructor(
     private val deviceHelper: DeviceHelper,
     private val workManager: WorkManager,
     private val authInterceptor: AuthInterceptor,
+    private val syncStatusBroadcaster: SyncStatusBroadcaster,
 ) : ViewModel() {
 
     companion object {
         private val THEME_KEY = stringPreferencesKey("theme")
+        val LANGUAGE_KEY = stringPreferencesKey("app_language")
         val PUSH_ENABLED_KEY = booleanPreferencesKey("pref_push_enabled")
         val SCAN_NOTIF_KEY = booleanPreferencesKey("pref_scan_notif")
         val RUMOR_NOTIF_KEY = booleanPreferencesKey("pref_rumor_notif")
@@ -43,6 +47,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _theme = MutableStateFlow("system")
     val theme: StateFlow<String> = _theme.asStateFlow()
+
+    private val _language = MutableStateFlow("fr")
+    val language: StateFlow<String> = _language.asStateFlow()
 
     private val _deviceId = MutableStateFlow("")
     val deviceId: StateFlow<String> = _deviceId.asStateFlow()
@@ -78,6 +85,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val prefs = dataStore.data.first()
             _theme.value = prefs[THEME_KEY] ?: "system"
+            _language.value = prefs[LANGUAGE_KEY] ?: "fr"
             _pushEnabled.value = prefs[PUSH_ENABLED_KEY] ?: true
             _scanNotif.value = prefs[SCAN_NOTIF_KEY] ?: true
             _rumorNotif.value = prefs[RUMOR_NOTIF_KEY] ?: true
@@ -102,6 +110,17 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.edit { it[THEME_KEY] = theme }
         }
+    }
+
+    fun setLanguage(lang: String) {
+        _language.value = lang
+        viewModelScope.launch {
+            dataStore.edit { it[LANGUAGE_KEY] = lang }
+        }
+        try {
+            val localeList = androidx.core.os.LocaleListCompat.forLanguageTags(lang)
+            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(localeList)
+        } catch (_: Exception) {}
     }
 
     fun setPushEnabled(enabled: Boolean) {
@@ -135,11 +154,22 @@ class SettingsViewModel @Inject constructor(
             request,
         )
 
+        // Monitor sync completion via broadcaster
         viewModelScope.launch {
-            // Simple approach: wait a bit and refresh
-            kotlinx.coroutines.delay(3000)
-            _lastSyncTime.value = syncRepository.getLastSyncTime()
-            _isSyncing.value = false
+            syncStatusBroadcaster.syncStatus.collect { event ->
+                when (event) {
+                    is SyncEvent.Completed, is SyncEvent.Failed -> {
+                        _lastSyncTime.value = syncRepository.getLastSyncTime()
+                        _isSyncing.value = false
+                    }
+                    is SyncEvent.Idle -> {
+                        _isSyncing.value = false
+                    }
+                    is SyncEvent.Syncing -> {
+                        _isSyncing.value = true
+                    }
+                }
+            }
         }
     }
 }

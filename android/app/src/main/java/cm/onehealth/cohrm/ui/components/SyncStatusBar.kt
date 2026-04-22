@@ -46,13 +46,12 @@ enum class SyncState {
 fun SyncStatusBar(
     syncState: SyncState,
     pendingCount: Int = 0,
+    syncProgress: String? = null,
     onRetryClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val isVisible = syncState != SyncState.SYNCED || pendingCount == 0
-
     AnimatedVisibility(
-        visible = true,
+        visible = syncState != SyncState.SYNCED,
         enter = expandVertically(),
         exit = shrinkVertically(),
         modifier = modifier,
@@ -74,7 +73,7 @@ fun SyncStatusBar(
             SyncState.SYNCING -> SyncBarConfig(
                 bgColor = Color(0xFF2196F3),
                 icon = Icons.Default.Sync,
-                message = "Synchronisation en cours...",
+                message = syncProgress ?: "Synchronisation en cours...",
                 clickable = false,
             )
             SyncState.ERROR -> SyncBarConfig(

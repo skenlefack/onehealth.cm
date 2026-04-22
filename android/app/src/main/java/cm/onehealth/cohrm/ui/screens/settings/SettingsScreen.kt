@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -68,6 +69,7 @@ fun SettingsScreen(
     val userName by viewModel.userName.collectAsStateWithLifecycle()
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
     val actorLevel by viewModel.actorLevelLabel.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
     val pushEnabled by viewModel.pushEnabled.collectAsStateWithLifecycle()
     val scanNotif by viewModel.scanNotif.collectAsStateWithLifecycle()
     val rumorNotif by viewModel.rumorNotif.collectAsStateWithLifecycle()
@@ -118,6 +120,38 @@ fun SettingsScreen(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Language section
+            SectionHeader(
+                icon = Icons.Default.Language,
+                title = stringResource(R.string.settings_language),
+            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    val languages = listOf(
+                        "fr" to R.string.settings_language_fr,
+                        "en" to R.string.settings_language_en,
+                    )
+                    languages.forEach { (key, labelRes) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setLanguage(key) }
+                                .padding(vertical = 4.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = language == key,
+                                onClick = { viewModel.setLanguage(key) },
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(labelRes))
+                        }
                     }
                 }
             }
