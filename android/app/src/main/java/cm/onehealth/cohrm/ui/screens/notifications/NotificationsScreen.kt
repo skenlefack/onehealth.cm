@@ -47,10 +47,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cm.onehealth.cohrm.R
 import cm.onehealth.cohrm.data.remote.dto.NotificationItem
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -82,10 +84,10 @@ fun NotificationsScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Notifications") },
+            title = { Text(stringResource(R.string.notifications_title)) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.notifications_back))
                 }
             },
         )
@@ -105,7 +107,7 @@ fun NotificationsScreen(
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Chargement des notifications...",
+                                text = stringResource(R.string.notifications_loading),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -133,7 +135,7 @@ fun NotificationsScreen(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             TextButton(onClick = { viewModel.loadNotifications() }) {
-                                Text("Réessayer")
+                                Text(stringResource(R.string.notifications_retry))
                             }
                         }
                     }
@@ -156,12 +158,12 @@ fun NotificationsScreen(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Aucune notification",
+                                text = stringResource(R.string.notifications_empty),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                text = "Vos notifications apparaitront ici",
+                                text = stringResource(R.string.notifications_empty_subtitle),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             )
@@ -300,11 +302,16 @@ private fun NotificationCard(notification: NotificationItem) {
 
 @Composable
 private fun NotificationStatusBadge(status: String) {
+    val sentLabel = stringResource(R.string.notifications_status_sent)
+    val pendingLabel = stringResource(R.string.notifications_status_pending)
+    val failedLabel = stringResource(R.string.notifications_status_failed)
+    val readLabel = stringResource(R.string.notifications_status_read)
+
     val (label, bgColor, textColor) = when (status) {
-        "sent" -> Triple("Envoyee", Color(0xFF4CAF50), Color.White)
-        "pending" -> Triple("En attente", Color(0xFFF57C00), Color.White)
-        "failed" -> Triple("Echec", Color(0xFFF44336), Color.White)
-        "read" -> Triple("Lue", Color(0xFF9E9E9E), Color.White)
+        "sent" -> Triple(sentLabel, Color(0xFF4CAF50), Color.White)
+        "pending" -> Triple(pendingLabel, Color(0xFFF57C00), Color.White)
+        "failed" -> Triple(failedLabel, Color(0xFFF44336), Color.White)
+        "read" -> Triple(readLabel, Color(0xFF9E9E9E), Color.White)
         else -> Triple(status.replaceFirstChar { it.uppercase() }, Color(0xFF9E9E9E), Color.White)
     }
 

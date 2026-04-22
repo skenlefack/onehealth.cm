@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COHRM</string>
+
+    <!-- Login -->
+    <string name="login_title">Login</string>
+    <string name="login_subtitle">Identify yourself to report</string>
+    <string name="login_email">Email or Login</string>
+    <string name="login_email_hint">Enter your email or login</string>
+    <string name="login_password">Password</string>
+    <string name="login_password_hint">Enter your password</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_footer">CAMEROON ONE HEALTH PLATFORM</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_rumors">Rumors</string>
+    <string name="nav_report">Report</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home / Dashboard -->
+    <string name="home_title">COHRM</string>
+    <string name="home_subtitle">Cameroon One Health Rumor Management System</string>
+    <string name="home_new_report">New Report</string>
+    <string name="home_sms_report">SMS Report</string>
+    <string name="home_drafts">Drafts</string>
+    <string name="home_pending">Pending</string>
+    <string name="home_synced">Synced</string>
+    <string name="home_errors">Errors</string>
+    <string name="home_last_sync">Last sync: %1$s</string>
+    <string name="home_never_synced">Never synced</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="dashboard_total">Total Rumors</string>
+    <string name="dashboard_today">Today</string>
+    <string name="dashboard_this_week">This Week</string>
+    <string name="dashboard_this_month">This Month</string>
+    <string name="dashboard_by_region">By Region</string>
+    <string name="dashboard_by_category">By Category</string>
+    <string name="dashboard_by_status">By Status</string>
+    <string name="dashboard_by_source">By Source</string>
+    <string name="dashboard_by_priority">By Priority</string>
+    <string name="dashboard_by_risk">By Risk</string>
+    <string name="dashboard_trends">Trends (30 days)</string>
+    <string name="dashboard_recent">Recent Rumors</string>
+    <string name="dashboard_alerts">Active Alerts</string>
+    <string name="dashboard_high_risk">High Risk</string>
+    <string name="dashboard_map">Rumors Map</string>
+    <string name="dashboard_refresh">Refresh</string>
+    <string name="dashboard_no_data">No data available</string>
+
+    <!-- Rumor Statuses -->
+    <string name="status_pending">Pending</string>
+    <string name="status_investigating">Investigating</string>
+    <string name="status_confirmed">Confirmed</string>
+    <string name="status_false_alarm">False Alarm</string>
+    <string name="status_closed">Closed</string>
+    <string name="status_all">All</string>
+
+    <!-- Rumor Priorities -->
+    <string name="priority_low">Low</string>
+    <string name="priority_medium">Medium</string>
+    <string name="priority_high">High</string>
+    <string name="priority_critical">Critical</string>
+
+    <!-- Risk Levels -->
+    <string name="risk_unknown">Unknown</string>
+    <string name="risk_low">Low</string>
+    <string name="risk_moderate">Moderate</string>
+    <string name="risk_high">High</string>
+    <string name="risk_very_high">Very High</string>
+
+    <!-- Sources -->
+    <string name="source_direct">Direct</string>
+    <string name="source_field">Field</string>
+    <string name="source_sms">SMS</string>
+    <string name="source_mobile">Mobile</string>
+    <string name="source_web">Web</string>
+    <string name="source_scanner">Scanner</string>
+    <string name="source_social_media">Social Media</string>
+    <string name="source_media">Media</string>
+
+    <!-- Categories -->
+    <string name="category_human_health">Human Health</string>
+    <string name="category_animal_health">Animal Health</string>
+    <string name="category_environmental">Environmental</string>
+    <string name="category_safety">Food Safety</string>
+    <string name="category_disaster">Natural Disaster</string>
+    <string name="category_other">Other</string>
+
+    <!-- Rumor List -->
+    <string name="rumors_title">Rumors</string>
+    <string name="rumors_empty">No rumors</string>
+    <string name="rumors_empty_subtitle">Rumors will appear here</string>
+    <string name="rumors_search">Search…</string>
+    <string name="rumors_filter">Filter</string>
+    <string name="rumors_sort">Sort</string>
+    <string name="rumors_load_more">Load more</string>
+    <string name="rumors_count">%1$d rumor(s)</string>
+
+    <!-- Rumor Detail -->
+    <string name="rumor_detail">Rumor Detail</string>
+    <string name="rumor_code">Code</string>
+    <string name="rumor_status">Status</string>
+    <string name="rumor_priority">Priority</string>
+    <string name="rumor_risk">Risk</string>
+    <string name="rumor_source">Source</string>
+    <string name="rumor_category">Category</string>
+    <string name="rumor_region">Region</string>
+    <string name="rumor_department">Department</string>
+    <string name="rumor_district">District</string>
+    <string name="rumor_species">Species</string>
+    <string name="rumor_symptoms">Symptoms</string>
+    <string name="rumor_affected">Affected Cases</string>
+    <string name="rumor_reporter">Reporter</string>
+    <string name="rumor_assigned">Assigned To</string>
+    <string name="rumor_created">Created</string>
+    <string name="rumor_updated">Updated</string>
+    <string name="rumor_description">Description</string>
+    <string name="rumor_photos">Photos</string>
+    <string name="rumor_location">Location</string>
+    <string name="rumor_timeline">Validation History</string>
+    <string name="rumor_feedback">Comments</string>
+    <string name="rumor_actions">Actions</string>
+    <string name="rumor_share">Share</string>
+    <string name="rumor_validate">Validate</string>
+
+    <!-- Validation -->
+    <string name="validation_title">Validation</string>
+    <string name="validation_approve">Approve</string>
+    <string name="validation_reject">Reject</string>
+    <string name="validation_escalate">Escalate</string>
+    <string name="validation_needs_info">Needs Info</string>
+    <string name="validation_notes">Validation Notes</string>
+    <string name="validation_notes_hint">Add your observations…</string>
+    <string name="validation_risk">Risk Assessment</string>
+    <string name="validation_priority_change">Change Priority</string>
+    <string name="validation_submit">Submit Validation</string>
+    <string name="validation_success">Validation submitted successfully</string>
+    <string name="validation_error">Error submitting validation</string>
+    <string name="validation_pending">Pending Validations</string>
+    <string name="validation_level">Level %1$d</string>
+    <string name="validation_history">History</string>
+
+    <!-- Feedback -->
+    <string name="feedback_add">Add a comment</string>
+    <string name="feedback_hint">Your comment…</string>
+    <string name="feedback_send">Send</string>
+    <string name="feedback_empty">No comments</string>
+
+    <!-- Report Wizard -->
+    <string name="report_title">New Report</string>
+    <string name="report_step">Step %1$d of %2$d</string>
+    <string name="report_next">Next</string>
+    <string name="report_previous">Previous</string>
+    <string name="report_submit">Submit</string>
+    <string name="report_save_draft">Save Draft</string>
+    <string name="report_submitted">Report submitted successfully</string>
+    <string name="report_saved">Draft saved</string>
+    <string name="report_submit_error">Error submitting report</string>
+
+    <!-- Step 1: Category -->
+    <string name="step1_title">Event Type</string>
+    <string name="step1_subtitle">Select the report category</string>
+    <string name="species_label">Species</string>
+    <string name="species_human">Human</string>
+    <string name="species_bovine">Bovine</string>
+    <string name="species_ovine">Sheep/Goat</string>
+    <string name="species_poultry">Poultry</string>
+    <string name="species_swine">Swine</string>
+    <string name="species_wildlife">Wildlife</string>
+    <string name="species_domestic">Dog/Cat</string>
+    <string name="species_other">Other</string>
+
+    <!-- Step 2: Location -->
+    <string name="step2_title">Location</string>
+    <string name="step2_subtitle">Indicate the event location</string>
+    <string name="location_region">Region</string>
+    <string name="location_department">Department</string>
+    <string name="location_district">District</string>
+    <string name="location_gps">GPS Position</string>
+    <string name="location_use_gps">Use my location</string>
+    <string name="location_gps_acquired">GPS position acquired</string>
+    <string name="location_gps_error">Unable to get GPS position</string>
+    <string name="location_select_region">Select a region</string>
+    <string name="location_arrondissement">Sub-division</string>
+    <string name="location_commune">Commune</string>
+    <string name="location_aire_sante">Health Area</string>
+    <string name="location_select_department">Select a department</string>
+
+    <!-- Step 3: Source -->
+    <string name="step3_source_title">Source and Detection</string>
+    <string name="step3_source_subtitle">Information about the report source</string>
+    <string name="source_date_detection">Detection Date</string>
+    <string name="source_date_detection_hint">YYYY-MM-DD</string>
+    <string name="source_type_label">Source Type</string>
+    <string name="source_message_received">Message Received</string>
+    <string name="source_message_received_hint">Describe the message or information received</string>
+    <string name="source_mobile_app">Mobile App</string>
+    <string name="source_community">Community</string>
+    <string name="source_social_network">Social Networks</string>
+    <string name="source_hotline">Hotline</string>
+    <string name="source_call_center">Call Center</string>
+    <string name="source_media_option">Media</string>
+    <string name="source_sms_option">SMS</string>
+    <string name="source_web_scan">Web Scanner</string>
+    <string name="source_direct_declaration">Direct Declaration</string>
+    <string name="source_other">Other</string>
+    <string name="date_detection_label">Detection Date</string>
+    <string name="date_detection_hint">Select the date</string>
+    <string name="message_received_label">Original Message Received</string>
+    <string name="message_received_hint">Transcribe the message as received</string>
+    <string name="source_media_type">Media</string>
+    <string name="source_direct_type">Direct Declaration</string>
+    <string name="themes_label">Rumor Themes</string>
+    <string name="themes_hint">Select one or more themes</string>
+    <string name="gravity_comment_label">Gravity Comment</string>
+    <string name="gravity_comment_hint">Describe the perceived gravity</string>
+
+    <!-- Step 3: Details -->
+    <string name="step3_title">Details</string>
+    <string name="step3_subtitle">Describe the event</string>
+    <string name="details_title_label">Title</string>
+    <string name="details_title_hint">Report title</string>
+    <string name="details_description_label">Description</string>
+    <string name="details_description_hint">Describe the event in detail</string>
+    <string name="details_symptoms">Observed symptoms</string>
+    <string name="details_affected_count">Number of cases</string>
+    <string name="details_affected_hint">Approximate number</string>
+    <string name="symptom_fever">Fever</string>
+    <string name="symptom_vomiting">Vomiting</string>
+    <string name="symptom_diarrhea">Diarrhea</string>
+    <string name="symptom_cough">Cough</string>
+    <string name="symptom_rash">Rash</string>
+    <string name="symptom_hemorrhage">Hemorrhage</string>
+    <string name="symptom_paralysis">Paralysis</string>
+    <string name="symptom_mortality">Mortality</string>
+    <string name="symptom_abortion">Abortion</string>
+    <string name="symptom_respiratory">Respiratory</string>
+    <string name="symptom_neurological">Neurological</string>
+    <string name="symptom_edema">Edema</string>
+    <string name="details_themes">Themes</string>
+    <string name="details_gravity_comment">Gravity Comment</string>
+    <string name="details_gravity_comment_hint">Describe the gravity of the situation</string>
+    <string name="theme_suspect_case_human">Suspect Human Case</string>
+    <string name="theme_human_death">Human Death</string>
+    <string name="theme_animal_death">Animal Death</string>
+    <string name="theme_vaccine_reluctance">Vaccine Reluctance</string>
+    <string name="theme_disease_denial">Disease Denial</string>
+    <string name="theme_stigmatization">Stigmatization</string>
+    <string name="theme_conspiracy_theory">Conspiracy Theory</string>
+    <string name="theme_natural_disasters">Natural Disaster</string>
+
+    <!-- Step 4: Photos -->
+    <string name="step4_title">Photos</string>
+    <string name="step4_subtitle">Add photos (optional, max 3)</string>
+    <string name="photo_take">Take Photo</string>
+    <string name="photo_gallery">Gallery</string>
+    <string name="photo_remove">Remove</string>
+    <string name="photo_count">%1$d / 3 photos</string>
+    <string name="photo_permission_needed">Camera permission required</string>
+
+    <!-- Step 5: Review -->
+    <string name="step5_title">Summary</string>
+    <string name="step5_subtitle">Review information before submission</string>
+    <string name="review_category">Category</string>
+    <string name="review_species">Species</string>
+    <string name="review_location">Location</string>
+    <string name="review_title">Title</string>
+    <string name="review_description">Description</string>
+    <string name="review_symptoms">Symptoms</string>
+    <string name="review_affected">Affected cases</string>
+    <string name="review_photos">Photos</string>
+    <string name="review_source_type">Source Type</string>
+    <string name="review_date_detection">Detection Date</string>
+    <string name="review_themes">Themes</string>
+    <string name="review_gravity_comment">Gravity Comment</string>
+    <string name="review_arrondissement">Sub-division</string>
+    <string name="review_commune">Commune</string>
+    <string name="review_aire_sante">Health Area</string>
+    <string name="review_confirm">Confirm and Submit</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_empty">No reports</string>
+    <string name="history_empty_subtitle">Your reports will appear here</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_filter_draft">Drafts</string>
+    <string name="history_filter_pending">Pending</string>
+    <string name="history_filter_synced">Synced</string>
+    <string name="history_filter_error">Errors</string>
+    <string name="history_delete">Delete</string>
+    <string name="history_delete_confirm">Do you want to delete this draft?</string>
+
+    <!-- SMS -->
+    <string name="sms_title">SMS Report</string>
+    <string name="sms_subtitle">Send a report via SMS</string>
+    <string name="sms_preview">Message preview</string>
+    <string name="sms_send">Send via SMS</string>
+    <string name="sms_format_info">Format: OH#CAT#SPE#SYMPTOMS#REGION#DESCRIPTION</string>
+    <string name="sms_no_app">No SMS application available</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_sync">Synchronization</string>
+    <string name="settings_sync_now">Sync now</string>
+    <string name="settings_sync_running">Syncing…</string>
+    <string name="settings_device_id">Device ID</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_about">About</string>
+    <string name="settings_about_text">COHRM - Cameroon One Health Rumor Management System</string>
+    <string name="settings_server_url">Server URL</string>
+    <string name="settings_logout">Logout</string>
+
+    <!-- Scanner -->
+    <string name="nav_scanner">Scanner</string>
+    <string name="scanner_title">Rumor Scanner</string>
+    <string name="scanner_launch">Launch Scan</string>
+    <string name="scanner_source">Source to Scan</string>
+    <string name="scanner_source_all">All Sources</string>
+    <string name="scanner_source_twitter">Twitter / X</string>
+    <string name="scanner_source_facebook">Facebook</string>
+    <string name="scanner_source_news">News Sites</string>
+    <string name="scanner_source_forums">Forums</string>
+    <string name="scanner_keywords">Keywords (optional)</string>
+    <string name="scanner_keywords_hint">E.g.: epidemic, cholera, flu</string>
+    <string name="scanner_run">Start Scan</string>
+    <string name="scanner_running">Scanning...</string>
+    <string name="scanner_history">Scan History</string>
+    <string name="scanner_empty">No scans performed</string>
+    <string name="scanner_items_scanned">%1$d items analyzed</string>
+    <string name="scanner_rumors_found">%1$d rumors detected</string>
+    <string name="scanner_duration">Duration: %1$ds</string>
+    <string name="scanner_detail_title">Scan Results</string>
+    <string name="scanner_result_relevance">Relevance: %1$.0f%%</string>
+    <string name="scanner_no_results">No results</string>
+    <string name="scanner_status_running">Running</string>
+    <string name="scanner_status_completed">Completed</string>
+    <string name="scanner_status_failed">Failed</string>
+    <string name="scanner_auto">Automatic Scan</string>
+    <string name="scanner_auto_enabled">Enable automatic scanning</string>
+    <string name="scanner_frequency">Frequency</string>
+    <string name="scanner_freq_30m">Every 30 minutes</string>
+    <string name="scanner_freq_1h">Every hour</string>
+    <string name="scanner_freq_3h">Every 3 hours</string>
+    <string name="scanner_freq_6h">Every 6 hours</string>
+    <string name="scanner_freq_12h">Every 12 hours</string>
+    <string name="scanner_freq_24h">Once a day</string>
+
+    <!-- Profile -->
+    <string name="profile_title">My Profile</string>
+    <string name="profile_name">Full Name</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_phone">Phone</string>
+    <string name="profile_role">Role</string>
+    <string name="profile_organization">Organization</string>
+    <string name="profile_region">Region</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_saved">Profile updated</string>
+    <string name="profile_change_password">Change Password</string>
+    <string name="profile_current_password">Current Password</string>
+    <string name="profile_new_password">New Password</string>
+    <string name="profile_confirm_password">Confirm Password</string>
+    <string name="profile_password_changed">Password changed</string>
+    <string name="profile_password_mismatch">Passwords do not match</string>
+    <string name="menu_profile">Profile</string>
+    <string name="menu_logout">Logout</string>
+
+    <!-- Sync status -->
+    <string name="sync_draft">Draft</string>
+    <string name="sync_pending">Pending</string>
+    <string name="sync_syncing">Syncing</string>
+    <string name="sync_synced">Synced</string>
+    <string name="sync_error">Error</string>
+
+    <!-- Notifications Screen -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_back">Back</string>
+    <string name="notifications_loading">Loading notifications…</string>
+    <string name="notifications_empty">No notifications</string>
+    <string name="notifications_empty_subtitle">Your notifications will appear here</string>
+    <string name="notifications_retry">Retry</string>
+    <string name="notifications_status_sent">Sent</string>
+    <string name="notifications_status_pending">Pending</string>
+    <string name="notifications_status_failed">Failed</string>
+    <string name="notifications_status_read">Read</string>
+    <string name="scan_completed_title">COHRM Scan Completed</string>
+    <string name="scan_completed_text">%1$d new rumor(s) detected</string>
+
+    <!-- Settings Enhancement -->
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_push_enabled">Enable push notifications</string>
+    <string name="settings_scan_notif">Scan notifications</string>
+    <string name="settings_rumor_notif">New assigned rumors</string>
+    <string name="settings_auto_scan">Automatic Scan</string>
+    <string name="settings_cache">Cache Management</string>
+    <string name="settings_clear_photos">Clear photo cache</string>
+    <string name="settings_clear_data">Clear local data</string>
+    <string name="settings_clear_confirm">Are you sure? This action cannot be undone.</string>
+    <string name="settings_cache_cleared">Cache cleared</string>
+    <string name="settings_developed_by">Developed by OneHealth Cameroon</string>
+    <string name="settings_api_endpoint">API Endpoint</string>
+
+    <!-- SMS Enhancement -->
+    <string name="sms_affected_count">Number of affected cases</string>
+    <string name="sms_affected_hint">Approximate number</string>
+    <string name="sms_confirm_title">Confirm Sending</string>
+    <string name="sms_confirm_message">Do you want to send this report via SMS?</string>
+    <string name="sms_confirm_send">Confirm Send</string>
+    <string name="sms_error_category">Category is required</string>
+    <string name="sms_error_region">Region is required</string>
+    <string name="sms_error_description">Description is required</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="error">Error</string>
+    <string name="loading">Loading…</string>
+    <string name="retry">Retry</string>
+    <string name="required_field">Required field</string>
+    <string name="no_network">No network connection</string>
+    <string name="see_all">See all</string>
+    <string name="close">Close</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="share">Share</string>
+
+    <!-- Regions -->
+    <string name="region_AD">Adamawa</string>
+    <string name="region_CE">Centre</string>
+    <string name="region_ES">East</string>
+    <string name="region_EN">Far North</string>
+    <string name="region_LT">Littoral</string>
+    <string name="region_NO">North</string>
+    <string name="region_NW">North-West</string>
+    <string name="region_OU">West</string>
+    <string name="region_SU">South</string>
+    <string name="region_SW">South-West</string>
+</resources>

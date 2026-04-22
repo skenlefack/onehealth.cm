@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COHRM</string>
+
+    <!-- Login -->
+    <string name="login_title">Connexion</string>
+    <string name="login_subtitle">Identifiez-vous pour signaler</string>
+    <string name="login_email">Email ou Login</string>
+    <string name="login_email_hint">Entrez votre email ou login</string>
+    <string name="login_password">Mot de passe</string>
+    <string name="login_password_hint">Entrez votre mot de passe</string>
+    <string name="login_button">Se connecter</string>
+    <string name="login_footer">CAMEROON ONE HEALTH PLATFORM</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Accueil</string>
+    <string name="nav_dashboard">Tableau de bord</string>
+    <string name="nav_rumors">Rumeurs</string>
+    <string name="nav_report">Signaler</string>
+    <string name="nav_history">Historique</string>
+    <string name="nav_settings">Paramètres</string>
+
+    <!-- Home / Dashboard -->
+    <string name="home_title">COHRM</string>
+    <string name="home_subtitle">Cameroon One Health Rumor Management System</string>
+    <string name="home_new_report">Nouveau signalement</string>
+    <string name="home_sms_report">Signalement SMS</string>
+    <string name="home_drafts">Brouillons</string>
+    <string name="home_pending">En attente</string>
+    <string name="home_synced">Envoyés</string>
+    <string name="home_errors">Erreurs</string>
+    <string name="home_last_sync">Dernière sync : %1$s</string>
+    <string name="home_never_synced">Jamais synchronisé</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Tableau de bord</string>
+    <string name="dashboard_total">Total rumeurs</string>
+    <string name="dashboard_today">Aujourd\'hui</string>
+    <string name="dashboard_this_week">Cette semaine</string>
+    <string name="dashboard_this_month">Ce mois</string>
+    <string name="dashboard_by_region">Par région</string>
+    <string name="dashboard_by_category">Par catégorie</string>
+    <string name="dashboard_by_status">Par statut</string>
+    <string name="dashboard_by_source">Par source</string>
+    <string name="dashboard_by_priority">Par priorité</string>
+    <string name="dashboard_by_risk">Par risque</string>
+    <string name="dashboard_trends">Tendances (30 jours)</string>
+    <string name="dashboard_recent">Rumeurs récentes</string>
+    <string name="dashboard_alerts">Alertes actives</string>
+    <string name="dashboard_high_risk">Haut risque</string>
+    <string name="dashboard_map">Carte des rumeurs</string>
+    <string name="dashboard_refresh">Actualiser</string>
+    <string name="dashboard_no_data">Aucune donnée disponible</string>
+
+    <!-- Rumor Statuses -->
+    <string name="status_pending">En attente</string>
+    <string name="status_investigating">En cours</string>
+    <string name="status_confirmed">Confirmée</string>
+    <string name="status_false_alarm">Fausse alerte</string>
+    <string name="status_closed">Clôturée</string>
+    <string name="status_all">Tous</string>
+
+    <!-- Rumor Priorities -->
+    <string name="priority_low">Basse</string>
+    <string name="priority_medium">Moyenne</string>
+    <string name="priority_high">Haute</string>
+    <string name="priority_critical">Critique</string>
+
+    <!-- Risk Levels -->
+    <string name="risk_unknown">Inconnu</string>
+    <string name="risk_low">Faible</string>
+    <string name="risk_moderate">Modéré</string>
+    <string name="risk_high">Élevé</string>
+    <string name="risk_very_high">Très élevé</string>
+
+    <!-- Sources -->
+    <string name="source_direct">Directe</string>
+    <string name="source_field">Terrain</string>
+    <string name="source_sms">SMS</string>
+    <string name="source_mobile">Mobile</string>
+    <string name="source_web">Web</string>
+    <string name="source_scanner">Scanner</string>
+    <string name="source_social_media">Réseaux sociaux</string>
+    <string name="source_media">Médias</string>
+
+    <!-- Categories -->
+    <string name="category_human_health">Santé humaine</string>
+    <string name="category_animal_health">Santé animale</string>
+    <string name="category_environmental">Environnement</string>
+    <string name="category_safety">Sécurité alimentaire</string>
+    <string name="category_disaster">Catastrophe naturelle</string>
+    <string name="category_other">Autre</string>
+
+    <!-- Rumor List -->
+    <string name="rumors_title">Rumeurs</string>
+    <string name="rumors_empty">Aucune rumeur</string>
+    <string name="rumors_empty_subtitle">Les rumeurs apparaîtront ici</string>
+    <string name="rumors_search">Rechercher…</string>
+    <string name="rumors_filter">Filtrer</string>
+    <string name="rumors_sort">Trier</string>
+    <string name="rumors_load_more">Charger plus</string>
+    <string name="rumors_count">%1$d rumeur(s)</string>
+
+    <!-- Rumor Detail -->
+    <string name="rumor_detail">Détail de la rumeur</string>
+    <string name="rumor_code">Code</string>
+    <string name="rumor_status">Statut</string>
+    <string name="rumor_priority">Priorité</string>
+    <string name="rumor_risk">Risque</string>
+    <string name="rumor_source">Source</string>
+    <string name="rumor_category">Catégorie</string>
+    <string name="rumor_region">Région</string>
+    <string name="rumor_department">Département</string>
+    <string name="rumor_district">District</string>
+    <string name="rumor_species">Espèce</string>
+    <string name="rumor_symptoms">Symptômes</string>
+    <string name="rumor_affected">Cas affectés</string>
+    <string name="rumor_reporter">Déclarant</string>
+    <string name="rumor_assigned">Assigné à</string>
+    <string name="rumor_created">Créé le</string>
+    <string name="rumor_updated">Mis à jour</string>
+    <string name="rumor_description">Description</string>
+    <string name="rumor_photos">Photos</string>
+    <string name="rumor_location">Localisation</string>
+    <string name="rumor_timeline">Historique de validation</string>
+    <string name="rumor_feedback">Commentaires</string>
+    <string name="rumor_actions">Actions</string>
+    <string name="rumor_share">Partager</string>
+    <string name="rumor_validate">Valider</string>
+
+    <!-- Validation -->
+    <string name="validation_title">Validation</string>
+    <string name="validation_approve">Approuver</string>
+    <string name="validation_reject">Rejeter</string>
+    <string name="validation_escalate">Escalader</string>
+    <string name="validation_needs_info">Info requise</string>
+    <string name="validation_notes">Notes de validation</string>
+    <string name="validation_notes_hint">Ajoutez vos observations…</string>
+    <string name="validation_risk">Évaluation du risque</string>
+    <string name="validation_priority_change">Changer la priorité</string>
+    <string name="validation_submit">Soumettre la validation</string>
+    <string name="validation_success">Validation soumise avec succès</string>
+    <string name="validation_error">Erreur lors de la validation</string>
+    <string name="validation_pending">Validations en attente</string>
+    <string name="validation_level">Niveau %1$d</string>
+    <string name="validation_history">Historique</string>
+
+    <!-- Feedback -->
+    <string name="feedback_add">Ajouter un commentaire</string>
+    <string name="feedback_hint">Votre commentaire…</string>
+    <string name="feedback_send">Envoyer</string>
+    <string name="feedback_empty">Aucun commentaire</string>
+
+    <!-- Report Wizard -->
+    <string name="report_title">Nouveau signalement</string>
+    <string name="report_step">Étape %1$d sur %2$d</string>
+    <string name="report_next">Suivant</string>
+    <string name="report_previous">Précédent</string>
+    <string name="report_submit">Soumettre</string>
+    <string name="report_save_draft">Enregistrer brouillon</string>
+    <string name="report_submitted">Signalement soumis avec succès</string>
+    <string name="report_saved">Brouillon enregistré</string>
+    <string name="report_submit_error">Erreur lors de la soumission</string>
+
+    <!-- Step 1: Category -->
+    <string name="step1_title">Type d\'événement</string>
+    <string name="step1_subtitle">Sélectionnez la catégorie du signalement</string>
+    <string name="species_label">Espèce concernée</string>
+    <string name="species_human">Humain</string>
+    <string name="species_bovine">Bovin</string>
+    <string name="species_ovine">Ovin/Caprin</string>
+    <string name="species_poultry">Volaille</string>
+    <string name="species_swine">Porcin</string>
+    <string name="species_wildlife">Faune sauvage</string>
+    <string name="species_domestic">Chien/Chat</string>
+    <string name="species_other">Autre</string>
+
+    <!-- Step 2: Location -->
+    <string name="step2_title">Localisation</string>
+    <string name="step2_subtitle">Indiquez le lieu de l\'événement</string>
+    <string name="location_region">Région</string>
+    <string name="location_department">Département</string>
+    <string name="location_district">District</string>
+    <string name="location_arrondissement">Arrondissement</string>
+    <string name="location_commune">Commune</string>
+    <string name="location_aire_sante">Aire de santé</string>
+    <string name="location_gps">Position GPS</string>
+    <string name="location_use_gps">Utiliser ma position</string>
+    <string name="location_gps_acquired">Position GPS acquise</string>
+    <string name="location_gps_error">Impossible d\'obtenir la position GPS</string>
+    <string name="location_select_region">Sélectionnez une région</string>
+    <string name="location_select_department">Sélectionnez un département</string>
+
+    <!-- Step 3: Source -->
+    <string name="step3_source_title">Source et détection</string>
+    <string name="step3_source_subtitle">Informations sur la source du signalement</string>
+    <string name="source_date_detection">Date de détection</string>
+    <string name="source_date_detection_hint">AAAA-MM-JJ</string>
+    <string name="source_type_label">Type de source</string>
+    <string name="source_message_received">Message reçu</string>
+    <string name="source_message_received_hint">Décrivez le message ou l\'information reçue</string>
+    <string name="source_mobile_app">Application mobile</string>
+    <string name="source_community">Communauté</string>
+    <string name="source_social_network">Réseaux sociaux</string>
+    <string name="source_hotline">Ligne verte</string>
+    <string name="source_call_center">Centre d\'appel</string>
+    <string name="source_media_option">Média</string>
+    <string name="source_sms_option">SMS</string>
+    <string name="source_web_scan">Scanner web</string>
+    <string name="source_direct_declaration">Déclaration directe</string>
+    <string name="source_other">Autre</string>
+    <string name="date_detection_label">Date de detection</string>
+    <string name="date_detection_hint">Selectionnez la date</string>
+    <string name="message_received_label">Message original recu</string>
+    <string name="message_received_hint">Transcrivez le message tel que recu</string>
+    <string name="source_media_type">Media</string>
+    <string name="source_direct_type">Declaration directe</string>
+    <string name="themes_label">Themes de la rumeur</string>
+    <string name="themes_hint">Selectionnez un ou plusieurs themes</string>
+    <string name="gravity_comment_label">Commentaire sur la gravite</string>
+    <string name="gravity_comment_hint">Decrivez la gravite percue</string>
+
+    <!-- Step 4: Details -->
+    <string name="step3_title">Détails</string>
+    <string name="step3_subtitle">Décrivez l\'événement</string>
+    <string name="details_themes">Thèmes</string>
+    <string name="details_gravity_comment">Commentaire sur la gravité</string>
+    <string name="details_gravity_comment_hint">Décrivez la gravité de la situation</string>
+    <string name="theme_suspect_case_human">Cas suspect humain</string>
+    <string name="theme_human_death">Décès humain</string>
+    <string name="theme_animal_death">Mort d\'animal</string>
+    <string name="theme_vaccine_reluctance">Réticence vaccins</string>
+    <string name="theme_disease_denial">Déni maladie</string>
+    <string name="theme_stigmatization">Stigmatisation</string>
+    <string name="theme_conspiracy_theory">Théorie du complot</string>
+    <string name="theme_natural_disasters">Catastrophe naturelle</string>
+    <string name="details_title_label">Titre</string>
+    <string name="details_title_hint">Titre du signalement</string>
+    <string name="details_description_label">Description</string>
+    <string name="details_description_hint">Décrivez l\'événement en détail</string>
+    <string name="details_symptoms">Symptômes observés</string>
+    <string name="details_affected_count">Nombre de cas</string>
+    <string name="details_affected_hint">Nombre approximatif</string>
+    <string name="symptom_fever">Fièvre</string>
+    <string name="symptom_vomiting">Vomissements</string>
+    <string name="symptom_diarrhea">Diarrhée</string>
+    <string name="symptom_cough">Toux</string>
+    <string name="symptom_rash">Éruption cutanée</string>
+    <string name="symptom_hemorrhage">Hémorragie</string>
+    <string name="symptom_paralysis">Paralysie</string>
+    <string name="symptom_mortality">Mortalité</string>
+    <string name="symptom_abortion">Avortement</string>
+    <string name="symptom_respiratory">Respiratoire</string>
+    <string name="symptom_neurological">Neurologique</string>
+    <string name="symptom_edema">Oedème</string>
+
+    <!-- Step 5: Photos -->
+    <string name="step4_title">Photos</string>
+    <string name="step4_subtitle">Ajoutez des photos (optionnel, max 3)</string>
+    <string name="photo_take">Prendre une photo</string>
+    <string name="photo_gallery">Galerie</string>
+    <string name="photo_remove">Supprimer</string>
+    <string name="photo_count">%1$d / 3 photos</string>
+    <string name="photo_permission_needed">Permission caméra requise</string>
+
+    <!-- Step 6: Review -->
+    <string name="step5_title">Récapitulatif</string>
+    <string name="step5_subtitle">Vérifiez les informations avant soumission</string>
+    <string name="review_category">Catégorie</string>
+    <string name="review_species">Espèce</string>
+    <string name="review_location">Localisation</string>
+    <string name="review_title">Titre</string>
+    <string name="review_description">Description</string>
+    <string name="review_symptoms">Symptômes</string>
+    <string name="review_affected">Cas affectés</string>
+    <string name="review_photos">Photos</string>
+    <string name="review_source_type">Type de source</string>
+    <string name="review_date_detection">Date de détection</string>
+    <string name="review_themes">Thèmes</string>
+    <string name="review_gravity_comment">Commentaire gravité</string>
+    <string name="review_arrondissement">Arrondissement</string>
+    <string name="review_commune">Commune</string>
+    <string name="review_aire_sante">Aire de santé</string>
+    <string name="review_confirm">Confirmer et soumettre</string>
+
+    <!-- History -->
+    <string name="history_title">Historique</string>
+    <string name="history_empty">Aucun signalement</string>
+    <string name="history_empty_subtitle">Vos signalements apparaîtront ici</string>
+    <string name="history_filter_all">Tous</string>
+    <string name="history_filter_draft">Brouillons</string>
+    <string name="history_filter_pending">En attente</string>
+    <string name="history_filter_synced">Envoyés</string>
+    <string name="history_filter_error">Erreurs</string>
+    <string name="history_delete">Supprimer</string>
+    <string name="history_delete_confirm">Voulez-vous supprimer ce brouillon ?</string>
+
+    <!-- SMS -->
+    <string name="sms_title">Signalement SMS</string>
+    <string name="sms_subtitle">Envoyez un signalement par SMS</string>
+    <string name="sms_preview">Aperçu du message</string>
+    <string name="sms_send">Envoyer par SMS</string>
+    <string name="sms_format_info">Format : OH#CAT#ESP#SYMPTÔMES#RÉGION#DESCRIPTION</string>
+    <string name="sms_no_app">Aucune application SMS disponible</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_language">Langue</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_theme">Thème</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_sync">Synchronisation</string>
+    <string name="settings_sync_now">Synchroniser maintenant</string>
+    <string name="settings_sync_running">Synchronisation en cours…</string>
+    <string name="settings_device_id">ID appareil</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_about">À propos</string>
+    <string name="settings_about_text">COHRM - Cameroon One Health Rumor Management System</string>
+    <string name="settings_server_url">URL du serveur</string>
+    <string name="settings_logout">Déconnexion</string>
+
+    <!-- Sync status -->
+    <string name="sync_draft">Brouillon</string>
+    <string name="sync_pending">En attente</string>
+    <string name="sync_syncing">Synchronisation</string>
+    <string name="sync_synced">Envoyé</string>
+    <string name="sync_error">Erreur</string>
+
+    <!-- Scanner -->
+    <string name="nav_scanner">Scanner</string>
+    <string name="scanner_title">Scanner de rumeurs</string>
+    <string name="scanner_launch">Lancer un scan</string>
+    <string name="scanner_source">Source a scanner</string>
+    <string name="scanner_source_all">Toutes les sources</string>
+    <string name="scanner_source_twitter">Twitter / X</string>
+    <string name="scanner_source_facebook">Facebook</string>
+    <string name="scanner_source_news">Sites d\'actualite</string>
+    <string name="scanner_source_forums">Forums</string>
+    <string name="scanner_keywords">Mots-cles (optionnel)</string>
+    <string name="scanner_keywords_hint">Ex: epidemie, cholera, grippe</string>
+    <string name="scanner_run">Demarrer le scan</string>
+    <string name="scanner_running">Scan en cours...</string>
+    <string name="scanner_history">Historique des scans</string>
+    <string name="scanner_empty">Aucun scan effectue</string>
+    <string name="scanner_items_scanned">%1$d elements analyses</string>
+    <string name="scanner_rumors_found">%1$d rumeurs detectees</string>
+    <string name="scanner_duration">Duree: %1$ds</string>
+    <string name="scanner_detail_title">Resultats du scan</string>
+    <string name="scanner_result_relevance">Pertinence: %1$.0f%%</string>
+    <string name="scanner_no_results">Aucun resultat</string>
+    <string name="scanner_status_running">En cours</string>
+    <string name="scanner_status_completed">Termine</string>
+    <string name="scanner_status_failed">Echoue</string>
+    <string name="scanner_auto">Scan automatique</string>
+    <string name="scanner_auto_enabled">Activer le scan automatique</string>
+    <string name="scanner_frequency">Frequence</string>
+    <string name="scanner_freq_30m">Toutes les 30 minutes</string>
+    <string name="scanner_freq_1h">Toutes les heures</string>
+    <string name="scanner_freq_3h">Toutes les 3 heures</string>
+    <string name="scanner_freq_6h">Toutes les 6 heures</string>
+    <string name="scanner_freq_12h">Toutes les 12 heures</string>
+    <string name="scanner_freq_24h">Une fois par jour</string>
+
+    <!-- Top Bar & Profile -->
+    <string name="profile_title">Mon profil</string>
+    <string name="profile_name">Nom complet</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_phone">Telephone</string>
+    <string name="profile_role">Role</string>
+    <string name="profile_organization">Organisation</string>
+    <string name="profile_region">Region</string>
+    <string name="profile_save">Enregistrer</string>
+    <string name="profile_saved">Profil mis a jour</string>
+    <string name="profile_change_password">Changer le mot de passe</string>
+    <string name="profile_current_password">Mot de passe actuel</string>
+    <string name="profile_new_password">Nouveau mot de passe</string>
+    <string name="profile_confirm_password">Confirmer le mot de passe</string>
+    <string name="profile_password_changed">Mot de passe modifie</string>
+    <string name="profile_password_mismatch">Les mots de passe ne correspondent pas</string>
+    <string name="menu_profile">Profil</string>
+    <string name="menu_logout">Deconnexion</string>
+
+    <!-- Notifications Screen -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_back">Retour</string>
+    <string name="notifications_loading">Chargement des notifications…</string>
+    <string name="notifications_empty">Aucune notification</string>
+    <string name="notifications_empty_subtitle">Vos notifications apparaîtront ici</string>
+    <string name="notifications_retry">Réessayer</string>
+    <string name="notifications_status_sent">Envoyée</string>
+    <string name="notifications_status_pending">En attente</string>
+    <string name="notifications_status_failed">Échec</string>
+    <string name="notifications_status_read">Lue</string>
+    <string name="scan_completed_title">Scan COHRM terminé</string>
+    <string name="scan_completed_text">%1$d nouvelle(s) rumeur(s) détectée(s)</string>
+
+    <!-- Settings Enhancement -->
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_push_enabled">Activer les notifications push</string>
+    <string name="settings_scan_notif">Notifications de scan</string>
+    <string name="settings_rumor_notif">Nouvelles rumeurs assignées</string>
+    <string name="settings_auto_scan">Scan automatique</string>
+    <string name="settings_cache">Gestion du cache</string>
+    <string name="settings_clear_photos">Vider le cache photos</string>
+    <string name="settings_clear_data">Effacer les données locales</string>
+    <string name="settings_clear_confirm">Êtes-vous sûr ? Cette action est irréversible.</string>
+    <string name="settings_cache_cleared">Cache vidé</string>
+    <string name="settings_developed_by">Développé par OneHealth Cameroun</string>
+    <string name="settings_api_endpoint">Endpoint API</string>
+
+    <!-- SMS Enhancement -->
+    <string name="sms_affected_count">Nombre de cas affectés</string>
+    <string name="sms_affected_hint">Nombre approximatif</string>
+    <string name="sms_confirm_title">Confirmer l\'envoi</string>
+    <string name="sms_confirm_message">Voulez-vous envoyer ce signalement par SMS ?</string>
+    <string name="sms_confirm_send">Confirmer l\'envoi</string>
+    <string name="sms_error_category">La catégorie est obligatoire</string>
+    <string name="sms_error_region">La région est obligatoire</string>
+    <string name="sms_error_description">La description est obligatoire</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Annuler</string>
+    <string name="yes">Oui</string>
+    <string name="no">Non</string>
+    <string name="error">Erreur</string>
+    <string name="loading">Chargement…</string>
+    <string name="retry">Réessayer</string>
+    <string name="required_field">Champ obligatoire</string>
+    <string name="no_network">Pas de connexion réseau</string>
+    <string name="see_all">Voir tout</string>
+    <string name="close">Fermer</string>
+    <string name="save">Enregistrer</string>
+    <string name="delete">Supprimer</string>
+    <string name="edit">Modifier</string>
+    <string name="share">Partager</string>
+
+    <!-- Regions -->
+    <string name="region_AD">Adamaoua</string>
+    <string name="region_CE">Centre</string>
+    <string name="region_ES">Est</string>
+    <string name="region_EN">Extrême-Nord</string>
+    <string name="region_LT">Littoral</string>
+    <string name="region_NO">Nord</string>
+    <string name="region_NW">Nord-Ouest</string>
+    <string name="region_OU">Ouest</string>
+    <string name="region_SU">Sud</string>
+    <string name="region_SW">Sud-Ouest</string>
+</resources>
