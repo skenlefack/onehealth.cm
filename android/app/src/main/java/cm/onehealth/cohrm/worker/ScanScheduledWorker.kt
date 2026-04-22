@@ -61,7 +61,7 @@ class ScanScheduledWorker @AssistedInject constructor(
                                 id = data.id,
                                 source = data.source,
                                 status = data.status,
-                                keywords = data.keywords?.joinToString(",") ?: "",
+                                keywords = data.keywordsList().joinToString(","),
                                 itemsScanned = data.itemsScanned,
                                 rumorsFound = data.rumorsFound,
                                 duration = data.duration ?: 0,
