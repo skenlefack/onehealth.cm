@@ -81,7 +81,7 @@ class ScanScheduledWorker @AssistedInject constructor(
                                     author = r.author ?: "",
                                     relevanceScore = r.relevanceScore ?: 0.0,
                                     status = r.status,
-                                    matchedKeywords = r.matchedKeywords?.joinToString(",") ?: "",
+                                    matchedKeywords = r.matchedKeywordsList().joinToString(","),
                                 )
                             },
                         )

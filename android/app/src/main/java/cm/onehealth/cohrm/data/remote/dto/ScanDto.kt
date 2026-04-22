@@ -89,8 +89,10 @@ data class ScanResultItem(
     @Json(name = "published_at") val publishedAt: String? = null,
     @Json(name = "relevance_score") val relevanceScore: Double? = null,
     val status: String = "new",
-    @Json(name = "matched_keywords") val matchedKeywords: List<String>? = null,
-)
+    @Json(name = "matched_keywords") val matchedKeywords: String? = null,
+) {
+    fun matchedKeywordsList(): List<String> = parseKeywords(matchedKeywords)
+}
 
 @JsonClass(generateAdapter = true)
 data class ScanRumorItem(

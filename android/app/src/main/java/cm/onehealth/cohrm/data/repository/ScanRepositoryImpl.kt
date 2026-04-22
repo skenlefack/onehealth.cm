@@ -54,7 +54,7 @@ class ScanRepositoryImpl @Inject constructor(
                     id = r.id, scanId = id, title = r.title ?: "", content = r.content ?: "",
                     url = r.url ?: "", source = r.source ?: "", author = r.author ?: "",
                     relevanceScore = r.relevanceScore ?: 0.0, status = r.status,
-                    matchedKeywords = r.matchedKeywords?.joinToString(",") ?: "",
+                    matchedKeywords = r.matchedKeywordsList().joinToString(","),
                 )
             })
             detail

@@ -388,13 +388,14 @@ private fun ScanResultCard(result: ScanResultItem) {
             }
 
             // Matched keywords
-            if (!result.matchedKeywords.isNullOrEmpty()) {
+            val resultKeywords = result.matchedKeywordsList()
+            if (resultKeywords.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    result.matchedKeywords.forEach { keyword ->
+                    resultKeywords.forEach { keyword ->
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
