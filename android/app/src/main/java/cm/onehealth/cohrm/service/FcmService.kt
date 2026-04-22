@@ -10,7 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import cm.onehealth.cohrm.CohrmApp
 import cm.onehealth.cohrm.MainActivity
 import cm.onehealth.cohrm.R
-import cm.onehealth.cohrm.data.preferences.dataStore
+import cm.onehealth.cohrm.di.dataStore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope

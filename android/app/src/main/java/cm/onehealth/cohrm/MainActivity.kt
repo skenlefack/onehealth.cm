@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cm.onehealth.cohrm.data.preferences.dataStore
+import cm.onehealth.cohrm.di.dataStore
 import cm.onehealth.cohrm.ui.navigation.CohrmNavigation
 import cm.onehealth.cohrm.ui.theme.CohrmTheme
 import dagger.hilt.android.AndroidEntryPoint

@@ -2,9 +2,10 @@ package cm.onehealth.cohrm.util
 
 import okhttp3.MediaType
 import okhttp3.RequestBody
+import okio.Buffer
 import okio.BufferedSink
+import okio.ForwardingSink
 import okio.buffer
-import okio.sink
 import java.io.IOException
 
 class ProgressRequestBody(
@@ -24,23 +25,17 @@ class ProgressRequestBody(
             return
         }
 
-        val countingSink = CountingSink(sink, totalBytes, onProgress)
-        val buffered = countingSink.sink().buffer()
-        delegate.writeTo(buffered)
-        buffered.flush()
-    }
+        val countingSink = object : ForwardingSink(sink) {
+            private var bytesWritten = 0L
 
-    private class CountingSink(
-        private val delegate: BufferedSink,
-        private val totalBytes: Long,
-        private val onProgress: (Float) -> Unit,
-    ) : okio.ForwardingSink(delegate) {
-        private var bytesWritten = 0L
-
-        override fun write(source: okio.Buffer, byteCount: Long) {
-            super.write(source, byteCount)
-            bytesWritten += byteCount
-            onProgress(bytesWritten.toFloat() / totalBytes.toFloat())
+            override fun write(source: Buffer, byteCount: Long) {
+                super.write(source, byteCount)
+                bytesWritten += byteCount
+                onProgress(bytesWritten.toFloat() / totalBytes.toFloat())
+            }
         }
+        val bufferedSink = countingSink.buffer()
+        delegate.writeTo(bufferedSink)
+        bufferedSink.flush()
     }
 }
