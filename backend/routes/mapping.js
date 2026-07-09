@@ -63,7 +63,9 @@ const documentFilter = (req, file, cb) => {
 // Storage for expert photos
 const expertPhotoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads', 'experts'));
+    const dir = path.join(__dirname, '..', 'uploads', 'experts');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueId = uuidv4();
@@ -75,7 +77,9 @@ const expertPhotoStorage = multer.diskStorage({
 // Storage for expert CVs
 const expertCvStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads', 'documents'));
+    const dir = path.join(__dirname, '..', 'uploads', 'documents');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueId = uuidv4();
@@ -88,7 +92,9 @@ const expertCvStorage = multer.diskStorage({
 // Storage for material images
 const materialImageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads', 'materials'));
+    const dir = path.join(__dirname, '..', 'uploads', 'materials');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueId = uuidv4();
@@ -100,7 +106,9 @@ const materialImageStorage = multer.diskStorage({
 // Storage for organization logos
 const organizationLogoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads', 'organizations'));
+    const dir = path.join(__dirname, '..', 'uploads', 'organizations');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueId = uuidv4();
@@ -112,7 +120,9 @@ const organizationLogoStorage = multer.diskStorage({
 // Storage for document files
 const documentFileStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads', 'documents', 'files'));
+    const dir = path.join(__dirname, '..', 'uploads', 'documents', 'files');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueId = uuidv4();
@@ -125,7 +135,9 @@ const documentFileStorage = multer.diskStorage({
 // Storage for document thumbnails
 const thumbnailStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads', 'thumbnails'));
+    const dir = path.join(__dirname, '..', 'uploads', 'thumbnails');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueId = uuidv4();
@@ -138,13 +150,16 @@ const thumbnailStorage = multer.diskStorage({
 const uploadExpertFiles = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
+      let dir;
       if (file.fieldname === 'photo') {
-        cb(null, path.join(__dirname, '..', 'uploads', 'experts'));
+        dir = path.join(__dirname, '..', 'uploads', 'experts');
       } else if (file.fieldname === 'cv') {
-        cb(null, path.join(__dirname, '..', 'uploads', 'documents'));
+        dir = path.join(__dirname, '..', 'uploads', 'documents');
       } else {
-        cb(null, path.join(__dirname, '..', 'uploads'));
+        dir = path.join(__dirname, '..', 'uploads');
       }
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
     },
     filename: (req, file, cb) => {
       const uniqueId = uuidv4();
@@ -187,13 +202,16 @@ const uploadOrganizationLogo = multer({
 const uploadDocumentFiles = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
+      let dir;
       if (file.fieldname === 'file') {
-        cb(null, path.join(__dirname, '..', 'uploads', 'documents', 'files'));
+        dir = path.join(__dirname, '..', 'uploads', 'documents', 'files');
       } else if (file.fieldname === 'thumbnail') {
-        cb(null, path.join(__dirname, '..', 'uploads', 'thumbnails'));
+        dir = path.join(__dirname, '..', 'uploads', 'thumbnails');
       } else {
-        cb(null, path.join(__dirname, '..', 'uploads'));
+        dir = path.join(__dirname, '..', 'uploads');
       }
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
     },
     filename: (req, file, cb) => {
       const uniqueId = uuidv4();
