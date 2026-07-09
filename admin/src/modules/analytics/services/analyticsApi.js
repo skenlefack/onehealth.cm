@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || '';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 const client = axios.create({
-  baseURL: `${API_URL}/api/analytics`,
+  baseURL: `${API_URL}/analytics`,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
