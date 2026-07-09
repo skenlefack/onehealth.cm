@@ -104,6 +104,9 @@ app.use('/api/cohrm', require('./routes/cohrm'));
 // Newsletter
 app.use('/api/newsletter', require('./routes/newsletter'));
 
+// Analytics
+app.use('/api/analytics', require('./routes/analytics'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });

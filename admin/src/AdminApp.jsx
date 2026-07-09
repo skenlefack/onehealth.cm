@@ -2,6 +2,7 @@ import PageBuilderPage from './PageBuilderPage';
 import COHRMSystemPage from './COHRMSystemPage';
 import CohrmModule from './modules/cohrm';
 import NewsletterPage from './NewsletterPage';
+import AnalyticsModule from './modules/analytics';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline, Polygon, Autocomplete } from '@react-google-maps/api';
 import {
@@ -22163,6 +22164,7 @@ export default function AdminApp() {
       case 'oh-elearning': return <OHELearningPage isDark={isDark} token={token} />;
       case 'cohrm-system': return <CohrmModule isDark={isDark} token={token} user={user} onBack={() => setActivePage('dashboard')} />;
       case 'newsletter': return <NewsletterPage isDark={isDark} token={token} />;
+      case 'analytics': return <AnalyticsModule isDark={isDark} token={token} user={user} onBack={() => setActivePage('dashboard')} />;
       default: return <Dashboard isDark={isDark} token={token} />;
     }
   };
@@ -22177,6 +22179,8 @@ export default function AdminApp() {
     ? { id: 'cohrm-system', label: 'COHRM-SYSTEM', icon: Radar }
     : activePage === 'newsletter'
     ? { id: 'newsletter', label: 'Newsletter', icon: Mail }
+    : activePage === 'analytics'
+    ? { id: 'analytics', label: 'Analytics', icon: BarChart3 }
     : filteredNavGroups.flatMap(g => g.items).find(i => i.id === activePage);
 
   return (
@@ -22336,6 +22340,20 @@ export default function AdminApp() {
               title="Gestion Newsletter"
             >
               <Mail size={20} />
+            </button>
+            {/* Analytics Button */}
+            <button
+              style={{
+                ...styles.btnIcon,
+                background: activePage === 'analytics' ? '#8B5CF6' : (isDark ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.15)'),
+                borderRadius: '12px',
+                color: activePage === 'analytics' ? 'white' : '#8B5CF6',
+                position: 'relative'
+              }}
+              onClick={() => setActivePage('analytics')}
+              title="Analytics"
+            >
+              <BarChart3 size={20} />
             </button>
             <div style={{ width: '1px', height: '32px', background: isDark ? '#334155' : 'rgba(0,122,51,0.2)' }} />
             <button style={{ ...styles.btnIcon, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,122,51,0.1)', borderRadius: '12px' }} onClick={() => setIsDark(!isDark)}>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 
@@ -76,6 +77,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className="min-h-screen bg-oh-background font-sans antialiased">
         <Providers>{children}</Providers>
+        <Script src="/js/oh-analytics.js" strategy="afterInteractive" />
       </body>
     </html>
   );
