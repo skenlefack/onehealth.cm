@@ -671,6 +671,7 @@ const createStyles = (isDark) => ({
     boxShadow: isDark ? 'none' : '0 2px 10px rgba(0,0,0,0.05)'
   },
   content: { padding: '32px', maxWidth: '1600px', margin: '0 auto' },
+  contentFull: { padding: 0, width: '100%' },
   card: {
     background: isDark ? '#1e293b' : '#ffffff',
     borderRadius: '16px',
@@ -22199,8 +22200,8 @@ export default function AdminApp() {
         @keyframes tooltipFadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
       `}</style>
 
-      {/* Sidebar */}
-      <aside style={styles.sidebar(sidebarCollapsed)}>
+      {/* Sidebar - hidden for modules with own layout */}
+      <aside style={{ ...styles.sidebar(sidebarCollapsed), display: (activePage === 'cohrm-system' || activePage === 'analytics') ? 'none' : 'flex' }}>
         <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '14px', borderBottom: `1px solid ${isDark ? '#334155' : 'rgba(255,255,255,0.2)'}` }}>
           <div style={{
             width: '48px', height: '48px', borderRadius: '12px',
@@ -22265,9 +22266,9 @@ export default function AdminApp() {
       </aside>
 
       {/* Main Content */}
-      <div style={styles.main(sidebarCollapsed)}>
-        {/* Header */}
-        <header style={styles.header}>
+      <div style={(activePage === 'cohrm-system' || activePage === 'analytics') ? { flex: 1, minHeight: '100vh' } : styles.main(sidebarCollapsed)}>
+        {/* Header - hidden for modules with own layout */}
+        <header style={{ ...styles.header, display: (activePage === 'cohrm-system' || activePage === 'analytics') ? 'none' : 'flex' }}>
           <div style={styles.flex}>
             <button
               style={{
@@ -22642,7 +22643,7 @@ export default function AdminApp() {
         </header>
 
         {/* Page Content */}
-        <main style={styles.content}>
+        <main style={(activePage === 'cohrm-system' || activePage === 'analytics') ? styles.contentFull : styles.content}>
           {renderPage()}
         </main>
       </div>
