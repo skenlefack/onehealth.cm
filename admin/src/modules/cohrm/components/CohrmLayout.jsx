@@ -498,7 +498,7 @@ const CohrmLayout = ({ children, user, isDark, onBack }) => {
             {/* Language Switcher */}
             <LanguageSwitcher isDark={isDark} />
             {/* Notifications */}
-            <button style={s.notifBtn}>
+            <button style={s.notifBtn} onClick={() => setActivePage('notifications')} title={t('nav.notifications', 'Notifications')}>
               <Bell size={18} />
               {stats?.alerts > 0 && (
                 <span style={s.notifBadge}>{stats.alerts}</span>

@@ -638,13 +638,13 @@ const ValidationQueue = ({ user, isDark = false }) => {
                 <div style={s.drawerField}>
                   <span style={s.drawerFieldLabel}>Priorité</span>
                   <span style={s.drawerFieldValue}>
-                    <PriorityBadge value={selectedRumor.priority} size="sm" />
+                    <PriorityBadge priority={selectedRumor.priority} size="sm" />
                   </span>
                 </div>
                 <div style={s.drawerField}>
                   <span style={s.drawerFieldLabel}>Statut</span>
                   <span style={s.drawerFieldValue}>
-                    <StatusBadge value={selectedRumor.status} size="sm" />
+                    <StatusBadge status={selectedRumor.status} size="sm" />
                   </span>
                 </div>
                 <div style={s.drawerField}>
@@ -745,7 +745,7 @@ const QueueTable = ({
                     </div>
                   </td>
                   <td style={s.td}>
-                    <PriorityBadge value={rumor.priority} size="sm" />
+                    <PriorityBadge priority={rumor.priority} size="sm" />
                   </td>
                   <td style={s.td}>
                     <span style={s.waitBadge(isUrgent)}>

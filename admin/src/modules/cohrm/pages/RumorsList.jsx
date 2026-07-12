@@ -217,7 +217,7 @@ const RumorsList = ({ isDark = false, user }) => {
       label: 'Risque',
       width: 100,
       sortable: true,
-      render: (val) => <RiskBadge riskLevel={val} size="sm" />,
+      render: (val) => <RiskBadge level={val} size="sm" />,
     },
     {
       key: 'status',

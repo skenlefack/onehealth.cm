@@ -118,7 +118,7 @@ const RumorCard = ({
       {/* Badges */}
       <div style={s.badges}>
         <PriorityBadge priority={rumor.priority} size="sm" />
-        <RiskBadge riskLevel={rumor.risk_level} size="sm" />
+        <RiskBadge level={rumor.risk_level} size="sm" />
         {!compact && <SourceBadge source={rumor.source} size="sm" />}
       </div>
 

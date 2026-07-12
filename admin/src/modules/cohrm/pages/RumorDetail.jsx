@@ -645,7 +645,7 @@ const RumorDetail = ({ isDark = false, user }) => {
             <div style={{ marginBottom: 16 }}>
               <div style={s.infoLabel}>Niveau de risque actuel</div>
               <div style={{ marginTop: 8 }}>
-                <RiskBadge riskLevel={rumor.risk_level} size="lg" />
+                <RiskBadge level={rumor.risk_level} size="lg" />
               </div>
             </div>
             {rumor.risk_description && (
@@ -828,7 +828,7 @@ const RumorDetail = ({ isDark = false, user }) => {
               <div style={s.badges}>
                 <StatusBadge status={rumor.status} size="md" />
                 <PriorityBadge priority={rumor.priority} size="md" />
-                <RiskBadge riskLevel={rumor.risk_level} size="md" />
+                <RiskBadge level={rumor.risk_level} size="md" />
                 <SourceBadge source={rumor.source} size="md" />
               </div>
 
