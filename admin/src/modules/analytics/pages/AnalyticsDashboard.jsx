@@ -12,6 +12,7 @@ import OsChart from '../components/OsChart';
 import DevicesChart from '../components/DevicesChart';
 import CountriesChart from '../components/CountriesChart';
 import UtmTable from '../components/UtmTable';
+import WorldMap from '../components/WorldMap';
 
 const Skeleton = ({ width = '100%', height = 20, borderRadius = 8, isDark }) => (
   <div style={{
@@ -266,6 +267,15 @@ const AnalyticsDashboard = ({ isDark, token, user, onBack }) => {
               <CountriesChart data={store.countries} isDark={isDark} />
               <UtmTable data={store.utm} isDark={isDark} />
             </>
+          )}
+        </div>
+
+        {/* World Map - full width */}
+        <div style={s.section}>
+          {store.loading && !store.countries ? (
+            <SkeletonChart isDark={isDark} height={450} />
+          ) : (
+            <WorldMap data={store.countries} isDark={isDark} />
           )}
         </div>
 

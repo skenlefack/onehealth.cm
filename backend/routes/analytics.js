@@ -304,31 +304,30 @@ router.get('/dashboard', auth, async (req, res) => {
     }
 
     // Trend data
-    let groupBy, dateFormat;
+    let groupExpr, labelExpr;
     switch (granularity) {
       case 'hour':
-        groupBy = "DATE_FORMAT(created_at, '%Y-%m-%d %H:00')";
-        dateFormat = '%H:00';
+        groupExpr = "DATE_FORMAT(created_at, '%Y-%m-%d %H:00')";
+        labelExpr = groupExpr;
         break;
       case 'week':
-        groupBy = "DATE_FORMAT(created_at, '%Y-%u')";
-        dateFormat = '%Y-W%u';
+        groupExpr = "DATE_FORMAT(created_at, '%x-%v')";
+        labelExpr = groupExpr;
         break;
       default:
-        groupBy = "DATE(created_at)";
-        dateFormat = '%Y-%m-%d';
+        groupExpr = "DATE(created_at)";
+        labelExpr = groupExpr;
     }
 
     const [trend] = await db.query(
       `SELECT
-         ${groupBy} as date_key,
-         DATE_FORMAT(created_at, '${dateFormat}') as label,
+         ${groupExpr} as label,
          COUNT(DISTINCT visitor_id) as visitors,
          COUNT(*) as pageviews
        FROM analytics_pageviews
        WHERE created_at BETWEEN ? AND ?
-       GROUP BY date_key
-       ORDER BY date_key`,
+       GROUP BY label
+       ORDER BY label`,
       [startDate, endDate]
     );
 
