@@ -370,7 +370,6 @@ const CohrmLayout = ({ children, user, isDark, onBack }) => {
     content: {
       flex: 1,
       padding: activePage === 'map' ? 0 : 28,
-      maxWidth: activePage === 'map' ? '100%' : 1600,
       width: '100%',
       overflow: activePage === 'map' ? 'hidden' : undefined,
     },

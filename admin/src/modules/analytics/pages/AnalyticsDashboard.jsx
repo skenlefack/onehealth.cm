@@ -83,8 +83,7 @@ const AnalyticsDashboard = ({ isDark, token, user, onBack }) => {
   const s = {
     container: {
       padding: '24px',
-      maxWidth: 1400,
-      margin: '0 auto',
+      width: '100%',
       minHeight: '100vh',
       backgroundColor: isDark ? '#0f172a' : '#F8FAFC',
     },
