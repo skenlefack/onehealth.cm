@@ -279,7 +279,7 @@ const RumorCreate = ({
 
   // Styles
   const s = {
-    page: { padding: 0, maxWidth: 900 },
+    page: { padding: 0, maxWidth: 900, margin: '0 auto' },
     backBtn: {
       display: 'inline-flex',
       alignItems: 'center',
