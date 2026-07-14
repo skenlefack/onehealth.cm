@@ -292,13 +292,19 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
     return { scanned: 0, results: 0, rumors_created: 0, errors: 0 };
   }
 
-  // Récupérer les mots-clés actifs (avec thèmes si disponibles)
-  const [keywords] = await db.query(`
-    SELECT k.*, t.label_fr as theme_name
-    FROM cohrm_scan_keywords k
-    LEFT JOIN cohrm_themes t ON k.theme_id = t.id
-    WHERE k.is_active = 1
-  `);
+  // Récupérer les mots-clés actifs
+  let keywords;
+  try {
+    [keywords] = await db.query(`
+      SELECT k.*, t.label_fr as theme_name
+      FROM cohrm_scan_keywords k
+      LEFT JOIN cohrm_themes t ON k.theme_id = t.id
+      WHERE k.is_active = 1
+    `);
+  } catch {
+    // Fallback si theme_id n'existe pas
+    [keywords] = await db.query('SELECT * FROM cohrm_scan_keywords WHERE is_active = 1');
+  }
 
   // Créer l'entrée de scan dans l'historique
   const [scanEntry] = await db.query(
@@ -316,9 +322,11 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
   // Scanner chaque source
   for (const source of sources) {
     // Vérifier si la source doit être scannée (respect de la fréquence)
-    if (isAutomatic && source.last_scanned_at) {
-      const hoursSinceLastScan = (Date.now() - new Date(source.last_scanned_at).getTime()) / 3600000;
-      if (hoursSinceLastScan < source.scan_frequency_hours) {
+    const lastScan = source.last_scanned_at || source.last_scan_at;
+    const freqMinutes = source.scan_frequency_hours ? source.scan_frequency_hours * 60 : (source.scan_frequency || 60);
+    if (isAutomatic && lastScan) {
+      const minutesSinceLastScan = (Date.now() - new Date(lastScan).getTime()) / 60000;
+      if (minutesSinceLastScan < freqMinutes) {
         continue; // Pas encore le moment de re-scanner cette source
       }
     }
@@ -344,12 +352,12 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
         // Vérifier la déduplication
         if (await isDuplicate(article, config.dedup_days)) continue;
 
-        // Sauvegarder le résultat
+        // Sauvegarder le résultat (compatible avec le schéma existant)
         const [resultEntry] = await db.query(
           `INSERT INTO cohrm_scan_results
-           (scan_id, source_id, title, content, url, published_at, relevance_score, keywords_matched, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
-          [scanId, source.id, article.title, article.content, article.url,
+           (scan_id, source, author, title, content, url, published_at, relevance_score, matched_keywords, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+          [scanId, source.name, source.type, article.title, article.content, article.url,
            article.published_at, score, JSON.stringify(matched)]
         );
         totalResults++;
@@ -372,7 +380,7 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
       }
 
       // Mettre à jour le timestamp du dernier scan
-      await db.query('UPDATE cohrm_scan_sources SET last_scanned_at = NOW() WHERE id = ?', [source.id]);
+      await db.query('UPDATE cohrm_scan_sources SET last_scan_at = NOW() WHERE id = ?', [source.id]);
 
     } catch (err) {
       errorsCount++;
