@@ -420,9 +420,10 @@ const autoCreateRumor = async (article, score, matched, source, config, scanResu
     // Générer le code rumeur
     const now = new Date();
     const prefix = `RUM-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // prefix = "RUM-202607", le "-" est à la position 11, le numéro commence à 12
     const [[{ maxCode }]] = await db.query(
-      "SELECT MAX(CAST(SUBSTRING(code, 11) AS UNSIGNED)) as maxCode FROM cohrm_rumors WHERE code LIKE ?",
-      [`${prefix}%`]
+      "SELECT MAX(CAST(SUBSTRING(code, 12) AS UNSIGNED)) as maxCode FROM cohrm_rumors WHERE code LIKE CONCAT(?, '-%')",
+      [prefix]
     );
     const nextNum = (maxCode || 0) + 1;
     const code = `${prefix}-${String(nextNum).padStart(4, '0')}`;
