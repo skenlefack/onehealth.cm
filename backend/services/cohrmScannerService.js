@@ -31,6 +31,7 @@ let schedulerJob = null;
 // ============================================
 
 const DEFAULT_CONFIG = {
+  enabled: false,                 // Activé/désactivé
   auto_create_threshold: 15,      // Score minimum pour auto-créer une rumeur
   high_priority_threshold: 25,    // Score pour priorité haute
   critical_threshold: 40,         // Score pour priorité critique
@@ -39,7 +40,6 @@ const DEFAULT_CONFIG = {
   dedup_days: 30,                 // Jours de déduplication
   notify_on_new_results: true,    // Notifier quand résultats trouvés
   notify_on_auto_rumor: true,     // Notifier quand rumeur auto-créée
-  scanner_enabled: false,         // Activé/désactivé
   scan_interval_minutes: 60,      // Intervalle par défaut entre scans
 };
 
@@ -646,8 +646,8 @@ const startScheduler = async () => {
 
   const config = await getConfig();
 
-  if (!config.scanner_enabled) {
-    console.log('[Scanner] Scheduler désactivé (scanner_enabled = false)');
+  if (!config.enabled) {
+    console.log('[Scanner] Scheduler désactivé (enabled = false)');
     return;
   }
 

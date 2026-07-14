@@ -1540,28 +1540,28 @@ const WebScanner = ({ isDark, user }) => {
       `}</style>
 
       {/* Scanner status banner */}
-      <div style={{ ...s.simBanner, backgroundColor: scannerConfig?.scanner_enabled ? (isDark ? 'rgba(16,185,129,0.1)' : '#F0FDF4') : (isDark ? 'rgba(245,158,11,0.1)' : '#FFFBEB'), borderColor: scannerConfig?.scanner_enabled ? '#10B981' : '#F59E0B' }}>
+      <div style={{ ...s.simBanner, backgroundColor: scannerConfig?.enabled ? (isDark ? 'rgba(16,185,129,0.1)' : '#F0FDF4') : (isDark ? 'rgba(245,158,11,0.1)' : '#FFFBEB'), borderColor: scannerConfig?.enabled ? '#10B981' : '#F59E0B' }}>
         <Info size={16} />
         <span style={{ flex: 1 }}>
-          {scannerConfig?.scanner_enabled
+          {scannerConfig?.enabled
             ? <><strong>Scanner automatique actif</strong> — Scan toutes les {scannerConfig?.scan_interval_minutes || 60} min. Les résultats à haute pertinence créent automatiquement des rumeurs (seuil: {scannerConfig?.auto_create_threshold || 15}).</>
             : <><strong>Scanner automatique désactivé</strong> — Activez-le dans l'onglet Configuration pour lancer la veille automatique.</>
           }
         </span>
         <button
           onClick={async () => {
-            const newState = !scannerConfig?.scanner_enabled;
+            const newState = !scannerConfig?.enabled;
             try {
               await toggleScanner(newState);
-              setScannerConfig(prev => ({ ...prev, scanner_enabled: newState }));
+              setScannerConfig(prev => ({ ...prev, enabled: newState }));
             } catch (e) { console.error(e); }
           }}
           style={{
             padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            backgroundColor: scannerConfig?.scanner_enabled ? '#EF4444' : '#10B981', color: '#fff',
+            backgroundColor: scannerConfig?.enabled ? '#EF4444' : '#10B981', color: '#fff',
           }}
         >
-          {scannerConfig?.scanner_enabled ? 'Désactiver' : 'Activer'}
+          {scannerConfig?.enabled ? 'Désactiver' : 'Activer'}
         </button>
       </div>
 
