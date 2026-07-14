@@ -29,6 +29,9 @@ const PERMISSION_MATRIX = {
   'actor-edit':   { view: 4, edit: 4 },
   'actor-detail': { view: 4, edit: 4 },
   notifications: { view: 3, edit: 5 },
+  reports:      { view: 2, edit: 2 },
+  'epi-report': { view: 3, edit: 3 },
+  'public-form': { view: 5, edit: 5 },
   export:       { view: 2, edit: 2 },
   settings:     { view: 5, edit: 5 },
 };
@@ -83,9 +86,12 @@ export const usePermissions = (user) => {
   /**
    * Vérifie si l'utilisateur peut supprimer (niveau 5 / admin)
    */
-  const canDelete = useCallback(() => {
+  const canDelete = useCallback((section) => {
     if (!user) return false;
-    return user.role === 'admin' || userLevel >= 5;
+    if (user.role === 'admin') return true;
+    const perm = PERMISSION_MATRIX[section];
+    const minLevel = perm ? Math.max(perm.edit, 4) : 5;
+    return userLevel >= minLevel;
   }, [user, userLevel]);
 
   /**

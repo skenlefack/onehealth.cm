@@ -139,6 +139,65 @@ export const getAllRumorsForMap = (params = {}) => {
 };
 
 // ============================================
+// PHOTOS
+// ============================================
+
+export const getRumorPhotos = (rumorId) => cohrmClient.get(`/rumors/${rumorId}/photos`);
+
+export const deleteRumorPhoto = (rumorId, photoId) => cohrmClient.delete(`/rumors/${rumorId}/photos/${photoId}`);
+
+// ============================================
+// RAPPORTS AVANCÉS
+// ============================================
+
+export const getReportSummary = (params = {}) => {
+  const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+  return cohrmClient.get('/reports/summary', { params: cleanParams });
+};
+
+export const getReportTrends = (params = {}) => {
+  const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+  return cohrmClient.get('/reports/trends', { params: cleanParams });
+};
+
+export const getReportGeographic = (params = {}) => {
+  const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+  return cohrmClient.get('/reports/geographic', { params: cleanParams });
+};
+
+export const getReportPerformance = (params = {}) => {
+  const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+  return cohrmClient.get('/reports/performance', { params: cleanParams });
+};
+
+export const getReportEpidemiological = (params = {}) => {
+  const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+  return cohrmClient.get('/reports/epidemiological', { params: cleanParams });
+};
+
+// ============================================
+// SCANNER WEB AVANCÉ
+// ============================================
+
+export const getScannerSources = () => cohrmClient.get('/scanner/sources');
+export const addScannerSource = (data) => cohrmClient.post('/scanner/sources', data);
+export const updateScannerSource = (id, data) => cohrmClient.put(`/scanner/sources/${id}`, data);
+export const deleteScannerSource = (id) => cohrmClient.delete(`/scanner/sources/${id}`);
+export const getScannerKeywords = () => cohrmClient.get('/scanner/keywords');
+export const addScannerKeyword = (data) => cohrmClient.post('/scanner/keywords', data);
+export const deleteScannerKeyword = (id) => cohrmClient.delete(`/scanner/keywords/${id}`);
+export const getScannerResults = (params = {}) => cohrmClient.get('/scanner/results', { params });
+export const reviewScannerResult = (id, data) => cohrmClient.put(`/scanner/results/${id}/review`, data);
+export const convertScannerResult = (id, data) => cohrmClient.post(`/scanner/results/${id}/convert`, data);
+
+// ============================================
+// FORMULAIRE PUBLIC
+// ============================================
+
+export const trackPublicRumor = (code) => cohrmClient.get(`/public/track/${code}`);
+export const getPublicRegions = () => cohrmClient.get('/public/regions');
+
+// ============================================
 // VALIDATION MULTI-NIVEAUX
 // ============================================
 
@@ -492,6 +551,29 @@ const cohrmApi = {
   updateRumor,
   deleteRumor,
   addNote,
+  // Photos
+  getRumorPhotos,
+  deleteRumorPhoto,
+  // Rapports
+  getReportSummary,
+  getReportTrends,
+  getReportGeographic,
+  getReportPerformance,
+  getReportEpidemiological,
+  // Scanner avancé
+  getScannerSources,
+  addScannerSource,
+  updateScannerSource,
+  deleteScannerSource,
+  getScannerKeywords,
+  addScannerKeyword,
+  deleteScannerKeyword,
+  getScannerResults,
+  reviewScannerResult,
+  convertScannerResult,
+  // Public
+  trackPublicRumor,
+  getPublicRegions,
   // Validation
   validateRumor,
   getValidations,

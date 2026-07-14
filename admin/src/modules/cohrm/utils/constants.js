@@ -285,6 +285,7 @@ export const DEFAULT_FILTERS = {
   source: '',
   region: '',
   species: '',
+  risk_level: '',
   search: '',
   date_from: '',
   date_to: '',
@@ -302,8 +303,11 @@ export const COHRM_NAV_ITEMS = [
   { id: 'sms', label: 'SMS', icon: 'MessageCircle', minLevel: 3 },
   { id: 'scanner', label: 'Scanner Web', icon: 'Globe', minLevel: 3 },
   { id: 'actors', label: 'Acteurs', icon: 'Users', minLevel: 4 },
+  { id: 'reports', label: 'Rapports', icon: 'BarChart3', minLevel: 2 },
+  { id: 'epi-report', label: 'Rapport Épi', icon: 'Activity', minLevel: 3 },
   { id: 'notifications', label: 'Notifications', icon: 'Bell', minLevel: 3 },
   { id: 'export', label: 'Export', icon: 'Download', minLevel: 2 },
+  { id: 'public-form', label: 'Formulaire public', icon: 'Globe', minLevel: 5 },
   { id: 'settings', label: 'Paramètres', icon: 'Settings', minLevel: 5 },
 ];
 

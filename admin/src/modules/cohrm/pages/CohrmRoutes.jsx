@@ -27,6 +27,9 @@ import ActorsList from './ActorsList';
 import ActorForm from './ActorForm';
 import ActorDetail from './ActorDetail';
 import NotificationsCenter from './NotificationsCenter';
+import ReportsPage from './ReportsPage';
+import EpiReportPage from './EpiReportPage';
+import PublicFormSettings from './PublicFormSettings';
 
 /**
  * Composant de routing COHRM
@@ -179,6 +182,29 @@ const CohrmRoutes = ({ user, isDark }) => {
         return (
           <ProtectedRoute user={user} section="settings" isDark={isDark}>
             <CohrmSettings isDark={isDark} user={user} />
+          </ProtectedRoute>
+        );
+
+      // ---- Rapports (niveau 2+) ----
+      case 'reports':
+        return (
+          <ProtectedRoute user={user} section="export" isDark={isDark}>
+            <ReportsPage isDark={isDark} user={user} />
+          </ProtectedRoute>
+        );
+
+      case 'epi-report':
+        return (
+          <ProtectedRoute user={user} section="export" isDark={isDark}>
+            <EpiReportPage isDark={isDark} user={user} />
+          </ProtectedRoute>
+        );
+
+      // ---- Formulaire public (niveau 5) ----
+      case 'public-form':
+        return (
+          <ProtectedRoute user={user} section="settings" isDark={isDark}>
+            <PublicFormSettings isDark={isDark} user={user} />
           </ProtectedRoute>
         );
 

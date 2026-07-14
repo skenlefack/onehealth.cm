@@ -8,11 +8,11 @@ import {
   ArrowLeft, Save, Plus, MapPin, Navigation, Upload,
   X, Image, AlertCircle, CheckCircle,
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import useCohrmStore from '../stores/cohrmStore';
 import { createRumor, createExtendedRumor } from '../services/cohrmApi';
-import { validateRumor as validateRumorData } from '../utils/validators';
+
 import {
   SOURCE_OPTIONS,
   PRIORITY_OPTIONS,
@@ -34,6 +34,17 @@ const SYMPTOM_OPTIONS = Object.entries(SYMPTOM_CODES).map(([code, info]) => ({
   value: code,
   label: `${code} - ${info.label}`,
 }));
+
+// Composant pour re-centrer la carte quand la position change
+const ChangeView = ({ center, zoom }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center && center[0] !== 0 && center[1] !== 0) {
+      map.setView(center, zoom || map.getZoom());
+    }
+  }, [center, zoom, map]);
+  return null;
+};
 
 // Marqueur personnalisé pour le formulaire
 const formMarkerIcon = L.divIcon({
@@ -696,6 +707,7 @@ const RumorCreate = ({
                 : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
               }
             />
+            <ChangeView center={hasPosition ? mapPosition : [7.3697, 12.3547]} />
             <DraggableMarker
               position={hasPosition ? mapPosition : [0, 0]}
               onPositionChange={handlePositionChange}

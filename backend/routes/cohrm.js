@@ -18,6 +18,35 @@ const { v4: uuidv4 } = require('uuid');
 // Service de notifications COHRM
 const cohrmNotificationService = require('../services/cohrmNotificationService');
 
+// Multer pour upload de photos
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const uploadDir = path.join(__dirname, '..', 'uploads', 'cohrm');
+const thumbDir = path.join(uploadDir, 'thumbnails');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+
+const photoStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `rumor-${req.params.id}-${Date.now()}${ext}`);
+  },
+});
+
+const photoUpload = multer({
+  storage: photoStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error('Type de fichier non autorisé. Utilisez JPG, PNG ou WebP.'));
+  },
+});
+
 // ============================================
 // HELPERS
 // ============================================
@@ -174,6 +203,7 @@ router.get('/rumors', auth, async (req, res) => {
       source,
       region,
       species,
+      risk_level,
       search,
       date_from,
       date_to
@@ -215,6 +245,11 @@ router.get('/rumors', auth, async (req, res) => {
       params.push(species);
     }
 
+    if (risk_level) {
+      query += ' AND r.risk_level = ?';
+      params.push(risk_level);
+    }
+
     if (search) {
       query += ' AND (r.title LIKE ? OR r.description LIKE ? OR r.location LIKE ? OR r.code LIKE ?)';
       const searchPattern = `%${search}%`;
@@ -236,9 +271,11 @@ router.get('/rumors', auth, async (req, res) => {
     const [[{ total }]] = await db.query(countQuery, params);
 
     // Pagination
-    const offset = (page - 1) * limit;
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 20;
+    const offset = (pageNum - 1) * limitNum;
     query += ' ORDER BY r.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), offset);
+    params.push(limitNum, offset);
 
     const [rumors] = await db.query(query, params);
 
@@ -3538,6 +3575,603 @@ router.post('/notifications/test', auth, async (req, res) => {
       message: 'Erreur lors de l\'envoi de la notification de test',
       error: error.message
     });
+  }
+});
+
+// ============================================
+// PHOTOS / MÉDIAS
+// ============================================
+
+// GET /api/cohrm/rumors/:id/photos
+router.get('/rumors/:id/photos', auth, async (req, res) => {
+  try {
+    const [photos] = await db.query(
+      'SELECT * FROM cohrm_rumor_photos WHERE rumor_id = ? ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json({ success: true, data: photos });
+  } catch (error) {
+    console.error('Get photos error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/cohrm/rumors/:id/photos - Upload photos
+router.post('/rumors/:id/photos', auth, photoUpload.array('photos', 5), async (req, res) => {
+  try {
+    const rumorId = req.params.id;
+    const captions = req.body.captions ? JSON.parse(req.body.captions) : [];
+
+    // Vérifier que la rumeur existe
+    const [[rumor]] = await db.query('SELECT id FROM cohrm_rumors WHERE id = ?', [rumorId]);
+    if (!rumor) {
+      return res.status(404).json({ success: false, message: 'Rumeur non trouvée' });
+    }
+
+    // Vérifier le nombre total de photos (max 10)
+    const [[{ count }]] = await db.query(
+      'SELECT COUNT(*) as count FROM cohrm_rumor_photos WHERE rumor_id = ?', [rumorId]
+    );
+    if (count + req.files.length > 10) {
+      return res.status(400).json({ success: false, message: 'Maximum 10 photos par rumeur' });
+    }
+
+    const photos = [];
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      const caption = captions[i] || '';
+      const url = `/uploads/cohrm/${file.filename}`;
+
+      // Générer thumbnail
+      let thumbnailUrl = url;
+      try {
+        const sharp = require('sharp');
+        const thumbFilename = `thumb-${file.filename}`;
+        await sharp(file.path)
+          .resize(200, 200, { fit: 'cover' })
+          .toFile(path.join(thumbDir, thumbFilename));
+        thumbnailUrl = `/uploads/cohrm/thumbnails/${thumbFilename}`;
+      } catch (thumbErr) {
+        console.warn('Thumbnail generation failed:', thumbErr.message);
+      }
+
+      const [result] = await db.query(
+        'INSERT INTO cohrm_rumor_photos (rumor_id, url, caption) VALUES (?, ?, ?)',
+        [rumorId, url, caption]
+      );
+
+      photos.push({ id: result.insertId, rumor_id: rumorId, url, thumbnail_url: thumbnailUrl, caption });
+    }
+
+    // Historique
+    await db.query(
+      'INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details) VALUES (?, ?, ?, ?)',
+      [rumorId, req.user.id, 'photo_added', JSON.stringify({ count: req.files.length })]
+    );
+
+    res.json({ success: true, data: photos, message: `${photos.length} photo(s) ajoutée(s)` });
+  } catch (error) {
+    console.error('Upload photos error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /api/cohrm/rumors/:id/photos/:photoId
+router.delete('/rumors/:id/photos/:photoId', auth, async (req, res) => {
+  try {
+    const { id: rumorId, photoId } = req.params;
+
+    const [[photo]] = await db.query(
+      'SELECT * FROM cohrm_rumor_photos WHERE id = ? AND rumor_id = ?',
+      [photoId, rumorId]
+    );
+    if (!photo) {
+      return res.status(404).json({ success: false, message: 'Photo non trouvée' });
+    }
+
+    // Supprimer les fichiers
+    const filePath = path.join(__dirname, '..', photo.url);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    const thumbPath = filePath.replace('cohrm/', 'cohrm/thumbnails/thumb-');
+    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+
+    await db.query('DELETE FROM cohrm_rumor_photos WHERE id = ?', [photoId]);
+
+    await db.query(
+      'INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details) VALUES (?, ?, ?, ?)',
+      [rumorId, req.user.id, 'photo_removed', JSON.stringify({ photoId })]
+    );
+
+    res.json({ success: true, message: 'Photo supprimée' });
+  } catch (error) {
+    console.error('Delete photo error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// FORMULAIRE PUBLIC (sans authentification)
+// ============================================
+
+const rateLimit = require('express-rate-limit');
+const publicLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: { success: false, message: 'Trop de soumissions. Réessayez dans 1 heure.' } });
+
+// POST /api/cohrm/public/report - Signalement public
+router.post('/public/report', publicLimiter, async (req, res) => {
+  try {
+    const {
+      reporter_name, reporter_phone, reporter_type,
+      region, department, district, location,
+      description, category, species, symptoms,
+      affected_count, dead_count, latitude, longitude,
+    } = req.body;
+
+    // Validation
+    if (!reporter_phone) {
+      return res.status(400).json({ success: false, message: 'Le numéro de téléphone est requis' });
+    }
+    if (!description || description.length < 20) {
+      return res.status(400).json({ success: false, message: 'La description doit contenir au moins 20 caractères' });
+    }
+
+    // Sanitize
+    const sanitize = (str) => str ? String(str).replace(/<[^>]*>/g, '').trim().substring(0, 1000) : '';
+
+    const code = generateRumorCode();
+
+    const [result] = await db.query(
+      `INSERT INTO cohrm_rumors (code, title, description, source, source_type,
+        reporter_name, reporter_phone, reporter_type,
+        region, department, district, location,
+        category, species, symptoms, affected_count, dead_count,
+        latitude, longitude, status, priority)
+       VALUES (?, ?, ?, 'web', 'public_form', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'medium')`,
+      [
+        code,
+        sanitize(description).substring(0, 100),
+        sanitize(description),
+        sanitize(reporter_name),
+        sanitize(reporter_phone),
+        sanitize(reporter_type) || 'citizen',
+        sanitize(region), sanitize(department), sanitize(district), sanitize(location),
+        sanitize(category) || 'other',
+        sanitize(species),
+        symptoms ? JSON.stringify(symptoms) : null,
+        parseInt(affected_count) || 0,
+        parseInt(dead_count) || 0,
+        parseFloat(latitude) || null,
+        parseFloat(longitude) || null,
+      ]
+    );
+
+    // Historique
+    await db.query(
+      'INSERT INTO cohrm_rumor_history (rumor_id, user_id, action, details) VALUES (?, NULL, ?, ?)',
+      [result.insertId, 'public_submission', JSON.stringify({ source: 'web', phone: reporter_phone })]
+    );
+
+    res.json({ success: true, code, message: 'Signalement enregistré avec succès' });
+  } catch (error) {
+    console.error('Public report error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de l\'enregistrement' });
+  }
+});
+
+// GET /api/cohrm/public/track/:code - Suivi de rumeur par code
+router.get('/public/track/:code', async (req, res) => {
+  try {
+    const [[rumor]] = await db.query(
+      'SELECT code, status, priority, created_at, updated_at FROM cohrm_rumors WHERE code = ?',
+      [req.params.code]
+    );
+    if (!rumor) {
+      return res.status(404).json({ success: false, message: 'Code de suivi non trouvé' });
+    }
+    res.json({ success: true, data: rumor });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/public/regions - Liste des régions (sans auth)
+router.get('/public/regions', async (req, res) => {
+  res.json({
+    success: true,
+    data: [
+      { code: 'AD', name: 'Adamaoua' },
+      { code: 'CE', name: 'Centre' },
+      { code: 'ES', name: 'Est' },
+      { code: 'EN', name: 'Extrême-Nord' },
+      { code: 'LT', name: 'Littoral' },
+      { code: 'NO', name: 'Nord' },
+      { code: 'NW', name: 'Nord-Ouest' },
+      { code: 'OU', name: 'Ouest' },
+      { code: 'SU', name: 'Sud' },
+      { code: 'SW', name: 'Sud-Ouest' },
+    ],
+  });
+});
+
+// ============================================
+// RAPPORTS AVANCÉS
+// ============================================
+
+// GET /api/cohrm/reports/summary
+router.get('/reports/summary', auth, async (req, res) => {
+  try {
+    const { date_from, date_to, region, group_by = 'day' } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    if (date_from) { whereClause += ' AND DATE(created_at) >= ?'; params.push(date_from); }
+    if (date_to) { whereClause += ' AND DATE(created_at) <= ?'; params.push(date_to); }
+    if (region) { whereClause += ' AND region = ?'; params.push(region); }
+
+    const [[totals]] = await db.query(
+      `SELECT COUNT(*) as total,
+        SUM(status = 'pending') as pending,
+        SUM(status = 'investigating') as investigating,
+        SUM(status = 'confirmed') as confirmed,
+        SUM(status = 'false_alarm') as false_alarm,
+        SUM(status = 'closed') as closed,
+        SUM(priority = 'critical') as critical,
+        SUM(priority = 'high') as high,
+        SUM(risk_level = 'high' OR risk_level = 'very_high') as high_risk
+      FROM cohrm_rumors ${whereClause}`, params
+    );
+
+    // Par statut
+    const [byStatus] = await db.query(
+      `SELECT status, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY status`, params
+    );
+
+    // Par priorité
+    const [byPriority] = await db.query(
+      `SELECT priority, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY priority`, params
+    );
+
+    // Par source
+    const [bySource] = await db.query(
+      `SELECT source, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY source`, params
+    );
+
+    // Par catégorie
+    const [byCategory] = await db.query(
+      `SELECT category, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY category`, params
+    );
+
+    // Par région
+    const [byRegion] = await db.query(
+      `SELECT region, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY region ORDER BY count DESC`, params
+    );
+
+    // Par risque
+    const [byRisk] = await db.query(
+      `SELECT risk_level, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY risk_level`, params
+    );
+
+    // Temps moyen de résolution
+    const [[avgTime]] = await db.query(
+      `SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, closed_at)) as avg_hours
+       FROM cohrm_rumors ${whereClause} AND closed_at IS NOT NULL`, params
+    );
+
+    res.json({
+      success: true,
+      data: {
+        totals, byStatus, byPriority, bySource, byCategory, byRegion, byRisk,
+        avgResolutionHours: Math.round(avgTime?.avg_hours || 0),
+      },
+    });
+  } catch (error) {
+    console.error('Report summary error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/reports/trends
+router.get('/reports/trends', auth, async (req, res) => {
+  try {
+    const { date_from, date_to, region, group_by = 'day' } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    if (date_from) { whereClause += ' AND DATE(created_at) >= ?'; params.push(date_from); }
+    if (date_to) { whereClause += ' AND DATE(created_at) <= ?'; params.push(date_to); }
+    if (region) { whereClause += ' AND region = ?'; params.push(region); }
+
+    const dateFormat = group_by === 'month' ? '%Y-%m' : group_by === 'week' ? '%Y-%u' : '%Y-%m-%d';
+
+    const [created] = await db.query(
+      `SELECT DATE_FORMAT(created_at, '${dateFormat}') as period, COUNT(*) as count
+       FROM cohrm_rumors ${whereClause} GROUP BY period ORDER BY period`, params
+    );
+
+    const [resolved] = await db.query(
+      `SELECT DATE_FORMAT(closed_at, '${dateFormat}') as period, COUNT(*) as count
+       FROM cohrm_rumors ${whereClause} AND closed_at IS NOT NULL
+       GROUP BY period ORDER BY period`, params
+    );
+
+    res.json({ success: true, data: { created, resolved } });
+  } catch (error) {
+    console.error('Report trends error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/reports/geographic
+router.get('/reports/geographic', auth, async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    if (date_from) { whereClause += ' AND DATE(created_at) >= ?'; params.push(date_from); }
+    if (date_to) { whereClause += ' AND DATE(created_at) <= ?'; params.push(date_to); }
+
+    const [byRegion] = await db.query(
+      `SELECT region, COUNT(*) as count,
+        SUM(status = 'confirmed') as confirmed,
+        SUM(priority = 'critical' OR priority = 'high') as high_priority,
+        SUM(risk_level = 'high' OR risk_level = 'very_high') as high_risk
+       FROM cohrm_rumors ${whereClause} AND region IS NOT NULL AND region != ''
+       GROUP BY region ORDER BY count DESC`, params
+    );
+
+    const [byDistrict] = await db.query(
+      `SELECT region, district, COUNT(*) as count
+       FROM cohrm_rumors ${whereClause} AND district IS NOT NULL AND district != ''
+       GROUP BY region, district ORDER BY count DESC LIMIT 20`, params
+    );
+
+    res.json({ success: true, data: { byRegion, byDistrict } });
+  } catch (error) {
+    console.error('Report geographic error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/reports/performance
+router.get('/reports/performance', auth, async (req, res) => {
+  try {
+    const { date_from, date_to, region } = req.query;
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    if (date_from) { whereClause += ' AND DATE(r.created_at) >= ?'; params.push(date_from); }
+    if (date_to) { whereClause += ' AND DATE(r.created_at) <= ?'; params.push(date_to); }
+    if (region) { whereClause += ' AND r.region = ?'; params.push(region); }
+
+    // Temps moyen première validation
+    const [[firstValidation]] = await db.query(
+      `SELECT AVG(TIMESTAMPDIFF(HOUR, r.created_at, v.validated_at)) as avg_hours
+       FROM cohrm_rumors r
+       INNER JOIN cohrm_validations v ON v.rumor_id = r.id AND v.level = 1 AND v.status = 'validated'
+       ${whereClause}`, params
+    );
+
+    // Temps moyen de clôture
+    const [[closeTime]] = await db.query(
+      `SELECT AVG(TIMESTAMPDIFF(HOUR, r.created_at, r.closed_at)) as avg_hours
+       FROM cohrm_rumors r ${whereClause} AND r.closed_at IS NOT NULL`, params
+    );
+
+    // Charge par acteur
+    const [actorWorkload] = await db.query(
+      `SELECT a.id, CONCAT(u.first_name, ' ', u.last_name) as name, a.actor_level,
+        COUNT(v.id) as validations_count
+       FROM cohrm_actors a
+       LEFT JOIN users u ON a.user_id = u.id
+       LEFT JOIN cohrm_validations v ON v.actor_id = a.id
+       WHERE a.is_active = 1
+       GROUP BY a.id ORDER BY validations_count DESC LIMIT 15`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        avgFirstValidationHours: Math.round(firstValidation?.avg_hours || 0),
+        avgCloseTimeHours: Math.round(closeTime?.avg_hours || 0),
+        actorWorkload,
+      },
+    });
+  } catch (error) {
+    console.error('Report performance error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/reports/epidemiological
+router.get('/reports/epidemiological', auth, async (req, res) => {
+  try {
+    const { date_from, date_to, category, region } = req.query;
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    if (date_from) { whereClause += ' AND DATE(created_at) >= ?'; params.push(date_from); }
+    if (date_to) { whereClause += ' AND DATE(created_at) <= ?'; params.push(date_to); }
+    if (category) { whereClause += ' AND category = ?'; params.push(category); }
+    if (region) { whereClause += ' AND region = ?'; params.push(region); }
+
+    const [bySpecies] = await db.query(
+      `SELECT species, COUNT(*) as count, SUM(affected_count) as total_affected, SUM(dead_count) as total_dead
+       FROM cohrm_rumors ${whereClause} AND species IS NOT NULL AND species != ''
+       GROUP BY species ORDER BY count DESC`, params
+    );
+
+    const [byCategory] = await db.query(
+      `SELECT category, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY category`, params
+    );
+
+    // Courbe épidémique
+    const [epiCurve] = await db.query(
+      `SELECT DATE(created_at) as date, COUNT(*) as count, category
+       FROM cohrm_rumors ${whereClause}
+       GROUP BY DATE(created_at), category ORDER BY date`, params
+    );
+
+    res.json({ success: true, data: { bySpecies, byCategory, epiCurve } });
+  } catch (error) {
+    console.error('Epi report error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// SCANNER WEB AVANCÉ
+// ============================================
+
+// GET /api/cohrm/scanner/sources
+router.get('/scanner/sources', auth, async (req, res) => {
+  try {
+    const [sources] = await db.query(
+      'SELECT * FROM cohrm_scan_sources WHERE 1=1 ORDER BY created_at DESC'
+    );
+    res.json({ success: true, data: sources });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/cohrm/scanner/sources
+router.post('/scanner/sources', auth, async (req, res) => {
+  try {
+    const { name, url, type = 'news', language = 'fr', scan_frequency_hours = 24 } = req.body;
+    if (!name || !url) return res.status(400).json({ success: false, message: 'Nom et URL requis' });
+
+    const [result] = await db.query(
+      'INSERT INTO cohrm_scan_sources (name, url, type, language, scan_frequency_hours) VALUES (?, ?, ?, ?, ?)',
+      [name, url, type, language, scan_frequency_hours]
+    );
+    res.json({ success: true, data: { id: result.insertId }, message: 'Source ajoutée' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PUT /api/cohrm/scanner/sources/:id
+router.put('/scanner/sources/:id', auth, async (req, res) => {
+  try {
+    const { name, url, type, language, scan_frequency_hours, is_active } = req.body;
+    await db.query(
+      `UPDATE cohrm_scan_sources SET name = COALESCE(?, name), url = COALESCE(?, url),
+       type = COALESCE(?, type), language = COALESCE(?, language),
+       scan_frequency_hours = COALESCE(?, scan_frequency_hours), is_active = COALESCE(?, is_active)
+       WHERE id = ?`,
+      [name, url, type, language, scan_frequency_hours, is_active, req.params.id]
+    );
+    res.json({ success: true, message: 'Source mise à jour' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /api/cohrm/scanner/sources/:id
+router.delete('/scanner/sources/:id', auth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM cohrm_scan_sources WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Source supprimée' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/scanner/keywords
+router.get('/scanner/keywords', auth, async (req, res) => {
+  try {
+    const [keywords] = await db.query('SELECT * FROM cohrm_scan_keywords ORDER BY category, keyword');
+    res.json({ success: true, data: keywords });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/cohrm/scanner/keywords
+router.post('/scanner/keywords', auth, async (req, res) => {
+  try {
+    const { keyword, category, weight = 1, language = 'fr' } = req.body;
+    if (!keyword || !category) return res.status(400).json({ success: false, message: 'Mot-clé et catégorie requis' });
+
+    const [result] = await db.query(
+      'INSERT INTO cohrm_scan_keywords (keyword, category, weight, language) VALUES (?, ?, ?, ?)',
+      [keyword, category, weight, language]
+    );
+    res.json({ success: true, data: { id: result.insertId }, message: 'Mot-clé ajouté' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /api/cohrm/scanner/keywords/:id
+router.delete('/scanner/keywords/:id', auth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM cohrm_scan_keywords WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Mot-clé supprimé' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/cohrm/scanner/results
+router.get('/scanner/results', auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, source_id, min_relevance } = req.query;
+    let query = 'SELECT sr.*, ss.name as source_name FROM cohrm_scan_results sr LEFT JOIN cohrm_scan_sources ss ON sr.source_id = ss.id WHERE 1=1';
+    const params = [];
+
+    if (status) { query += ' AND sr.status = ?'; params.push(status); }
+    if (source_id) { query += ' AND sr.source_id = ?'; params.push(source_id); }
+    if (min_relevance) { query += ' AND sr.relevance_score >= ?'; params.push(parseInt(min_relevance)); }
+
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 20;
+    query += ' ORDER BY sr.relevance_score DESC, sr.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limitNum, (pageNum - 1) * limitNum);
+
+    const [results] = await db.query(query, params);
+    res.json({ success: true, data: results });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PUT /api/cohrm/scanner/results/:id/review
+router.put('/scanner/results/:id/review', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    await db.query(
+      'UPDATE cohrm_scan_results SET status = ?, reviewed_by = ? WHERE id = ?',
+      [status, req.user.id, req.params.id]
+    );
+    res.json({ success: true, message: 'Résultat mis à jour' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/cohrm/scanner/results/:id/convert - Convertir en rumeur
+router.post('/scanner/results/:id/convert', auth, async (req, res) => {
+  try {
+    const [[scanResult]] = await db.query('SELECT * FROM cohrm_scan_results WHERE id = ?', [req.params.id]);
+    if (!scanResult) return res.status(404).json({ success: false, message: 'Résultat non trouvé' });
+
+    const code = generateRumorCode();
+    const title = req.body.title || scanResult.title;
+    const description = req.body.description || scanResult.content;
+
+    const [result] = await db.query(
+      `INSERT INTO cohrm_rumors (code, title, description, source, source_details, status, priority, reported_by)
+       VALUES (?, ?, ?, 'scanner', ?, 'pending', 'medium', ?)`,
+      [code, title, description, scanResult.url, req.user.id]
+    );
+
+    await db.query(
+      'UPDATE cohrm_scan_results SET status = ?, rumor_id = ? WHERE id = ?',
+      ['converted', result.insertId, req.params.id]
+    );
+
+    res.json({ success: true, data: { rumorId: result.insertId, code }, message: 'Converti en rumeur' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

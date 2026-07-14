@@ -20,12 +20,13 @@ import { useTranslation } from 'react-i18next';
 import { COHRM_NAV_ITEMS, COHRM_COLORS } from '../utils/constants';
 import { usePermissions } from '../hooks/usePermissions';
 import useCohrmStore from '../stores/cohrmStore';
+import useNotificationStore from '../stores/notificationStore';
 import LanguageSwitcher from './LanguageSwitcher';
 
 // Mapping des noms d'icônes vers les composants Lucide
 const ICON_MAP = {
   BarChart3, Megaphone, CheckCircle, Map, Shield, MessageCircle,
-  Globe, Users, Download, Settings, Bell,
+  Globe, Users, Download, Settings, Bell, Activity,
 };
 
 /**
@@ -50,10 +51,19 @@ const CohrmLayout = ({ children, user, isDark, onBack }) => {
   const [hoveredNav, setHoveredNav] = useState(null);
   const [tooltipNav, setTooltipNav] = useState(null);
 
+  // Socket.IO notifications en temps réel
+  const { unreadCount, initSocket, disconnectSocket } = useNotificationStore();
+
   // Charger les stats au montage (pour les badges compteurs)
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  // Initialiser Socket.IO
+  useEffect(() => {
+    initSocket();
+    return () => disconnectSocket();
+  }, [initSocket, disconnectSocket]);
 
   // Largeurs du sidebar
   const SIDEBAR_WIDTH = sidebarCollapsed ? 64 : 260;
@@ -499,8 +509,8 @@ const CohrmLayout = ({ children, user, isDark, onBack }) => {
             {/* Notifications */}
             <button style={s.notifBtn} onClick={() => setActivePage('notifications')} title={t('nav.notifications', 'Notifications')}>
               <Bell size={18} />
-              {stats?.alerts > 0 && (
-                <span style={s.notifBadge}>{stats.alerts}</span>
+              {(unreadCount > 0 || stats?.alerts > 0) && (
+                <span style={s.notifBadge}>{unreadCount || stats.alerts}</span>
               )}
             </button>
             {/* Info utilisateur */}

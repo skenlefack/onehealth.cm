@@ -129,10 +129,19 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+// Create HTTP server and attach Socket.IO
+const http = require('http');
+const server = http.createServer(app);
+
+// Initialize COHRM Socket.IO
+const cohrmSocketService = require('./services/cohrmSocketService');
+cohrmSocketService.initialize(server);
+
+server.listen(PORT, () => {
   console.log(`🚀 One Health CMS Server running on port ${PORT}`);
   console.log(`📚 API: http://localhost:${PORT}/api`);
   console.log(`💾 Health: http://localhost:${PORT}/api/health`);
+  console.log(`🔌 Socket.IO: ws://localhost:${PORT}/cohrm`);
 
   // Start newsletter scheduler (check every minute for scheduled campaigns)
   const newsletterEmailService = require('./services/newsletterEmailService');
@@ -149,7 +158,7 @@ app.listen(PORT, () => {
   console.log(`📧 Newsletter scheduler started`);
 });
 
-module.exports = app;
+module.exports = { app, server };
 // force reload Thu, Jan  8, 2026 12:56:20 AM
 
 // trigger restart
