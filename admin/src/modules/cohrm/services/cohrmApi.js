@@ -189,6 +189,9 @@ export const deleteScannerKeyword = (id) => cohrmClient.delete(`/scanner/keyword
 export const getScannerResults = (params = {}) => cohrmClient.get('/scanner/results', { params });
 export const reviewScannerResult = (id, data) => cohrmClient.put(`/scanner/results/${id}/review`, data);
 export const convertScannerResult = (id, data) => cohrmClient.post(`/scanner/results/${id}/convert`, data);
+export const getScannerConfig = () => cohrmClient.get('/scanner/config');
+export const updateScannerConfig = (data) => cohrmClient.put('/scanner/config', data);
+export const toggleScanner = (enabled) => cohrmClient.post('/scanner/toggle', { enabled });
 
 // ============================================
 // FORMULAIRE PUBLIC

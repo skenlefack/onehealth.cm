@@ -17,7 +17,12 @@ import {
 } from 'lucide-react';
 import { COHRM_COLORS } from '../utils/constants';
 import { formatDate, formatRelativeDate } from '../utils/formatters';
-import { runScan, getScanHistory, getScanDetail, updateScanResult } from '../services/cohrmApi';
+import {
+  runScan, getScanHistory, getScanDetail, updateScanResult,
+  getScannerSources, addScannerSource, updateScannerSource, deleteScannerSource,
+  getScannerKeywords, addScannerKeyword, deleteScannerKeyword,
+  getScannerConfig, updateScannerConfig, toggleScanner,
+} from '../services/cohrmApi';
 import useCohrmStore from '../stores/cohrmStore';
 
 // ============================================
@@ -91,7 +96,17 @@ const WebScanner = ({ isDark, user }) => {
   const [sortBy, setSortBy] = useState('relevance');
   const [filterSource, setFilterSource] = useState('all');
   const [minScore, setMinScore] = useState(0);
-  const [activeTab, setActiveTab] = useState('scan'); // 'scan' | 'history'
+  const [activeTab, setActiveTab] = useState('scan'); // 'scan' | 'history' | 'config'
+
+  // --- Configuration scanner ---
+  const [scannerConfig, setScannerConfig] = useState(null);
+  const [scannerSources, setScannerSources] = useState([]);
+  const [scannerKeywords, setScannerKeywords] = useState([]);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [newSource, setNewSource] = useState({ name: '', url: '', type: 'news', language: 'fr', scan_frequency_hours: 6 });
+  const [newKeyword, setNewKeyword] = useState({ keyword: '', category: 'disease', weight: 2, language: 'fr' });
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [showAddKeyword, setShowAddKeyword] = useState(false);
 
   // --- Historique ---
   const [history, setHistory] = useState([]);
@@ -103,6 +118,35 @@ const WebScanner = ({ isDark, user }) => {
   // --- Refs ---
   const keywordInputRef = useRef(null);
   const resultsRef = useRef(null);
+
+  // ============================================
+  // CHARGEMENT CONFIG SCANNER
+  // ============================================
+
+  const loadConfigTab = useCallback(async () => {
+    setConfigLoading(true);
+    try {
+      const [configRes, sourcesRes, keywordsRes] = await Promise.all([
+        getScannerConfig().catch(() => ({ success: false })),
+        getScannerSources().catch(() => ({ success: false })),
+        getScannerKeywords().catch(() => ({ success: false })),
+      ]);
+      if (configRes.success) setScannerConfig(configRes.data);
+      if (sourcesRes.success) setScannerSources(sourcesRes.data || []);
+      if (keywordsRes.success) setScannerKeywords(keywordsRes.data || []);
+    } catch (err) {
+      console.error('Config load error:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  // Charger la config au montage (pour le banner)
+  useEffect(() => {
+    getScannerConfig().then(res => {
+      if (res.success) setScannerConfig(res.data);
+    }).catch(() => {});
+  }, []);
 
   // ============================================
   // CHARGEMENT HISTORIQUE
@@ -1291,6 +1335,185 @@ const WebScanner = ({ isDark, user }) => {
   };
 
   // ============================================
+  // RENDER CONFIG TAB
+  // ============================================
+
+  const renderConfigTab = () => {
+    const cs = {
+      section: { padding: 20, borderRadius: 12, marginBottom: 16, backgroundColor: isDark ? '#1e293b' : '#fff', border: isDark ? '1px solid #334155' : '1px solid #E5E7EB' },
+      sectionTitle: { fontSize: 16, fontWeight: 700, color: isDark ? '#e2e8f0' : '#1f2937', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 },
+      row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: isDark ? '1px solid #334155' : '1px solid #F3F4F6' },
+      label: { fontSize: 13, color: isDark ? '#e2e8f0' : '#374151' },
+      desc: { fontSize: 11, color: isDark ? '#64748b' : '#9CA3AF', marginTop: 2 },
+      input: { padding: '6px 10px', borderRadius: 6, border: isDark ? '1px solid #334155' : '1px solid #D1D5DB', backgroundColor: isDark ? '#0f172a' : '#fff', color: isDark ? '#e2e8f0' : '#374151', fontSize: 13, width: 80, textAlign: 'center', outline: 'none' },
+      btn: (color = '#3B82F6') => ({ padding: '6px 14px', borderRadius: 6, border: 'none', backgroundColor: color, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }),
+      tag: (color = '#3B82F6') => ({ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 12, backgroundColor: `${color}15`, color, fontSize: 12, fontWeight: 500 }),
+      removeBtn: { padding: 2, border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: '#EF4444', display: 'flex' },
+      addForm: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 0' },
+      select: { padding: '6px 10px', borderRadius: 6, border: isDark ? '1px solid #334155' : '1px solid #D1D5DB', backgroundColor: isDark ? '#0f172a' : '#fff', color: isDark ? '#e2e8f0' : '#374151', fontSize: 13, outline: 'none' },
+    };
+
+    const categoryColors = { disease: '#EF4444', symptom: '#F59E0B', species: '#10B981', location: '#3B82F6', alert: '#8B5CF6' };
+
+    if (configLoading) return <div style={{ textAlign: 'center', padding: 60, color: isDark ? '#64748b' : '#9CA3AF' }}><Loader size={24} style={{ animation: 'spin 1s linear infinite' }} /></div>;
+
+    return (
+      <div>
+        {/* Paramètres du scanner */}
+        <div style={cs.section}>
+          <div style={cs.sectionTitle}><Filter size={18} /> Paramètres de la veille automatique</div>
+
+          <div style={cs.row}>
+            <div><div style={cs.label}>Intervalle entre les scans</div><div style={cs.desc}>Fréquence des scans automatiques</div></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="number" style={cs.input} value={scannerConfig?.scan_interval_minutes || 60}
+                onChange={(e) => setScannerConfig(prev => ({ ...prev, scan_interval_minutes: parseInt(e.target.value) || 60 }))} />
+              <span style={{ fontSize: 12, color: isDark ? '#64748b' : '#9CA3AF' }}>min</span>
+            </div>
+          </div>
+
+          <div style={cs.row}>
+            <div><div style={cs.label}>Seuil auto-création rumeur</div><div style={cs.desc}>Score minimum pour créer automatiquement une rumeur</div></div>
+            <input type="number" style={cs.input} value={scannerConfig?.auto_create_threshold || 15}
+              onChange={(e) => setScannerConfig(prev => ({ ...prev, auto_create_threshold: parseInt(e.target.value) || 15 }))} />
+          </div>
+
+          <div style={cs.row}>
+            <div><div style={cs.label}>Seuil priorité haute</div><div style={cs.desc}>Score pour marquer la rumeur en priorité haute</div></div>
+            <input type="number" style={cs.input} value={scannerConfig?.high_priority_threshold || 25}
+              onChange={(e) => setScannerConfig(prev => ({ ...prev, high_priority_threshold: parseInt(e.target.value) || 25 }))} />
+          </div>
+
+          <div style={cs.row}>
+            <div><div style={cs.label}>Seuil critique</div><div style={cs.desc}>Score pour marquer la rumeur comme critique</div></div>
+            <input type="number" style={cs.input} value={scannerConfig?.critical_threshold || 40}
+              onChange={(e) => setScannerConfig(prev => ({ ...prev, critical_threshold: parseInt(e.target.value) || 40 }))} />
+          </div>
+
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+            <button style={cs.btn(COHRM_COLORS.primary)} onClick={async () => {
+              try {
+                await updateScannerConfig(scannerConfig);
+                alert('Configuration sauvegardée. Scheduler redémarré.');
+              } catch (e) { alert('Erreur: ' + e.message); }
+            }}>Sauvegarder la configuration</button>
+          </div>
+        </div>
+
+        {/* Sources de veille */}
+        <div style={cs.section}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={cs.sectionTitle}><Globe size={18} /> Sources de veille ({scannerSources.length})</div>
+            <button style={cs.btn('#10B981')} onClick={() => setShowAddSource(!showAddSource)}>
+              <Plus size={14} /> Ajouter
+            </button>
+          </div>
+
+          {showAddSource && (
+            <div style={cs.addForm}>
+              <input placeholder="Nom" style={{ ...cs.input, width: 150, textAlign: 'left' }} value={newSource.name} onChange={(e) => setNewSource(p => ({ ...p, name: e.target.value }))} />
+              <input placeholder="URL" style={{ ...cs.input, width: 250, textAlign: 'left' }} value={newSource.url} onChange={(e) => setNewSource(p => ({ ...p, url: e.target.value }))} />
+              <select style={cs.select} value={newSource.type} onChange={(e) => setNewSource(p => ({ ...p, type: e.target.value }))}>
+                <option value="news">Actualités</option><option value="health_org">Org. santé</option>
+                <option value="government">Gouvernement</option><option value="blog">Blog</option><option value="social">Réseau social</option>
+              </select>
+              <select style={cs.select} value={newSource.language} onChange={(e) => setNewSource(p => ({ ...p, language: e.target.value }))}>
+                <option value="fr">FR</option><option value="en">EN</option>
+              </select>
+              <input type="number" placeholder="Freq (h)" style={{ ...cs.input, width: 60 }} value={newSource.scan_frequency_hours} onChange={(e) => setNewSource(p => ({ ...p, scan_frequency_hours: parseInt(e.target.value) || 6 }))} />
+              <button style={cs.btn('#10B981')} onClick={async () => {
+                if (!newSource.name || !newSource.url) return;
+                try {
+                  await addScannerSource(newSource);
+                  setNewSource({ name: '', url: '', type: 'news', language: 'fr', scan_frequency_hours: 6 });
+                  setShowAddSource(false);
+                  loadConfigTab();
+                } catch (e) { alert('Erreur: ' + e.message); }
+              }}>Ajouter</button>
+            </div>
+          )}
+
+          {scannerSources.map(src => (
+            <div key={src.id} style={{ ...cs.row, gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...cs.label, fontWeight: 600 }}>{src.name}</div>
+                <div style={cs.desc}>{src.url}</div>
+              </div>
+              <span style={cs.tag(src.is_active ? '#10B981' : '#9CA3AF')}>{src.type}</span>
+              <span style={{ fontSize: 12, color: isDark ? '#64748b' : '#9CA3AF' }}>/{src.scan_frequency_hours}h</span>
+              <button style={cs.btn(src.is_active ? '#EF4444' : '#10B981')} onClick={async () => {
+                await updateScannerSource(src.id, { is_active: !src.is_active });
+                loadConfigTab();
+              }}>{src.is_active ? 'Désactiver' : 'Activer'}</button>
+              <button style={cs.removeBtn} onClick={async () => {
+                if (window.confirm('Supprimer cette source ?')) { await deleteScannerSource(src.id); loadConfigTab(); }
+              }}><X size={14} /></button>
+            </div>
+          ))}
+          {scannerSources.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: isDark ? '#64748b' : '#9CA3AF', fontSize: 13 }}>Aucune source configurée</div>}
+        </div>
+
+        {/* Mots-clés de surveillance */}
+        <div style={cs.section}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={cs.sectionTitle}><Hash size={18} /> Mots-clés de surveillance ({scannerKeywords.length})</div>
+            <button style={cs.btn('#8B5CF6')} onClick={() => setShowAddKeyword(!showAddKeyword)}>
+              <Plus size={14} /> Ajouter
+            </button>
+          </div>
+
+          {showAddKeyword && (
+            <div style={cs.addForm}>
+              <input placeholder="Mot-clé" style={{ ...cs.input, width: 180, textAlign: 'left' }} value={newKeyword.keyword} onChange={(e) => setNewKeyword(p => ({ ...p, keyword: e.target.value }))} />
+              <select style={cs.select} value={newKeyword.category} onChange={(e) => setNewKeyword(p => ({ ...p, category: e.target.value }))}>
+                <option value="disease">Maladie</option><option value="symptom">Symptôme</option>
+                <option value="species">Espèce</option><option value="location">Localisation</option>
+                <option value="alert">Alerte</option>
+              </select>
+              <input type="number" placeholder="Poids" style={{ ...cs.input, width: 50 }} value={newKeyword.weight} onChange={(e) => setNewKeyword(p => ({ ...p, weight: parseInt(e.target.value) || 1 }))} />
+              <select style={cs.select} value={newKeyword.language} onChange={(e) => setNewKeyword(p => ({ ...p, language: e.target.value }))}>
+                <option value="fr">FR</option><option value="en">EN</option>
+              </select>
+              <button style={cs.btn('#8B5CF6')} onClick={async () => {
+                if (!newKeyword.keyword) return;
+                try {
+                  await addScannerKeyword(newKeyword);
+                  setNewKeyword({ keyword: '', category: 'disease', weight: 2, language: 'fr' });
+                  setShowAddKeyword(false);
+                  loadConfigTab();
+                } catch (e) { alert('Erreur: ' + e.message); }
+              }}>Ajouter</button>
+            </div>
+          )}
+
+          {/* Grouper par catégorie */}
+          {['disease', 'symptom', 'species', 'location', 'alert'].map(cat => {
+            const catKws = scannerKeywords.filter(k => k.category === cat);
+            if (catKws.length === 0) return null;
+            const catLabels = { disease: 'Maladies', symptom: 'Symptômes', species: 'Espèces', location: 'Localisations', alert: 'Alertes' };
+            return (
+              <div key={cat} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: categoryColors[cat], marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>{catLabels[cat]} ({catKws.length})</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {catKws.map(kw => (
+                    <span key={kw.id} style={cs.tag(categoryColors[cat])}>
+                      {kw.keyword} <span style={{ opacity: 0.6, fontSize: 10 }}>×{kw.weight}</span>
+                      <button style={cs.removeBtn} onClick={async () => { await deleteScannerKeyword(kw.id); loadConfigTab(); }}>
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {scannerKeywords.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: isDark ? '#64748b' : '#9CA3AF', fontSize: 13 }}>Aucun mot-clé configuré</div>}
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================
   // RENDER PRINCIPAL
   // ============================================
 
@@ -1316,27 +1539,42 @@ const WebScanner = ({ isDark, user }) => {
         }
       `}</style>
 
-      {/* Simulation banner */}
-      <div style={s.simBanner}>
+      {/* Scanner status banner */}
+      <div style={{ ...s.simBanner, backgroundColor: scannerConfig?.scanner_enabled ? (isDark ? 'rgba(16,185,129,0.1)' : '#F0FDF4') : (isDark ? 'rgba(245,158,11,0.1)' : '#FFFBEB'), borderColor: scannerConfig?.scanner_enabled ? '#10B981' : '#F59E0B' }}>
         <Info size={16} />
-        <span><strong>Mode simulation</strong> — Les résultats affichés sont pré-générés pour démonstration. Le scan réel sera connecté aux sources web ultérieurement.</span>
+        <span style={{ flex: 1 }}>
+          {scannerConfig?.scanner_enabled
+            ? <><strong>Scanner automatique actif</strong> — Scan toutes les {scannerConfig?.scan_interval_minutes || 60} min. Les résultats à haute pertinence créent automatiquement des rumeurs (seuil: {scannerConfig?.auto_create_threshold || 15}).</>
+            : <><strong>Scanner automatique désactivé</strong> — Activez-le dans l'onglet Configuration pour lancer la veille automatique.</>
+          }
+        </span>
+        <button
+          onClick={async () => {
+            const newState = !scannerConfig?.scanner_enabled;
+            try {
+              await toggleScanner(newState);
+              setScannerConfig(prev => ({ ...prev, scanner_enabled: newState }));
+            } catch (e) { console.error(e); }
+          }}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            backgroundColor: scannerConfig?.scanner_enabled ? '#EF4444' : '#10B981', color: '#fff',
+          }}
+        >
+          {scannerConfig?.scanner_enabled ? 'Désactiver' : 'Activer'}
+        </button>
       </div>
 
       {/* Tab navigation */}
       <div style={s.tabs}>
-        <div
-          style={s.tab(activeTab === 'scan')}
-          onClick={() => setActiveTab('scan')}
-        >
-          <Radar size={16} />
-          Scanner
+        <div style={s.tab(activeTab === 'scan')} onClick={() => setActiveTab('scan')}>
+          <Radar size={16} /> Scanner
         </div>
-        <div
-          style={s.tab(activeTab === 'history')}
-          onClick={() => setActiveTab('history')}
-        >
-          <Clock size={16} />
-          Historique
+        <div style={s.tab(activeTab === 'history')} onClick={() => setActiveTab('history')}>
+          <Clock size={16} /> Historique
+        </div>
+        <div style={s.tab(activeTab === 'config')} onClick={() => { setActiveTab('config'); loadConfigTab(); }}>
+          <Filter size={16} /> Configuration
         </div>
       </div>
 
@@ -1346,6 +1584,8 @@ const WebScanner = ({ isDark, user }) => {
           {renderScanForm()}
           {renderResults()}
         </>
+      ) : activeTab === 'config' ? (
+        renderConfigTab()
       ) : (
         renderHistory()
       )}

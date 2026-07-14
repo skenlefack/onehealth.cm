@@ -1378,140 +1378,76 @@ router.get('/scan-results/:scanId/rumors', auth, async (req, res) => {
   }
 });
 
-// POST /api/cohrm/scan/run - Lancer un scan manuel
+// POST /api/cohrm/scan/run - Lancer un scan (réel, via cohrmScannerService)
 router.post('/scan/run', auth, async (req, res) => {
   try {
-    const { source = 'all', keywords } = req.body;
+    const { source_id } = req.body;
+    const scannerService = require('../services/cohrmScannerService');
 
-    // Récupérer les paramètres de scan depuis les settings
-    const [settings] = await db.query(
-      "SELECT value FROM cohrm_settings WHERE `key` = 'web_scanner_keywords'"
-    );
+    // Répondre immédiatement, le scan tourne en arrière-plan
+    res.json({ success: true, message: 'Scan lancé avec succès' });
 
-    const scanKeywords = keywords || (settings.length > 0 ? JSON.parse(settings[0].value) : [
-      'épidémie', 'maladie', 'mort', 'grippe aviaire', 'choléra', 'fièvre', 'zoonose'
-    ]);
-
-    // Créer l'entrée du scan
-    const [result] = await db.query(`
-      INSERT INTO cohrm_web_scans (
-        source, status, keywords, started_at, created_at
-      ) VALUES (?, 'running', ?, NOW(), NOW())
-    `, [source, JSON.stringify(scanKeywords)]);
-
-    const scanId = result.insertId;
-
-    // Simuler un scan (dans une vraie implémentation, cela serait un job asynchrone)
-    // Pour l'instant, on simule juste des résultats réalistes
-    setTimeout(async () => {
-      try {
-        // Exemples de résultats de scan simulés
-        const simulatedResults = [
-          {
-            title: 'Cas suspects de choléra signalés dans la région du Nord',
-            content: 'Plusieurs cas de diarrhée aiguë ont été signalés dans des villages près de Garoua. Les autorités sanitaires enquêtent sur une possible épidémie de choléra.',
-            url: 'https://cameroon-tribune.cm/sante/cholera-nord-2024',
-            source: 'news',
-            author: 'Cameroon Tribune',
-            keywords: ['choléra', 'épidémie', 'diarrhée'],
-            relevance: 0.92
-          },
-          {
-            title: 'Rumeur sur Facebook: vaccin COVID dangereux au Cameroun',
-            content: 'Un post viral sur Facebook affirme que le vaccin COVID causerait des effets secondaires graves. Cette information non vérifiée circule dans les groupes WhatsApp.',
-            url: 'https://facebook.com/post/123456789',
-            source: 'facebook',
-            author: 'Utilisateur anonyme',
-            keywords: ['vaccin', 'COVID', 'effets secondaires'],
-            relevance: 0.78
-          },
-          {
-            title: 'Grippe aviaire: mortalité élevée de volailles à Bafoussam',
-            content: 'Des éleveurs de l\'Ouest signalent une mortalité anormale de poulets. Les services vétérinaires ont été alertés pour des prélèvements.',
-            url: 'https://actucameroun.com/grippe-aviaire-ouest',
-            source: 'news',
-            author: 'Actu Cameroun',
-            keywords: ['grippe aviaire', 'volailles', 'mortalité'],
-            relevance: 0.85
-          },
-          {
-            title: 'Tweet: Eau contaminée à Douala Bonabéri',
-            content: 'Habitants de Bonabéri signalent une eau du robinet trouble et malodorante depuis 3 jours. Plusieurs cas de gastro-entérite rapportés.',
-            url: 'https://twitter.com/user/status/987654321',
-            source: 'twitter',
-            author: '@citoyen_douala',
-            keywords: ['eau', 'contamination', 'gastro-entérite'],
-            relevance: 0.71
-          },
-          {
-            title: 'Alerte: Cas de rougeole en augmentation à Yaoundé',
-            content: 'Le district de santé de Biyem-Assi rapporte une hausse des cas de rougeole chez les enfants non vaccinés.',
-            url: 'https://minsante.cm/alerte-rougeole-yaounde',
-            source: 'news',
-            author: 'MinSanté',
-            keywords: ['rougeole', 'vaccination', 'enfants'],
-            relevance: 0.88
-          }
-        ];
-
-        // Sélectionner aléatoirement des résultats
-        const numResults = Math.floor(Math.random() * 4) + 2; // 2 à 5 résultats
-        const selectedResults = simulatedResults
-          .sort(() => Math.random() - 0.5)
-          .slice(0, numResults);
-
-        const itemsScanned = Math.floor(Math.random() * 100) + 50;
-        const rumorsFound = selectedResults.length;
-        const duration = Math.floor(Math.random() * 30) + 10;
-
-        // Mettre à jour le scan avec les résultats
-        await db.query(`
-          UPDATE cohrm_web_scans
-          SET status = 'completed',
-              items_scanned = ?,
-              rumors_found = ?,
-              rumors_created = 0,
-              duration = ?,
-              completed_at = NOW()
-          WHERE id = ?
-        `, [itemsScanned, rumorsFound, duration, scanId]);
-
-        // Créer les entrées de résultat détaillées
-        for (const result of selectedResults) {
-          await db.query(`
-            INSERT INTO cohrm_scan_results (
-              scan_id, title, content, url, source, author,
-              matched_keywords, relevance_score, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', NOW())
-          `, [
-            scanId,
-            result.title,
-            result.content,
-            result.url,
-            result.source,
-            result.author,
-            JSON.stringify(result.keywords),
-            result.relevance
-          ]);
-        }
-      } catch (err) {
-        console.error('Scan completion error:', err);
-        await db.query(`
-          UPDATE cohrm_web_scans
-          SET status = 'failed', error_message = ?
-          WHERE id = ?
-        `, [err.message, scanId]);
-      }
-    }, 5000); // Simule un scan de 5 secondes
-
-    res.json({
-      success: true,
-      message: 'Scan lancé avec succès',
-      data: { scan_id: scanId }
+    // Lancer le scan réel en arrière-plan
+    scannerService.runScan(source_id || null, false).catch(err => {
+      console.error('Background scan error:', err.message);
     });
   } catch (error) {
     console.error('Run scan error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/cohrm/scanner/config - Config du scanner
+router.get('/scanner/config', auth, async (req, res) => {
+  try {
+    const scannerService = require('../services/cohrmScannerService');
+    const config = await scannerService.getConfig();
+    res.json({ success: true, data: config });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PUT /api/cohrm/scanner/config - Mettre à jour la config du scanner
+router.put('/scanner/config', auth, async (req, res) => {
+  try {
+    const settings = req.body;
+    for (const [key, value] of Object.entries(settings)) {
+      await db.query(
+        "INSERT INTO cohrm_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?",
+        [`scanner_${key}`, String(value), `Scanner config: ${key}`, String(value)]
+      );
+    }
+
+    // Redémarrer le scheduler si la config a changé
+    const scannerService = require('../services/cohrmScannerService');
+    await scannerService.restartScheduler();
+
+    res.json({ success: true, message: 'Configuration mise à jour. Scheduler redémarré.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/cohrm/scanner/toggle - Activer/désactiver le scanner
+router.post('/scanner/toggle', auth, async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    await db.query(
+      "INSERT INTO cohrm_settings (`key`, value, description) VALUES ('scanner_enabled', ?, 'Scanner automatique activé') ON DUPLICATE KEY UPDATE value = ?",
+      [String(!!enabled), String(!!enabled)]
+    );
+
+    const scannerService = require('../services/cohrmScannerService');
+    if (enabled) {
+      await scannerService.startScheduler();
+    } else {
+      scannerService.stopScheduler();
+    }
+
+    res.json({ success: true, message: enabled ? 'Scanner activé' : 'Scanner désactivé' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

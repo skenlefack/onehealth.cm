@@ -156,6 +156,15 @@ server.listen(PORT, () => {
     }
   }, 60000); // Check every minute
   console.log(`📧 Newsletter scheduler started`);
+
+  // Start COHRM Scanner scheduler
+  const cohrmScannerService = require('./services/cohrmScannerService');
+  const cohrmNotifService = require('./services/cohrmNotificationService');
+  cohrmScannerService.initialize({
+    socketService: cohrmSocketService,
+    notificationService: cohrmNotifService,
+  });
+  console.log(`🔍 COHRM Scanner scheduler initialized`);
 });
 
 module.exports = { app, server };

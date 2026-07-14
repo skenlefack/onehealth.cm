@@ -38,12 +38,14 @@ CREATE TABLE IF NOT EXISTS cohrm_scan_keywords (
   id INT AUTO_INCREMENT PRIMARY KEY,
   keyword VARCHAR(100) NOT NULL,
   category ENUM('disease','symptom','species','location','alert') NOT NULL,
+  theme_id INT NULL COMMENT 'Lien vers le thème de surveillance',
   weight INT DEFAULT 1,
   language VARCHAR(10) DEFAULT 'fr',
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_category (category),
-  INDEX idx_active (is_active)
+  INDEX idx_active (is_active),
+  INDEX idx_theme (theme_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed keywords for Cameroon disease surveillance
@@ -100,3 +102,35 @@ INSERT IGNORE INTO cohrm_scan_keywords (keyword, category, weight, language) VAL
 ('outbreak', 'alert', 4, 'en'),
 ('epidemic', 'alert', 4, 'en'),
 ('health emergency', 'alert', 5, 'en');
+
+-- =====================================================
+-- Sources de veille par défaut (Cameroun)
+-- =====================================================
+
+INSERT IGNORE INTO cohrm_scan_sources (name, url, type, language, is_active, scan_frequency_hours) VALUES
+-- Sites officiels
+('OMS Afrique - Cameroun', 'https://www.afro.who.int/fr/countries/cameroon/news', 'health_org', 'fr', 1, 12),
+('MinSanté Cameroun', 'https://www.minsante.cm', 'government', 'fr', 1, 6),
+-- Presse camerounaise
+('Cameroon Tribune', 'https://www.cameroon-tribune.cm/categorie/sante/', 'news', 'fr', 1, 4),
+('Journal du Cameroun', 'https://www.journalducameroun.com/category/sante/', 'news', 'fr', 1, 4),
+('Actu Cameroun', 'https://actucameroun.com/category/sante/', 'news', 'fr', 1, 6),
+-- Organisations internationales
+('ProMED', 'https://promedmail.org/promed-posts/', 'health_org', 'en', 1, 12),
+('ReliefWeb Cameroon', 'https://reliefweb.int/country/cmr', 'health_org', 'en', 1, 24),
+-- Flux RSS santé
+('Google News Santé Cameroun', 'https://news.google.com/rss/search?q=sant%C3%A9+cameroun+%C3%A9pid%C3%A9mie&hl=fr&gl=FR&ceid=FR:fr', 'news', 'fr', 1, 2);
+
+-- =====================================================
+-- Configuration scanner par défaut
+-- =====================================================
+
+INSERT IGNORE INTO cohrm_settings (`key`, value, description) VALUES
+('scanner_enabled', 'false', 'Activer le scanner automatique de veille'),
+('scanner_scan_interval_minutes', '60', 'Intervalle entre les scans automatiques (minutes)'),
+('scanner_auto_create_threshold', '15', 'Score minimum pour créer automatiquement une rumeur'),
+('scanner_high_priority_threshold', '25', 'Score pour priorité haute'),
+('scanner_critical_threshold', '40', 'Score pour priorité critique'),
+('scanner_notify_on_new_results', 'true', 'Notifier les responsables lors de nouveaux résultats'),
+('scanner_notify_on_auto_rumor', 'true', 'Notifier lors de création automatique de rumeur'),
+('scanner_dedup_days', '30', 'Jours de rétention pour la déduplication');
