@@ -718,7 +718,9 @@ const parseDate = (dateStr) => {
   if (!dateStr) return null;
   try {
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d.toISOString();
+    if (isNaN(d.getTime())) return null;
+    // Format MySQL DATETIME: YYYY-MM-DD HH:MM:SS
+    return d.toISOString().slice(0, 19).replace('T', ' ');
   } catch { return null; }
 };
 
