@@ -1413,9 +1413,11 @@ router.put('/scanner/config', auth, async (req, res) => {
   try {
     const settings = req.body;
     for (const [key, value] of Object.entries(settings)) {
+      // Ne pas doubler le préfixe si la clé commence déjà par scanner_
+      const dbKey = key.startsWith('scanner_') ? key : `scanner_${key}`;
       await db.query(
         "INSERT INTO cohrm_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?",
-        [`scanner_${key}`, String(value), `Scanner config: ${key}`, String(value)]
+        [dbKey, String(value), `Scanner config: ${key}`, String(value)]
       );
     }
 

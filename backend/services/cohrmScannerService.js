@@ -53,7 +53,12 @@ const getConfig = async () => {
       "SELECT `key`, value FROM cohrm_settings WHERE `key` LIKE 'scanner_%' OR `key` LIKE 'web_scanner_%'"
     );
     for (const s of settings) {
-      const key = s.key.replace('scanner_', '').replace('web_scanner_', '');
+      // Normaliser la clé : retirer le préfixe une seule fois
+      let key = s.key;
+      if (key.startsWith('web_scanner_')) key = key.substring(12);
+      else if (key.startsWith('scanner_')) key = key.substring(8);
+      // Ignorer les clés dupliquées (scanner_scanner_*)
+      if (key.startsWith('scanner_')) continue;
       if (key in config) {
         config[key] = s.value === 'true' ? true : s.value === 'false' ? false : (isNaN(s.value) ? s.value : Number(s.value));
       }
