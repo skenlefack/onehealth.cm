@@ -48,7 +48,9 @@ import cm.onehealth.cohrm.ui.screens.rumors.RumorsListScreen
 import cm.onehealth.cohrm.ui.screens.scanner.ScanDetailScreen
 import cm.onehealth.cohrm.ui.screens.scanner.ScannerScreen
 import cm.onehealth.cohrm.data.remote.AuthInterceptor
+import cm.onehealth.cohrm.ui.screens.notifications.NotificationPrefsScreen
 import cm.onehealth.cohrm.ui.screens.notifications.NotificationsScreen
+import cm.onehealth.cohrm.ui.screens.reports.ReportsScreen
 import cm.onehealth.cohrm.ui.screens.notifications.NotificationsViewModel
 import cm.onehealth.cohrm.ui.screens.profile.ProfileScreen
 import cm.onehealth.cohrm.ui.screens.settings.SettingsScreen
@@ -81,6 +83,8 @@ object Routes {
     const val SCAN_DETAIL = "scan/{scanId}"
     const val PROFILE = "profile"
     const val NOTIFICATIONS = "notifications"
+    const val NOTIFICATION_PREFS = "notification_prefs"
+    const val REPORTS = "reports"
     const val PUBLIC_REPORT = "public_report"
 
     fun report(id: String? = null): String =
@@ -234,6 +238,7 @@ fun CohrmNavigation() {
                     onNewReport = { navController.navigate(Routes.report()) },
                     onRumorClick = { id -> navController.navigate(Routes.rumorDetail(id)) },
                     onViewAllRumors = { navController.navigate(Routes.RUMORS) },
+                    onViewReports = { navController.navigate(Routes.REPORTS) },
                 )
             }
 
@@ -298,6 +303,9 @@ fun CohrmNavigation() {
                             popUpTo(0) { inclusive = true }
                         }
                     },
+                    onNotificationPrefs = {
+                        navController.navigate(Routes.NOTIFICATION_PREFS)
+                    },
                 )
             }
 
@@ -320,6 +328,14 @@ fun CohrmNavigation() {
 
             composable(Routes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.REPORTS) {
+                ReportsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.NOTIFICATION_PREFS) {
+                NotificationPrefsScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.PUBLIC_REPORT) {

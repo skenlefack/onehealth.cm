@@ -397,6 +397,39 @@
     <string name="scan_completed_title">Scan COHRM terminé</string>
     <string name="scan_completed_text">%1$d nouvelle(s) rumeur(s) détectée(s)</string>
 
+    <!-- Risk Assessment -->
+    <string name="risk_assessment_title">Évaluation du risque</string>
+    <string name="risk_assessment_expand">Évaluer le risque</string>
+    <string name="risk_assessment_collapse">Réduire</string>
+    <string name="risk_assessment_level">Niveau de risque</string>
+    <string name="risk_assessment_description">Description du risque</string>
+    <string name="risk_assessment_description_hint">Décrivez le risque identifié…</string>
+    <string name="risk_assessment_context">Contexte du risque</string>
+    <string name="risk_assessment_context_hint">Contexte épidémiologique, environnemental…</string>
+    <string name="risk_assessment_exposure">Exposition</string>
+    <string name="risk_assessment_exposure_hint">Population exposée, zone d\'impact…</string>
+    <string name="risk_assessment_submit">Soumettre l\'évaluation</string>
+    <string name="risk_assessment_success">Évaluation du risque soumise</string>
+
+    <!-- Validation Workflow -->
+    <string name="validation_workflow_title">Workflow de validation</string>
+    <string name="validation_none">Aucune validation pour le moment</string>
+    <string name="validation_rejection_reason">Motif du rejet</string>
+    <string name="validation_rejection_hint">Expliquez le motif du rejet…</string>
+
+    <!-- Scanner Results -->
+    <string name="scanner_results_title">Résultats du scanner</string>
+    <string name="scanner_results_empty">Aucun résultat du scanner</string>
+    <string name="scanner_result_status_new">Nouveau</string>
+    <string name="scanner_result_status_reviewed">Examiné</string>
+    <string name="scanner_result_status_converted">Converti</string>
+    <string name="scanner_result_status_dismissed">Ignoré</string>
+    <string name="scanner_result_convert">Convertir en rumeur</string>
+    <string name="scanner_result_dismiss">Ignorer</string>
+    <string name="scanner_result_convert_title">Convertir en rumeur</string>
+    <string name="scanner_result_convert_rumor_title">Titre de la rumeur</string>
+    <string name="scanner_result_convert_description">Description</string>
+
     <!-- Settings Enhancement -->
     <string name="settings_notifications">Notifications</string>
     <string name="settings_push_enabled">Activer les notifications push</string>
@@ -460,6 +493,41 @@
     <string name="public_report_login_button">Signaler sans compte</string>
     <string name="public_report_mark_read">Marquer comme lue</string>
     <string name="public_report_mark_all_read">Tout marquer comme lu</string>
+
+    <!-- Reports -->
+    <string name="reports_title">Rapports</string>
+    <string name="reports_period_7d">7 jours</string>
+    <string name="reports_period_30d">30 jours</string>
+    <string name="reports_period_90d">90 jours</string>
+    <string name="reports_period_1y">1 an</string>
+    <string name="reports_total">Total</string>
+    <string name="reports_resolved">Résolues</string>
+    <string name="reports_pending">En attente</string>
+    <string name="reports_high_risk">Haut risque</string>
+    <string name="reports_avg_resolution">Temps moyen</string>
+    <string name="reports_by_status">Par statut</string>
+    <string name="reports_by_region">Par région</string>
+    <string name="reports_performance">Performance</string>
+    <string name="reports_avg_first_validation">Temps moyen 1ère validation</string>
+    <string name="reports_avg_close_time">Temps moyen de clôture</string>
+    <string name="reports_workload">Charge de travail des acteurs</string>
+
+    <!-- Notification Preferences -->
+    <string name="notif_prefs_title">Préférences de notifications</string>
+    <string name="notif_prefs_types">Types de notifications</string>
+    <string name="notif_prefs_channels">Canaux préférés</string>
+    <string name="notif_prefs_saved">Préférences enregistrées</string>
+    <string name="notif_prefs_manage">Gérer les préférences serveur</string>
+    <string name="notif_pref_new_rumor">Nouvelle rumeur</string>
+    <string name="notif_pref_escalation">Escalade</string>
+    <string name="notif_pref_validation">Validation</string>
+    <string name="notif_pref_rejection">Rejet</string>
+    <string name="notif_pref_risk_assessment">Évaluation des risques</string>
+    <string name="notif_pref_reminder">Rappels</string>
+    <string name="notif_pref_feedback">Commentaires</string>
+    <string name="notif_pref_email">Email</string>
+    <string name="notif_pref_sms">SMS</string>
+    <string name="notif_pref_push">Notifications push</string>
 
     <!-- Regions -->
     <string name="region_AD">Adamaoua</string>

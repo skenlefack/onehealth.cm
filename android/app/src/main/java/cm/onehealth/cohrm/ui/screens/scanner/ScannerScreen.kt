@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -28,12 +29,16 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,11 +57,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cm.onehealth.cohrm.R
 import cm.onehealth.cohrm.data.remote.dto.ScanSummary
+import cm.onehealth.cohrm.data.remote.dto.ScannerResultItem
 import cm.onehealth.cohrm.ui.theme.Accent
 import cm.onehealth.cohrm.ui.theme.Danger
 import cm.onehealth.cohrm.ui.theme.Muted
 import cm.onehealth.cohrm.ui.theme.Primary
 import cm.onehealth.cohrm.ui.theme.PrimaryLight
+import cm.onehealth.cohrm.ui.theme.Info
 import cm.onehealth.cohrm.ui.theme.Success
 import cm.onehealth.cohrm.ui.theme.Warning
 
@@ -152,6 +159,66 @@ fun ScannerScreen(
         // Scan history cards
         items(state.scans, key = { it.id }) { scan ->
             ScanHistoryCard(scan = scan, onClick = { onScanClick(scan.id) })
+        }
+
+        // Scanner results section
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = stringResource(R.string.scanner_results_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
+        // Result filter chips
+        item {
+            ScannerResultFilterChips(
+                selected = state.selectedResultFilter,
+                onSelect = viewModel::updateResultFilter,
+            )
+        }
+
+        // Results loading
+        if (state.isLoadingResults) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
+
+        // Scanner result items
+        if (!state.isLoadingResults && state.scannerResults.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.scanner_results_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Muted,
+                    )
+                }
+            }
+        }
+
+        items(state.scannerResults, key = { it.id }) { result ->
+            ScannerResultCard(
+                result = result,
+                onReview = { viewModel.reviewResult(result.id, "reviewed") },
+                onDismiss = { viewModel.reviewResult(result.id, "dismissed") },
+                onConvert = { title, desc -> viewModel.convertToRumor(result.id, title, desc) },
+            )
         }
 
         // Auto-scan settings
@@ -618,6 +685,286 @@ private fun AutoScanCard(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ScannerResultFilterChips(
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    val filters = listOf(
+        null to R.string.status_all,
+        "new" to R.string.scanner_result_status_new,
+        "reviewed" to R.string.scanner_result_status_reviewed,
+        "converted" to R.string.scanner_result_status_converted,
+        "dismissed" to R.string.scanner_result_status_dismissed,
+    )
+
+    FlowRow(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        filters.forEach { (value, labelRes) ->
+            val isSelected = selected == value
+            val chipColor = if (isSelected) Primary else Muted
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (isSelected) chipColor.copy(alpha = 0.15f) else chipColor.copy(alpha = 0.08f))
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = stringResource(labelRes),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) chipColor else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ScannerResultCard(
+    result: ScannerResultItem,
+    onReview: () -> Unit,
+    onDismiss: () -> Unit,
+    onConvert: (String?, String?) -> Unit,
+) {
+    var showConvertDialog by remember { mutableStateOf(false) }
+    val relevance = result.relevanceScore ?: 0.0
+    val relevanceColor = when {
+        relevance > 0.7 -> Success
+        relevance > 0.4 -> Warning
+        else -> Danger
+    }
+    val statusColor = when (result.status) {
+        "new" -> Info
+        "reviewed" -> Warning
+        "converted" -> Success
+        "dismissed" -> Muted
+        else -> Muted
+    }
+    val statusLabel = when (result.status) {
+        "new" -> R.string.scanner_result_status_new
+        "reviewed" -> R.string.scanner_result_status_reviewed
+        "converted" -> R.string.scanner_result_status_converted
+        "dismissed" -> R.string.scanner_result_status_dismissed
+        else -> R.string.scanner_result_status_new
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Title + status badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                result.title?.let { title ->
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(statusColor.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = stringResource(statusLabel),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = statusColor,
+                    )
+                }
+            }
+
+            // Content preview
+            result.content?.let { content ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Source + date
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                result.source?.let { source ->
+                    Text(
+                        text = formatSourceLabel(source),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Muted,
+                    )
+                }
+                result.createdAt?.let { date ->
+                    if (result.source != null) {
+                        Text(" \u2022 ", style = MaterialTheme.typography.labelSmall, color = Muted)
+                    }
+                    Text(
+                        text = formatDate(date),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Muted,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Relevance bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.scanner_result_relevance, relevance * 100),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = relevanceColor,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                LinearProgressIndicator(
+                    progress = { relevance.toFloat().coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = relevanceColor,
+                    trackColor = relevanceColor.copy(alpha = 0.15f),
+                )
+            }
+
+            // Matched keywords
+            val keywords = result.matchedKeywordsList()
+            if (keywords.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    keywords.forEach { keyword ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Primary.copy(alpha = 0.1f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = keyword,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = Primary,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Action buttons (only for actionable states)
+            if (result.status in listOf("new", "reviewed", null)) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = { showConvertDialog = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Success),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.scanner_result_convert),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.scanner_result_dismiss),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Convert to rumor dialog
+    if (showConvertDialog) {
+        var convertTitle by remember { mutableStateOf(result.title ?: "") }
+        var convertDesc by remember { mutableStateOf(result.content ?: "") }
+
+        AlertDialog(
+            onDismissRequest = { showConvertDialog = false },
+            title = { Text(stringResource(R.string.scanner_result_convert_title)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = convertTitle,
+                        onValueChange = { convertTitle = it },
+                        label = { Text(stringResource(R.string.scanner_result_convert_rumor_title)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        singleLine = true,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = convertDesc,
+                        onValueChange = { convertDesc = it },
+                        label = { Text(stringResource(R.string.scanner_result_convert_description)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        minLines = 3,
+                        maxLines = 5,
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onConvert(convertTitle.ifBlank { null }, convertDesc.ifBlank { null })
+                        showConvertDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                ) {
+                    Text(stringResource(R.string.scanner_result_convert))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConvertDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }
 

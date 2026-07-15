@@ -26,9 +26,13 @@ struct RumorDetailView: View {
                         headerSection(rumor: rumor)
                         infoSection(rumor: rumor)
                         locationSection(rumor: rumor)
+                        riskAssessmentSection(rumor: rumor)
                         reporterSection(rumor: rumor)
                         photosSection(rumor: rumor)
+                        PhotoGalleryView(rumorId: rumorId)
+                        feedbackSection
                         validationSection(rumor: rumor)
+                        validationWorkflowSection(rumor: rumor)
                         notesSection(rumor: rumor)
                     }
                     .padding(.horizontal, AppDimensions.spacing)
@@ -37,6 +41,8 @@ struct RumorDetailView: View {
                 }
                 .refreshable {
                     await viewModel.loadDetail(id: rumorId)
+                    await viewModel.loadValidations(rumorId: rumorId)
+                    await viewModel.loadFeedback(rumorId: rumorId)
                 }
             }
         }
@@ -44,6 +50,8 @@ struct RumorDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadDetail(id: rumorId)
+            await viewModel.loadValidations(rumorId: rumorId)
+            await viewModel.loadFeedback(rumorId: rumorId)
         }
     }
 
@@ -239,6 +247,142 @@ struct RumorDetailView: View {
         }
     }
 
+    // MARK: - Risk Assessment
+
+    private func riskAssessmentSection(rumor: RumorDetail) -> some View {
+        VStack(alignment: .leading, spacing: AppDimensions.spacingM) {
+            SectionHeader(
+                title: String(localized: "rumors.detail.risk_assessment"),
+                icon: "shield.checkered"
+            )
+
+            // Current risk level display
+            if let risk = rumor.riskLevel, !risk.isEmpty {
+                HStack(spacing: AppDimensions.spacingM) {
+                    RiskLevelBadge(level: risk)
+                    Spacer()
+                }
+            }
+
+            // Current risk description
+            if let desc = rumor.riskDescription, !desc.isEmpty {
+                Text(desc)
+                    .font(AppFonts.callout)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            // Risk level picker
+            VStack(alignment: .leading, spacing: AppDimensions.spacingS) {
+                Text(String(localized: "rumors.risk.select_level"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: AppDimensions.spacingS) {
+                        ForEach(RumorDetailViewModel.riskLevels, id: \.value) { level in
+                            RiskLevelChip(
+                                label: level.label,
+                                value: level.value,
+                                isSelected: viewModel.selectedRiskLevel == level.value,
+                                color: riskColor(for: level.value)
+                            ) {
+                                HapticHelper.selection()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.selectedRiskLevel = level.value
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Description
+            VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+                Text(String(localized: "rumors.risk.description"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                TextField(
+                    String(localized: "rumors.risk.description_placeholder"),
+                    text: $viewModel.riskDescription,
+                    axis: .vertical
+                )
+                .font(AppFonts.body)
+                .lineLimit(1...4)
+                .textFieldStyle(.plain)
+                .padding(AppDimensions.spacingM)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+            }
+
+            // Context
+            VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+                Text(String(localized: "rumors.risk.context"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                TextField(
+                    String(localized: "rumors.risk.context_placeholder"),
+                    text: $viewModel.riskContext,
+                    axis: .vertical
+                )
+                .font(AppFonts.body)
+                .lineLimit(1...3)
+                .textFieldStyle(.plain)
+                .padding(AppDimensions.spacingM)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+            }
+
+            // Exposure
+            VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+                Text(String(localized: "rumors.risk.exposure"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                TextField(
+                    String(localized: "rumors.risk.exposure_placeholder"),
+                    text: $viewModel.riskExposure,
+                    axis: .vertical
+                )
+                .font(AppFonts.body)
+                .lineLimit(1...3)
+                .textFieldStyle(.plain)
+                .padding(AppDimensions.spacingM)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+            }
+
+            // Submit button
+            PrimaryButton(
+                String(localized: "rumors.risk.submit"),
+                icon: "shield.checkered",
+                isLoading: viewModel.isAssessingRisk
+            ) {
+                Task { await viewModel.assessRisk(rumorId: rumorId) }
+            }
+
+            // Success message
+            if viewModel.riskAssessmentSuccess {
+                HStack(spacing: AppDimensions.spacingXS) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(AppColors.success)
+                    Text(String(localized: "rumors.risk.success"))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.success)
+                }
+                .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppDimensions.cardPadding)
+        .cardStyle()
+        .animation(.easeInOut(duration: 0.3), value: viewModel.riskAssessmentSuccess)
+    }
+
     // MARK: - Declarant
 
     private func reporterSection(rumor: RumorDetail) -> some View {
@@ -305,7 +449,7 @@ struct RumorDetailView: View {
         }
     }
 
-    // MARK: - Validation
+    // MARK: - Validation (existing inline validations)
 
     private func validationSection(rumor: RumorDetail) -> some View {
         let validations = rumor.validations ?? []
@@ -319,6 +463,199 @@ struct RumorDetailView: View {
                     )
 
                     ValidationTimelineView(validations: validations)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(AppDimensions.cardPadding)
+                .cardStyle()
+            }
+        }
+    }
+
+    // MARK: - Validation Workflow (actions)
+
+    private func validationWorkflowSection(rumor: RumorDetail) -> some View {
+        VStack(alignment: .leading, spacing: AppDimensions.spacingM) {
+            SectionHeader(
+                title: String(localized: "rumors.detail.validation_actions"),
+                icon: "hand.thumbsup.fill"
+            )
+
+            // Validation level stepper
+            ValidationLevelStepper(
+                validations: viewModel.validationHistory,
+                currentLevel: currentValidationLevel
+            )
+
+            // Validation history from dedicated endpoint
+            if viewModel.isLoadingValidations {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding(AppDimensions.spacingS)
+                    Spacer()
+                }
+            } else if !viewModel.validationHistory.isEmpty {
+                VStack(spacing: AppDimensions.spacingS) {
+                    ForEach(viewModel.validationHistory) { item in
+                        ValidationHistoryRowView(item: item)
+                    }
+                }
+            }
+
+            Divider()
+
+            // Notes de validation
+            VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+                Text(String(localized: "rumors.validation.notes"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                TextField(
+                    String(localized: "rumors.validation.notes_placeholder"),
+                    text: $viewModel.validationNotes,
+                    axis: .vertical
+                )
+                .font(AppFonts.body)
+                .lineLimit(1...3)
+                .textFieldStyle(.plain)
+                .padding(AppDimensions.spacingM)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+            }
+
+            // Rejection reason (visible when rejection form is shown)
+            if viewModel.showRejectionForm {
+                VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+                    Text(String(localized: "rumors.validation.rejection_reason"))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.danger)
+
+                    TextField(
+                        String(localized: "rumors.validation.rejection_reason_placeholder"),
+                        text: $viewModel.rejectionReason,
+                        axis: .vertical
+                    )
+                    .font(AppFonts.body)
+                    .lineLimit(1...4)
+                    .textFieldStyle(.plain)
+                    .padding(AppDimensions.spacingM)
+                    .background(AppColors.danger.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous)
+                            .stroke(AppColors.danger.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Action buttons
+            HStack(spacing: AppDimensions.spacingS) {
+                // Validate
+                ActionButton(
+                    title: String(localized: "rumors.validation.validate"),
+                    icon: "checkmark.circle.fill",
+                    color: AppColors.success,
+                    isLoading: viewModel.isValidating && !viewModel.showRejectionForm
+                ) {
+                    Task { await viewModel.validateRumor(rumorId: rumorId) }
+                }
+
+                // Reject
+                if viewModel.showRejectionForm {
+                    ActionButton(
+                        title: String(localized: "rumors.validation.confirm_reject"),
+                        icon: "xmark.circle.fill",
+                        color: AppColors.danger,
+                        isLoading: viewModel.isValidating
+                    ) {
+                        Task { await viewModel.rejectRumor(rumorId: rumorId) }
+                    }
+                } else {
+                    ActionButton(
+                        title: String(localized: "rumors.validation.reject"),
+                        icon: "xmark.circle.fill",
+                        color: AppColors.danger,
+                        isLoading: false
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.showRejectionForm = true
+                        }
+                    }
+                }
+
+                // Escalate
+                ActionButton(
+                    title: String(localized: "rumors.validation.escalate"),
+                    icon: "arrow.up.circle.fill",
+                    color: AppColors.warning,
+                    isLoading: false
+                ) {
+                    Task { await viewModel.escalateRumor(rumorId: rumorId) }
+                }
+            }
+
+            // Success/error messages
+            if viewModel.validationSuccess {
+                HStack(spacing: AppDimensions.spacingXS) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(AppColors.success)
+                    Text(String(localized: "rumors.validation.success"))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.success)
+                }
+                .transition(.opacity)
+            }
+
+            if let error = viewModel.errorMessage {
+                HStack(spacing: AppDimensions.spacingXS) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(AppColors.danger)
+                    Text(error)
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.danger)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppDimensions.cardPadding)
+        .cardStyle()
+        .animation(.easeInOut(duration: 0.3), value: viewModel.validationSuccess)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.showRejectionForm)
+    }
+
+    /// Determine le niveau de validation actuel
+    private var currentValidationLevel: Int {
+        if let validations = viewModel.rumor?.validations, !validations.isEmpty {
+            return validations.compactMap(\.level).max() ?? 0
+        }
+        if !viewModel.validationHistory.isEmpty {
+            return viewModel.validationHistory.compactMap(\.level).max() ?? 0
+        }
+        return 0
+    }
+
+    // MARK: - Feedback
+
+    private var feedbackSection: some View {
+        Group {
+            if viewModel.isLoadingFeedback {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(AppDimensions.cardPadding)
+                    .cardStyle()
+            } else if !viewModel.feedbackItems.isEmpty {
+                VStack(alignment: .leading, spacing: AppDimensions.spacingM) {
+                    SectionHeader(
+                        title: String(localized: "feedback.title") + " (\(viewModel.feedbackItems.count))",
+                        icon: "bubble.left.and.bubble.right.fill"
+                    )
+
+                    VStack(spacing: AppDimensions.spacingS) {
+                        ForEach(viewModel.feedbackItems) { item in
+                            FeedbackRowView(item: item)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(AppDimensions.cardPadding)
@@ -448,6 +785,336 @@ struct RumorDetailView: View {
             Spacer()
         }
     }
+
+    // MARK: - Risk color helper
+
+    private func riskColor(for level: String) -> Color {
+        switch level.lowercased() {
+        case "low": return AppColors.success
+        case "moderate": return AppColors.warning
+        case "high": return AppColors.danger
+        case "very_high": return Color(hex: 0x8E24AA)
+        default: return AppColors.muted
+        }
+    }
+}
+
+// MARK: - Risk Level Badge
+
+/// Badge affichant le niveau de risque avec couleur
+private struct RiskLevelBadge: View {
+    let level: String
+
+    var body: some View {
+        HStack(spacing: AppDimensions.spacingS) {
+            Image(systemName: "shield.fill")
+                .font(.title3)
+                .foregroundStyle(color)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "rumors.risk.current_level"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textTertiary)
+
+                Text(displayLabel)
+                    .font(AppFonts.headline)
+                    .foregroundStyle(color)
+            }
+        }
+        .padding(AppDimensions.spacingM)
+        .background(color.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+    }
+
+    private var color: Color {
+        switch level.lowercased() {
+        case "low": return AppColors.success
+        case "moderate": return AppColors.warning
+        case "high": return AppColors.danger
+        case "very_high": return Color(hex: 0x8E24AA)
+        default: return AppColors.muted
+        }
+    }
+
+    private var displayLabel: String {
+        switch level.lowercased() {
+        case "low": return "Faible"
+        case "moderate": return "Modere"
+        case "high": return "Eleve"
+        case "very_high": return "Tres eleve"
+        default: return "Inconnu"
+        }
+    }
+}
+
+// MARK: - Risk Level Chip
+
+/// Chip selecteur de niveau de risque
+private struct RiskLevelChip: View {
+    let label: String
+    let value: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                Text(label)
+                    .font(AppFonts.badge)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .foregroundStyle(isSelected ? .white : color)
+            .background(isSelected ? color : color.opacity(0.1))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Validation Level Stepper
+
+/// Stepper visuel des niveaux de validation (1 a 5)
+private struct ValidationLevelStepper: View {
+    let validations: [ValidationHistoryItem]
+    let currentLevel: Int
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(1...5, id: \.self) { level in
+                let status = statusFor(level: level)
+
+                HStack(spacing: 0) {
+                    // Cercle du niveau
+                    VStack(spacing: 4) {
+                        ZStack {
+                            Circle()
+                                .fill(status.color.opacity(0.15))
+                                .frame(width: 32, height: 32)
+
+                            Circle()
+                                .stroke(status.color, lineWidth: 2)
+                                .frame(width: 32, height: 32)
+
+                            if status == .completed {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(status.color)
+                            } else if status == .rejected {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(status.color)
+                            } else {
+                                Text("\(level)")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundStyle(status.color)
+                            }
+                        }
+
+                        Text("N\(level)")
+                            .font(AppFonts.caption2)
+                            .foregroundStyle(status.color)
+                    }
+
+                    // Ligne de connexion
+                    if level < 5 {
+                        Rectangle()
+                            .fill(level < currentLevel ? AppColors.success : AppColors.muted.opacity(0.3))
+                            .frame(height: 2)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, AppDimensions.spacingS)
+    }
+
+    private enum StepStatus {
+        case completed, rejected, current, pending
+
+        var color: Color {
+            switch self {
+            case .completed: return AppColors.success
+            case .rejected: return AppColors.danger
+            case .current: return AppColors.info
+            case .pending: return AppColors.muted
+            }
+        }
+    }
+
+    private func statusFor(level: Int) -> StepStatus {
+        if let validation = validations.first(where: { $0.level == level }) {
+            if validation.actionType?.lowercased() == "reject" {
+                return .rejected
+            }
+            return .completed
+        }
+        if level == currentLevel + 1 {
+            return .current
+        }
+        if level <= currentLevel {
+            return .completed
+        }
+        return .pending
+    }
+}
+
+// MARK: - Validation History Row
+
+/// Ligne d'historique de validation detaillee
+private struct ValidationHistoryRowView: View {
+    let item: ValidationHistoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+            HStack {
+                // Niveau
+                if let level = item.level {
+                    Text("Niveau \(level)")
+                        .font(AppFonts.badge)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(statusColor)
+                        .clipShape(Capsule())
+                }
+
+                // Action type
+                if let action = item.actionType {
+                    StatusBadge(
+                        actionLabel(for: action),
+                        color: actionColor(for: action),
+                        icon: actionIcon(for: action)
+                    )
+                }
+
+                Spacer()
+
+                // Date
+                if let dateStr = item.validatedAt {
+                    Text(RumorDateHelper.relativeString(from: dateStr))
+                        .font(AppFonts.caption2)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+            }
+
+            // User
+            if let user = item.userName, !user.isEmpty {
+                HStack(spacing: AppDimensions.spacingXS) {
+                    Image(systemName: "person.fill")
+                        .font(.caption2)
+                        .foregroundStyle(AppColors.textTertiary)
+                    Text(user)
+                        .font(AppFonts.footnote)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+
+            // Notes
+            if let notes = item.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Rejection reason
+            if let reason = item.rejectionReason, !reason.isEmpty {
+                HStack(spacing: AppDimensions.spacingXS) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(AppColors.danger)
+                    Text(reason)
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(AppDimensions.spacingM)
+        .background(AppColors.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous))
+    }
+
+    private var statusColor: Color {
+        switch item.status?.lowercased() {
+        case "validated": return AppColors.success
+        case "rejected": return AppColors.danger
+        case "escalated": return AppColors.warning
+        default: return AppColors.info
+        }
+    }
+
+    private func actionLabel(for action: String) -> String {
+        switch action.lowercased() {
+        case "validate": return "Valide"
+        case "reject": return "Rejete"
+        case "escalate": return "Escalade"
+        default: return action.capitalized
+        }
+    }
+
+    private func actionColor(for action: String) -> Color {
+        switch action.lowercased() {
+        case "validate": return AppColors.success
+        case "reject": return AppColors.danger
+        case "escalate": return AppColors.warning
+        default: return AppColors.info
+        }
+    }
+
+    private func actionIcon(for action: String) -> String {
+        switch action.lowercased() {
+        case "validate": return "checkmark.circle.fill"
+        case "reject": return "xmark.circle.fill"
+        case "escalate": return "arrow.up.circle.fill"
+        default: return "circle.fill"
+        }
+    }
+}
+
+// MARK: - Action Button
+
+/// Bouton d'action compact pour la validation
+private struct ActionButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let isLoading: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            HapticHelper.impact(.light)
+            action()
+        } label: {
+            VStack(spacing: 4) {
+                if isLoading {
+                    ProgressView()
+                        .tint(color)
+                        .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 20))
+                        .foregroundStyle(color)
+                }
+                Text(title)
+                    .font(AppFonts.caption2)
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, AppDimensions.spacingM)
+            .background(color.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+        }
+        .disabled(isLoading)
+        .buttonStyle(.plain)
+    }
 }
 
 // MARK: - Ligne de detail cle/valeur
@@ -576,6 +1243,107 @@ private struct NoteRowView: View {
         .padding(AppDimensions.spacingM)
         .background(AppColors.secondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous))
+    }
+}
+
+// MARK: - Feedback Row
+
+/// Vue affichant un element de feedback
+private struct FeedbackRowView: View {
+    let item: FeedbackItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+            HStack(spacing: AppDimensions.spacingS) {
+                // Type badge
+                if let feedbackType = item.feedbackType, !feedbackType.isEmpty {
+                    StatusBadge(
+                        feedbackTypeLabel(feedbackType),
+                        color: feedbackTypeColor(feedbackType),
+                        icon: feedbackTypeIcon(feedbackType)
+                    )
+                }
+
+                // Channel badge
+                if let channel = item.channel, !channel.isEmpty {
+                    StatusBadge(
+                        channel.capitalized,
+                        color: AppColors.info,
+                        icon: "antenna.radiowaves.left.and.right"
+                    )
+                }
+
+                // Status badge
+                if let status = item.status, !status.isEmpty {
+                    StatusBadge(
+                        status.capitalized,
+                        color: feedbackStatusColor(status)
+                    )
+                }
+
+                Spacer()
+
+                // Date
+                if let dateStr = item.createdAt {
+                    Text(RumorDateHelper.relativeString(from: dateStr))
+                        .font(AppFonts.caption2)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+            }
+
+            // Message
+            if let message = item.message, !message.isEmpty {
+                Text(message)
+                    .font(AppFonts.callout)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(AppDimensions.spacingM)
+        .background(AppColors.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous))
+    }
+
+    private func feedbackTypeLabel(_ type: String) -> String {
+        switch type.lowercased() {
+        case "positive": return String(localized: "feedback.type.positive")
+        case "negative": return String(localized: "feedback.type.negative")
+        case "suggestion": return String(localized: "feedback.type.suggestion")
+        case "question": return String(localized: "feedback.type.question")
+        case "followup": return String(localized: "feedback.type.followup")
+        default: return type.capitalized
+        }
+    }
+
+    private func feedbackTypeColor(_ type: String) -> Color {
+        switch type.lowercased() {
+        case "positive": return AppColors.success
+        case "negative": return AppColors.danger
+        case "suggestion": return AppColors.info
+        case "question": return AppColors.warning
+        case "followup": return AppColors.primary
+        default: return AppColors.muted
+        }
+    }
+
+    private func feedbackTypeIcon(_ type: String) -> String {
+        switch type.lowercased() {
+        case "positive": return "hand.thumbsup.fill"
+        case "negative": return "hand.thumbsdown.fill"
+        case "suggestion": return "lightbulb.fill"
+        case "question": return "questionmark.circle.fill"
+        case "followup": return "arrow.turn.down.right"
+        default: return "bubble.left.fill"
+        }
+    }
+
+    private func feedbackStatusColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "read", "lu": return AppColors.success
+        case "pending", "en_attente": return AppColors.warning
+        case "archived": return AppColors.muted
+        default: return AppColors.muted
+        }
     }
 }
 

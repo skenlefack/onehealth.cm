@@ -397,6 +397,39 @@
     <string name="scan_completed_title">COHRM Scan Completed</string>
     <string name="scan_completed_text">%1$d new rumor(s) detected</string>
 
+    <!-- Risk Assessment -->
+    <string name="risk_assessment_title">Risk Assessment</string>
+    <string name="risk_assessment_expand">Assess Risk</string>
+    <string name="risk_assessment_collapse">Collapse</string>
+    <string name="risk_assessment_level">Risk Level</string>
+    <string name="risk_assessment_description">Risk Description</string>
+    <string name="risk_assessment_description_hint">Describe the identified risk…</string>
+    <string name="risk_assessment_context">Risk Context</string>
+    <string name="risk_assessment_context_hint">Epidemiological, environmental context…</string>
+    <string name="risk_assessment_exposure">Exposure</string>
+    <string name="risk_assessment_exposure_hint">Exposed population, impact zone…</string>
+    <string name="risk_assessment_submit">Submit Assessment</string>
+    <string name="risk_assessment_success">Risk assessment submitted</string>
+
+    <!-- Validation Workflow -->
+    <string name="validation_workflow_title">Validation Workflow</string>
+    <string name="validation_none">No validations yet</string>
+    <string name="validation_rejection_reason">Rejection Reason</string>
+    <string name="validation_rejection_hint">Explain the reason for rejection…</string>
+
+    <!-- Scanner Results -->
+    <string name="scanner_results_title">Scanner Results</string>
+    <string name="scanner_results_empty">No scanner results</string>
+    <string name="scanner_result_status_new">New</string>
+    <string name="scanner_result_status_reviewed">Reviewed</string>
+    <string name="scanner_result_status_converted">Converted</string>
+    <string name="scanner_result_status_dismissed">Dismissed</string>
+    <string name="scanner_result_convert">Convert to rumor</string>
+    <string name="scanner_result_dismiss">Dismiss</string>
+    <string name="scanner_result_convert_title">Convert to Rumor</string>
+    <string name="scanner_result_convert_rumor_title">Rumor Title</string>
+    <string name="scanner_result_convert_description">Description</string>
+
     <!-- Settings Enhancement -->
     <string name="settings_notifications">Notifications</string>
     <string name="settings_push_enabled">Enable push notifications</string>

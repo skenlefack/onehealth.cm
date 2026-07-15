@@ -16,6 +16,9 @@ final class ScannerViewModel {
     /// Detail du scan selectionne
     var scanDetail: ScanDetailDTO?
 
+    /// Resultats du scanner (endpoint global)
+    var scannerResults: [ScannerResultItem] = []
+
     // MARK: - Inputs
 
     /// Source selectionnee pour le scan
@@ -35,6 +38,12 @@ final class ScannerViewModel {
     /// Chargement du detail
     var isLoadingDetail = false
 
+    /// Chargement des resultats
+    var isLoadingResults = false
+
+    /// Action en cours sur un resultat
+    var isProcessingResult = false
+
     /// Message d'erreur
     var errorMessage: String?
 
@@ -46,6 +55,38 @@ final class ScannerViewModel {
 
     /// S'il y a plus de pages
     var hasMorePages = false
+
+    /// Page courante des resultats
+    private(set) var resultsPage = 1
+
+    /// S'il y a plus de resultats
+    var hasMoreResults = false
+
+    /// Onglet actif (historique ou resultats)
+    var selectedTab: ScannerTab = .history
+
+    // MARK: - Onglets
+
+    enum ScannerTab: String, CaseIterable, Identifiable {
+        case history
+        case results
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .history: return String(localized: "scanner.tab.history")
+            case .results: return String(localized: "scanner.tab.results")
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .history: return "clock.fill"
+            case .results: return "list.bullet.rectangle"
+            }
+        }
+    }
 
     // MARK: - Sources disponibles
 
@@ -169,5 +210,91 @@ final class ScannerViewModel {
     func loadMore() async {
         guard hasMorePages, !isLoadingHistory else { return }
         await loadHistory(page: currentPage + 1)
+    }
+
+    // MARK: - Scanner Results
+
+    /// Charge les resultats du scanner
+    func loadResults(page: Int = 1) async {
+        isLoadingResults = true
+        errorMessage = nil
+
+        do {
+            let response = try await APIService.shared.getScannerResults(
+                page: page,
+                limit: 20
+            )
+
+            if let data = response.data {
+                if page == 1 {
+                    scannerResults = data
+                } else {
+                    scannerResults.append(contentsOf: data)
+                }
+                resultsPage = page
+                hasMoreResults = data.count >= 20
+            } else {
+                if page == 1 { scannerResults = [] }
+                hasMoreResults = false
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingResults = false
+    }
+
+    /// Charge la page suivante des resultats
+    func loadMoreResults() async {
+        guard hasMoreResults, !isLoadingResults else { return }
+        await loadResults(page: resultsPage + 1)
+    }
+
+    /// Review un resultat de scan (approve ou dismiss)
+    func reviewResult(id: Int, status: String) async {
+        isProcessingResult = true
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let response = try await APIService.shared.reviewScanResult(id: id, status: status)
+            if response.success {
+                successMessage = status == "dismissed"
+                    ? String(localized: "scanner.result.dismissed")
+                    : String(localized: "scanner.result.reviewed")
+
+                // Retirer le resultat de la liste
+                scannerResults.removeAll { $0.id == id }
+            } else {
+                errorMessage = response.message ?? String(localized: "scanner.error.generic")
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isProcessingResult = false
+    }
+
+    /// Convertit un resultat de scan en rumeur
+    func convertToRumor(id: Int) async {
+        isProcessingResult = true
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let response = try await APIService.shared.convertScanResult(id: id)
+            if response.success {
+                successMessage = String(localized: "scanner.result.converted")
+
+                // Retirer le resultat de la liste
+                scannerResults.removeAll { $0.id == id }
+            } else {
+                errorMessage = response.message ?? String(localized: "scanner.error.generic")
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isProcessingResult = false
     }
 }

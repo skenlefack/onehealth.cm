@@ -26,13 +26,17 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -170,12 +174,20 @@ fun RumorDetailScreen(
                         }
                     }
 
-                    // Validation Timeline
-                    if (rumor.validations.isNotEmpty()) {
-                        SectionCard(stringResource(R.string.rumor_timeline)) {
-                            ValidationTimeline(rumor.validations)
-                        }
-                    }
+                    // Risk Assessment section
+                    RiskAssessmentSection(
+                        rumor = rumor,
+                        isAssessing = state.isAssessingRisk,
+                        onAssess = { riskLevel, desc, ctx, exp ->
+                            viewModel.assessRisk(riskLevel, desc, ctx, exp)
+                        },
+                    )
+
+                    // Validation Timeline with level stepper
+                    ValidationSection(
+                        validations = if (state.validations.isNotEmpty()) state.validations else rumor.validations,
+                        isLoading = state.isLoadingValidations,
+                    )
 
                     // Action buttons
                     if (rumor.status != "closed") {
@@ -449,6 +461,291 @@ private fun FeedbackSection(
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = PrimaryLight)
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RiskAssessmentSection(
+    rumor: RumorDetail,
+    isAssessing: Boolean,
+    onAssess: (riskLevel: String, description: String?, context: String?, exposure: String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selectedRiskLevel by remember { mutableStateOf(rumor.riskLevel) }
+    var riskDescription by remember { mutableStateOf("") }
+    var riskContext by remember { mutableStateOf("") }
+    var riskExposure by remember { mutableStateOf("") }
+    var riskDropdownExpanded by remember { mutableStateOf(false) }
+
+    val riskLevels = listOf(
+        "unknown" to "Inconnu",
+        "low" to "Faible",
+        "moderate" to "Modéré",
+        "high" to "Élevé",
+        "very_high" to "Très élevé",
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = riskColor(rumor.riskLevel),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.risk_assessment_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Badge(formatLabel(rumor.riskLevel), riskColor(rumor.riskLevel))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Toggle expand
+            OutlinedButton(
+                onClick = { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (expanded) stringResource(R.string.risk_assessment_collapse) else stringResource(R.string.risk_assessment_expand))
+            }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Risk level dropdown
+                Text(
+                    text = stringResource(R.string.risk_assessment_level),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                ExposedDropdownMenuBox(
+                    expanded = riskDropdownExpanded,
+                    onExpandedChange = { riskDropdownExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = riskLevels.find { it.first == selectedRiskLevel }?.second ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = riskDropdownExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = riskDropdownExpanded,
+                        onDismissRequest = { riskDropdownExpanded = false },
+                    ) {
+                        riskLevels.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    selectedRiskLevel = value
+                                    riskDropdownExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Description
+                OutlinedTextField(
+                    value = riskDescription,
+                    onValueChange = { riskDescription = it },
+                    label = { Text(stringResource(R.string.risk_assessment_description)) },
+                    placeholder = { Text(stringResource(R.string.risk_assessment_description_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    minLines = 2,
+                    maxLines = 4,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Context
+                OutlinedTextField(
+                    value = riskContext,
+                    onValueChange = { riskContext = it },
+                    label = { Text(stringResource(R.string.risk_assessment_context)) },
+                    placeholder = { Text(stringResource(R.string.risk_assessment_context_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    minLines = 2,
+                    maxLines = 4,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Exposure
+                OutlinedTextField(
+                    value = riskExposure,
+                    onValueChange = { riskExposure = it },
+                    label = { Text(stringResource(R.string.risk_assessment_exposure)) },
+                    placeholder = { Text(stringResource(R.string.risk_assessment_exposure_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    minLines = 2,
+                    maxLines = 4,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Submit button
+                Button(
+                    onClick = {
+                        onAssess(selectedRiskLevel, riskDescription, riskContext, riskExposure)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isAssessing,
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    if (isAssessing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(stringResource(R.string.risk_assessment_submit), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ValidationSection(
+    validations: List<ValidationItem>,
+    isLoading: Boolean,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.validation_workflow_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Level stepper (1-5)
+            ValidationLevelStepper(validations)
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                }
+            } else if (validations.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.validation_none),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                )
+            } else {
+                // Validation timeline entries
+                ValidationTimeline(validations)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ValidationLevelStepper(validations: List<ValidationItem>) {
+    val completedLevels = validations
+        .filter { it.decision == "approved" }
+        .map { it.actorLevel }
+        .toSet()
+    val rejectedLevels = validations
+        .filter { it.decision == "rejected" }
+        .map { it.actorLevel }
+        .toSet()
+    val escalatedLevels = validations
+        .filter { it.decision == "escalated" }
+        .map { it.actorLevel }
+        .toSet()
+    val maxCompletedLevel = completedLevels.maxOrNull() ?: 0
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        (1..5).forEach { level ->
+            val color = when {
+                level in rejectedLevels -> Danger
+                level in completedLevels -> Accent
+                level in escalatedLevels -> Warning
+                level == maxCompletedLevel + 1 -> Info
+                else -> Muted.copy(alpha = 0.3f)
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(color),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "$level",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "N$level",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.sp,
+                    color = color,
+                )
+            }
+            if (level < 5) {
+                Box(
+                    modifier = Modifier
+                        .height(2.dp)
+                        .width(12.dp)
+                        .background(if (level <= maxCompletedLevel) Accent else Muted.copy(alpha = 0.2f)),
+                )
             }
         }
     }

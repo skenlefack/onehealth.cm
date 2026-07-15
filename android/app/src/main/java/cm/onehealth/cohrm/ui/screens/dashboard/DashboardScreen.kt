@@ -79,6 +79,7 @@ fun DashboardScreen(
     onNewReport: () -> Unit = {},
     onRumorClick: (Int) -> Unit = {},
     onViewAllRumors: () -> Unit = {},
+    onViewReports: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -111,14 +112,19 @@ fun DashboardScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
-                    IconButton(onClick = { viewModel.refresh() }, enabled = !state.isLoading) {
-                        if (state.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                    Row {
+                        IconButton(onClick = onViewReports) {
+                            Icon(Icons.Default.Assessment, contentDescription = stringResource(R.string.reports_title))
+                        }
+                        IconButton(onClick = { viewModel.refresh() }, enabled = !state.isLoading) {
+                            if (state.isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                            }
                         }
                     }
                 }

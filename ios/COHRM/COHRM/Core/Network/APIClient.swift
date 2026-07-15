@@ -136,6 +136,32 @@ actor APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
+    /// Effectue une requête PUT avec un corps Encodable (type-safe)
+    func putEncodable<B: Encodable, T: Decodable>(
+        _ endpoint: String,
+        body: B,
+        responseType: T.Type
+    ) async throws -> T {
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(body)
+
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(T.self, from: data)
+    }
+
     /// Effectue un upload multipart (photos)
     func uploadMultipart<T: Decodable>(
         _ endpoint: String,

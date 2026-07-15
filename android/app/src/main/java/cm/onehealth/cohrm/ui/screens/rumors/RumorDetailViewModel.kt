@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cm.onehealth.cohrm.data.remote.dto.RumorDetail
+import cm.onehealth.cohrm.data.remote.dto.ValidationItem
 import cm.onehealth.cohrm.domain.repository.CohrmRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +23,9 @@ data class RumorDetailState(
     val error: String? = null,
     val isValidating: Boolean = false,
     val isSendingFeedback: Boolean = false,
+    val isAssessingRisk: Boolean = false,
+    val validations: List<ValidationItem> = emptyList(),
+    val isLoadingValidations: Boolean = false,
 )
 
 sealed interface RumorDetailEvent {
@@ -44,7 +48,10 @@ class RumorDetailViewModel @Inject constructor(
     val events: SharedFlow<RumorDetailEvent> = _events.asSharedFlow()
 
     init {
-        if (rumorId > 0) loadRumor()
+        if (rumorId > 0) {
+            loadRumor()
+            loadValidations()
+        }
     }
 
     fun loadRumor() {
@@ -100,6 +107,48 @@ class RumorDetailViewModel @Inject constructor(
             cohrmRepository.updateRumor(rumorId, status = status).fold(
                 onSuccess = { rumor -> _state.update { it.copy(rumor = rumor) } },
                 onFailure = { e -> _events.emit(RumorDetailEvent.Error(e.localizedMessage ?: "Erreur")) },
+            )
+        }
+    }
+
+    fun assessRisk(
+        riskLevel: String,
+        description: String? = null,
+        context: String? = null,
+        exposure: String? = null,
+    ) {
+        _state.update { it.copy(isAssessingRisk = true) }
+        viewModelScope.launch {
+            cohrmRepository.assessRisk(
+                id = rumorId,
+                riskLevel = riskLevel,
+                riskDescription = description?.ifBlank { null },
+                riskContext = context?.ifBlank { null },
+                riskExposure = exposure?.ifBlank { null },
+            ).fold(
+                onSuccess = {
+                    _state.update { it.copy(isAssessingRisk = false) }
+                    _events.emit(RumorDetailEvent.Success("Évaluation du risque soumise"))
+                    loadRumor()
+                },
+                onFailure = { e ->
+                    _state.update { it.copy(isAssessingRisk = false) }
+                    _events.emit(RumorDetailEvent.Error(e.localizedMessage ?: "Erreur"))
+                },
+            )
+        }
+    }
+
+    fun loadValidations() {
+        _state.update { it.copy(isLoadingValidations = true) }
+        viewModelScope.launch {
+            cohrmRepository.getValidations(rumorId).fold(
+                onSuccess = { validations ->
+                    _state.update { it.copy(isLoadingValidations = false, validations = validations) }
+                },
+                onFailure = {
+                    _state.update { it.copy(isLoadingValidations = false) }
+                },
             )
         }
     }

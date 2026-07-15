@@ -18,16 +18,26 @@ import cm.onehealth.cohrm.data.remote.dto.ScanRunResponse
 import cm.onehealth.cohrm.data.remote.dto.ChangePasswordRequest
 import cm.onehealth.cohrm.data.remote.dto.DeviceRegistrationRequest
 import cm.onehealth.cohrm.data.remote.dto.GenericResponse
+import cm.onehealth.cohrm.data.remote.dto.NotificationPrefsResponse
+import cm.onehealth.cohrm.data.remote.dto.NotificationPrefsUpdate
 import cm.onehealth.cohrm.data.remote.dto.ProfileResponse
 import cm.onehealth.cohrm.data.remote.dto.ProfileUpdateRequest
 import cm.onehealth.cohrm.data.remote.dto.PublicReportRequest
 import cm.onehealth.cohrm.data.remote.dto.RegionsResponse
+import cm.onehealth.cohrm.data.remote.dto.ReportGeographicResponse
+import cm.onehealth.cohrm.data.remote.dto.ReportPerformanceResponse
 import cm.onehealth.cohrm.data.remote.dto.ReportSummaryResponse
+import cm.onehealth.cohrm.data.remote.dto.ReportTrendsResponse
 import cm.onehealth.cohrm.data.remote.dto.ScannerConfigResponse
 import cm.onehealth.cohrm.data.remote.dto.SmsRequest
 import cm.onehealth.cohrm.data.remote.dto.SyncResponse
 import cm.onehealth.cohrm.data.remote.dto.TrackingResponse
+import cm.onehealth.cohrm.data.remote.dto.ConvertRequest
+import cm.onehealth.cohrm.data.remote.dto.ReviewRequest
+import cm.onehealth.cohrm.data.remote.dto.RiskAssessmentRequest
+import cm.onehealth.cohrm.data.remote.dto.ScannerResultsResponse
 import cm.onehealth.cohrm.data.remote.dto.ValidationRequest
+import cm.onehealth.cohrm.data.remote.dto.ValidationsResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -102,6 +112,17 @@ interface ApiService {
         @Body request: ValidationRequest,
     ): RumorDetailResponse
 
+    // Risk Assessment
+    @POST("cohrm/rumors/{id}/risk-assessment")
+    suspend fun assessRisk(
+        @Path("id") id: Int,
+        @Body request: RiskAssessmentRequest,
+    ): GenericResponse
+
+    // Validations list
+    @GET("cohrm/rumors/{id}/validations")
+    suspend fun getValidations(@Path("id") id: Int): ValidationsResponse
+
     // Feedback
     @POST("rumors/{id}/feedback")
     suspend fun addFeedback(
@@ -168,9 +189,57 @@ interface ApiService {
         @Query("group_by") groupBy: String? = "day",
     ): ReportSummaryResponse
 
+    @GET("cohrm/reports/trends")
+    suspend fun getReportTrends(
+        @Query("date_from") dateFrom: String?,
+        @Query("date_to") dateTo: String?,
+        @Query("region") region: String?,
+        @Query("group_by") groupBy: String? = "day",
+    ): ReportTrendsResponse
+
+    @GET("cohrm/reports/geographic")
+    suspend fun getReportGeographic(
+        @Query("date_from") dateFrom: String?,
+        @Query("date_to") dateTo: String?,
+    ): ReportGeographicResponse
+
+    @GET("cohrm/reports/performance")
+    suspend fun getReportPerformance(
+        @Query("date_from") dateFrom: String?,
+        @Query("date_to") dateTo: String?,
+        @Query("region") region: String?,
+    ): ReportPerformanceResponse
+
     // Scanner config
     @GET("cohrm/scanner/config")
     suspend fun getScannerConfig(): ScannerConfigResponse
+
+    // Scanner results
+    @GET("cohrm/scanner/results")
+    suspend fun getScannerResults(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("status") status: String? = null,
+    ): ScannerResultsResponse
+
+    @PUT("cohrm/scanner/results/{id}/review")
+    suspend fun reviewScanResult(
+        @Path("id") id: Int,
+        @Body request: ReviewRequest,
+    ): GenericResponse
+
+    @POST("cohrm/scanner/results/{id}/convert")
+    suspend fun convertScanResult(
+        @Path("id") id: Int,
+        @Body request: ConvertRequest,
+    ): GenericResponse
+
+    // Notification preferences
+    @GET("cohrm/notification-preferences")
+    suspend fun getNotificationPreferences(): NotificationPrefsResponse
+
+    @PUT("cohrm/notification-preferences")
+    suspend fun updateNotificationPreferences(@Body prefs: NotificationPrefsUpdate): GenericResponse
 
     // Notifications mark read
     @PUT("cohrm/notifications/{id}/read")

@@ -79,6 +79,9 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            // Section 0 : Profil
+            profileSection
+
             // Section 1 : Langue
             languageSection
 
@@ -133,6 +136,43 @@ struct SettingsView: View {
             if let url = exportedFileURL {
                 ShareSheet(items: [url])
             }
+        }
+    }
+
+    // MARK: - Section Profil
+
+    private var profileSection: some View {
+        Section {
+            NavigationLink {
+                ProfileView()
+            } label: {
+                HStack(spacing: AppDimensions.spacingM) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous)
+                            .fill(AppColors.primary.opacity(0.12))
+                            .frame(width: 44, height: 44)
+
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(AppColors.primary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.profile.title"))
+                            .font(AppFonts.headline)
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Text(String(localized: "settings.profile.subtitle"))
+                            .font(AppFonts.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                }
+            }
+        } header: {
+            Label(
+                String(localized: "settings.profile.header"),
+                systemImage: "person.fill"
+            )
         }
     }
 

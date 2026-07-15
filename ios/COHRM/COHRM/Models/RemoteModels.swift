@@ -191,6 +191,85 @@ struct PhotoItem: Codable, Identifiable {
     }
 }
 
+// MARK: - Risk Assessment
+
+/// Requete d'evaluation du risque
+struct RiskAssessmentRequest: Codable {
+    let riskLevel: String
+    let riskDescription: String?
+    let riskContext: String?
+    let riskExposure: String?
+
+    enum CodingKeys: String, CodingKey {
+        case riskLevel = "risk_level"
+        case riskDescription = "risk_description"
+        case riskContext = "risk_context"
+        case riskExposure = "risk_exposure"
+    }
+}
+
+// MARK: - Validation Workflow
+
+/// Reponse contenant l'historique des validations
+struct ValidationsResponse: Codable {
+    let success: Bool
+    let data: [ValidationHistoryItem]?
+}
+
+/// Element d'historique de validation detaille
+struct ValidationHistoryItem: Codable, Identifiable {
+    let id: Int
+    let level: Int?
+    let actionType: String?
+    let status: String?
+    let notes: String?
+    let rejectionReason: String?
+    let validatedAt: String?
+    let userName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, level, status, notes
+        case actionType = "action_type"
+        case rejectionReason = "rejection_reason"
+        case validatedAt = "validated_at"
+        case userName = "user_name"
+    }
+}
+
+/// Requete de validation d'une rumeur
+struct ValidationRequest: Codable {
+    let actionType: String
+    let status: String
+    let notes: String?
+    let rejectionReason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case actionType = "action_type"
+        case status, notes
+        case rejectionReason = "rejection_reason"
+    }
+}
+
+// MARK: - Scanner Results
+
+/// Resultat individuel du scanner (pour la liste globale)
+struct ScannerResultItem: Codable, Identifiable {
+    let id: Int
+    let title: String?
+    let content: String?
+    let url: String?
+    let source: String?
+    let relevanceScore: Double?
+    let status: String?
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, content, url, source, status
+        case relevanceScore = "relevance_score"
+        case createdAt = "created_at"
+    }
+}
+
 // MARK: - Scanner
 
 /// Résultat de lancement d'un scan
@@ -393,4 +472,147 @@ struct RegionItem: Codable, Identifiable {
 struct RegionsResponse: Codable {
     let success: Bool
     let data: [RegionItem]?
+}
+
+// MARK: - Photos (endpoint dédié)
+
+/// Réponse pour les photos d'une rumeur
+struct PhotosResponse: Codable {
+    let success: Bool
+    let data: [RumorPhoto]?
+}
+
+/// Photo de rumeur (endpoint dédié)
+struct RumorPhoto: Codable, Identifiable {
+    let id: Int
+    let url: String?
+    let filePath: String?
+    let caption: String?
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, url, caption
+        case filePath = "file_path"
+        case createdAt = "created_at"
+    }
+
+    /// URL résolue pour l'affichage
+    var resolvedURL: URL? {
+        if let url = url, url.hasPrefix("http") { return URL(string: url) }
+        if let path = filePath ?? url {
+            let base = UserDefaults.standard.string(forKey: "serverURL") ?? "https://onehealth.cm/api"
+            return URL(string: "\(base)/uploads/\(path)")
+        }
+        return nil
+    }
+}
+
+// MARK: - Feedback
+
+/// Réponse pour les feedbacks d'une rumeur
+struct FeedbackResponse: Codable {
+    let success: Bool
+    let data: [FeedbackItem]?
+}
+
+/// Element de feedback
+struct FeedbackItem: Codable, Identifiable {
+    let id: Int
+    let feedbackType: String?
+    let message: String?
+    let channel: String?
+    let status: String?
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, message, channel, status
+        case feedbackType = "feedback_type"
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - Profil
+
+/// Requête de mise a jour du profil
+struct ProfileUpdateRequest: Codable {
+    let firstName: String?
+    let lastName: String?
+    let phone: String?
+
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case phone
+    }
+}
+
+/// Requête de changement de mot de passe
+struct ChangePasswordRequest: Codable {
+    let currentPassword: String
+    let newPassword: String
+
+    enum CodingKeys: String, CodingKey {
+        case currentPassword = "current_password"
+        case newPassword = "new_password"
+    }
+}
+
+// MARK: - Reports
+
+/// Réponse du résumé des rapports
+struct ReportSummaryResponse: Codable {
+    let success: Bool
+    let data: ReportSummaryData?
+}
+
+/// Données de résumé des rapports
+struct ReportSummaryData: Codable {
+    let totals: SummaryTotals?
+    let byStatus: [StatusCount]?
+    let byRegion: [RegionCount]?
+    let bySource: [SourceCount]?
+    let avgResolutionHours: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case totals
+        case byStatus = "by_status"
+        case byRegion = "by_region"
+        case bySource = "by_source"
+        case avgResolutionHours = "avg_resolution_hours"
+    }
+}
+
+/// Totaux du résumé
+struct SummaryTotals: Codable {
+    let total: Int?
+    let pending: Int?
+    let confirmed: Int?
+    let closed: Int?
+    let highRisk: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case total, pending, confirmed, closed
+        case highRisk = "high_risk"
+    }
+}
+
+/// Comptage par statut
+struct StatusCount: Codable, Identifiable {
+    var id: String { status ?? UUID().uuidString }
+    let status: String?
+    let count: Int?
+}
+
+/// Comptage par région
+struct RegionCount: Codable, Identifiable {
+    var id: String { region ?? UUID().uuidString }
+    let region: String?
+    let count: Int?
+}
+
+/// Comptage par source
+struct SourceCount: Codable, Identifiable {
+    var id: String { source ?? UUID().uuidString }
+    let source: String?
+    let count: Int?
 }

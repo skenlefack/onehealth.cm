@@ -4,9 +4,11 @@ import cm.onehealth.cohrm.data.remote.ApiService
 import cm.onehealth.cohrm.data.remote.dto.ActorInfo
 import cm.onehealth.cohrm.data.remote.dto.DashboardData
 import cm.onehealth.cohrm.data.remote.dto.FeedbackRequest
+import cm.onehealth.cohrm.data.remote.dto.RiskAssessmentRequest
 import cm.onehealth.cohrm.data.remote.dto.RumorDetail
 import cm.onehealth.cohrm.data.remote.dto.RumorUpdateRequest
 import cm.onehealth.cohrm.data.remote.dto.RumorsListData
+import cm.onehealth.cohrm.data.remote.dto.ValidationItem
 import cm.onehealth.cohrm.data.remote.dto.ValidationRequest
 import cm.onehealth.cohrm.domain.repository.CohrmRepository
 import javax.inject.Inject
@@ -74,5 +76,25 @@ class CohrmRepositoryImpl @Inject constructor(
         runCatching {
             val response = apiService.getActors(region, level)
             response.data
+        }
+
+    override suspend fun assessRisk(
+        id: Int,
+        riskLevel: String,
+        riskDescription: String?,
+        riskContext: String?,
+        riskExposure: String?,
+    ): Result<Unit> = runCatching {
+        val response = apiService.assessRisk(
+            id,
+            RiskAssessmentRequest(riskLevel, riskDescription, riskContext, riskExposure),
+        )
+        if (!response.success) throw Exception(response.message ?: "Risk assessment failed")
+    }
+
+    override suspend fun getValidations(id: Int): Result<List<ValidationItem>> =
+        runCatching {
+            val response = apiService.getValidations(id)
+            response.data ?: emptyList()
         }
 }

@@ -12,6 +12,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import cm.onehealth.cohrm.data.preferences.ScanPreferences
 import cm.onehealth.cohrm.data.remote.dto.ScanSummary
+import cm.onehealth.cohrm.data.remote.dto.ScannerResultItem
 import cm.onehealth.cohrm.domain.repository.ScanRepository
 import cm.onehealth.cohrm.ui.screens.login.LoginViewModel
 import cm.onehealth.cohrm.worker.ScanScheduledWorker
@@ -42,11 +43,15 @@ data class ScannerUiState(
     val autoScanFrequency: Int = 60,
     val autoScanSource: String = "all",
     val autoScanKeywords: String = "",
+    val scannerResults: List<ScannerResultItem> = emptyList(),
+    val isLoadingResults: Boolean = false,
+    val selectedResultFilter: String? = null,
 )
 
 sealed interface ScannerEvent {
     data class ScanCompleted(val scanId: Int, val rumorsFound: Int) : ScannerEvent
     data class Error(val message: String) : ScannerEvent
+    data class Success(val message: String) : ScannerEvent
 }
 
 @HiltViewModel
@@ -66,6 +71,7 @@ class ScannerViewModel @Inject constructor(
         checkAccess()
         loadHistory()
         loadSchedulePrefs()
+        loadScannerResults()
     }
 
     private fun checkAccess() {
@@ -207,5 +213,55 @@ class ScannerViewModel @Inject constructor(
 
     private fun cancelAutoScan() {
         workManager.cancelUniqueWork(ScanScheduledWorker.WORK_NAME)
+    }
+
+    // --- Scanner results management ---
+
+    fun loadScannerResults(status: String? = _state.value.selectedResultFilter) {
+        _state.update { it.copy(isLoadingResults = true) }
+        viewModelScope.launch {
+            scanRepository.getScannerResults(status = status).fold(
+                onSuccess = { results ->
+                    _state.update { it.copy(isLoadingResults = false, scannerResults = results) }
+                },
+                onFailure = { e ->
+                    _state.update { it.copy(isLoadingResults = false) }
+                    _events.emit(ScannerEvent.Error(e.localizedMessage ?: "Erreur"))
+                },
+            )
+        }
+    }
+
+    fun updateResultFilter(status: String?) {
+        _state.update { it.copy(selectedResultFilter = status) }
+        loadScannerResults(status)
+    }
+
+    fun reviewResult(id: Int, status: String) {
+        viewModelScope.launch {
+            scanRepository.reviewScanResult(id, status).fold(
+                onSuccess = {
+                    _events.emit(ScannerEvent.Success(if (status == "dismissed") "Résultat ignoré" else "Résultat examiné"))
+                    loadScannerResults()
+                },
+                onFailure = { e ->
+                    _events.emit(ScannerEvent.Error(e.localizedMessage ?: "Erreur"))
+                },
+            )
+        }
+    }
+
+    fun convertToRumor(id: Int, title: String? = null, description: String? = null) {
+        viewModelScope.launch {
+            scanRepository.convertScanResult(id, title, description).fold(
+                onSuccess = {
+                    _events.emit(ScannerEvent.Success("Converti en rumeur"))
+                    loadScannerResults()
+                },
+                onFailure = { e ->
+                    _events.emit(ScannerEvent.Error(e.localizedMessage ?: "Erreur"))
+                },
+            )
+        }
     }
 }

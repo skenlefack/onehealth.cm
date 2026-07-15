@@ -112,6 +112,20 @@ data class RumorUpdateRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class RiskAssessmentRequest(
+    @Json(name = "risk_level") val riskLevel: String,
+    @Json(name = "risk_description") val riskDescription: String? = null,
+    @Json(name = "risk_context") val riskContext: String? = null,
+    @Json(name = "risk_exposure") val riskExposure: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ValidationsResponse(
+    val success: Boolean = false,
+    val data: List<ValidationItem>? = null,
+)
+
+@JsonClass(generateAdapter = true)
 data class ActorsResponse(
     val success: Boolean = false,
     val data: List<ActorInfo> = emptyList(),

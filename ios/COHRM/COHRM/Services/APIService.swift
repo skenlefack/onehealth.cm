@@ -130,6 +130,65 @@ actor APIService {
         )
     }
 
+    // MARK: - Risk Assessment
+
+    /// Soumet une evaluation de risque pour une rumeur
+    func assessRisk(rumorId: Int, request: RiskAssessmentRequest) async throws -> APIResponse<EmptyDTO> {
+        return try await client.postEncodable(
+            Endpoints.assessRisk(rumorId: rumorId),
+            body: request,
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    // MARK: - Validations
+
+    /// Recupere l'historique des validations d'une rumeur
+    func getValidations(rumorId: Int) async throws -> ValidationsResponse {
+        return try await client.get(
+            Endpoints.rumorValidations(rumorId),
+            responseType: ValidationsResponse.self
+        )
+    }
+
+    /// Valide une rumeur avec un type d'action et un statut
+    func validateRumor(rumorId: Int, request: ValidationRequest) async throws -> APIResponse<EmptyDTO> {
+        return try await client.postEncodable(
+            Endpoints.rumorValidate(rumorId),
+            body: request,
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    // MARK: - Scanner Results
+
+    /// Recupere les resultats du scanner
+    func getScannerResults(page: Int = 1, limit: Int = 20) async throws -> APIResponse<[ScannerResultItem]> {
+        return try await client.get(
+            Endpoints.scannerResults,
+            queryParams: ["page": "\(page)", "limit": "\(limit)"],
+            responseType: APIResponse<[ScannerResultItem]>.self
+        )
+    }
+
+    /// Review un resultat de scan (approve/dismiss)
+    func reviewScanResult(id: Int, status: String) async throws -> APIResponse<EmptyDTO> {
+        return try await client.put(
+            Endpoints.reviewScanResult(id),
+            body: ["status": status],
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    /// Convertit un resultat de scan en rumeur
+    func convertScanResult(id: Int) async throws -> APIResponse<EmptyDTO> {
+        return try await client.post(
+            Endpoints.convertScanResult(id),
+            body: [:],
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
     // MARK: - Scanner
 
     /// Lancer un nouveau scan
@@ -224,6 +283,59 @@ actor APIService {
         return try await client.put(
             Endpoints.markAllNotificationsRead,
             responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    // MARK: - Photos de rumeur
+
+    /// Récupère les photos d'une rumeur
+    func getRumorPhotos(rumorId: Int) async throws -> PhotosResponse {
+        return try await client.get(
+            Endpoints.rumorPhotos(rumorId),
+            responseType: PhotosResponse.self
+        )
+    }
+
+    // MARK: - Feedback de rumeur
+
+    /// Récupère les feedbacks d'une rumeur
+    func getRumorFeedback(rumorId: Int) async throws -> FeedbackResponse {
+        return try await client.get(
+            Endpoints.rumorFeedback(rumorId),
+            responseType: FeedbackResponse.self
+        )
+    }
+
+    // MARK: - Profil
+
+    /// Met a jour le profil utilisateur
+    func updateProfile(request: ProfileUpdateRequest) async throws -> APIResponse<EmptyDTO> {
+        return try await client.putEncodable(
+            Endpoints.updateProfile,
+            body: request,
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    /// Change le mot de passe
+    func changePassword(request: ChangePasswordRequest) async throws -> APIResponse<EmptyDTO> {
+        return try await client.putEncodable(
+            Endpoints.changePassword,
+            body: request,
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    // MARK: - Reports
+
+    /// Récupère le résumé des rapports
+    func getReportsSummary(period: String? = nil) async throws -> ReportSummaryResponse {
+        var params: [String: String] = [:]
+        if let period = period { params["period"] = period }
+        return try await client.get(
+            Endpoints.reportsSummary,
+            queryParams: params,
+            responseType: ReportSummaryResponse.self
         )
     }
 }

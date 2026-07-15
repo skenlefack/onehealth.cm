@@ -106,11 +106,67 @@ enum Endpoints {
     /// GET /cohrm/public/regions
     static let publicRegions = "/cohrm/public/regions"
 
+    // MARK: - Photos
+
+    /// Photos d'une rumeur
+    /// GET /cohrm/rumors/:id/photos
+    static func rumorPhotos(_ id: Int) -> String { "/cohrm/rumors/\(id)/photos" }
+
+    // MARK: - Feedback
+
+    /// Feedback d'une rumeur
+    /// GET /cohrm/rumors/:id/feedback
+    static func rumorFeedback(_ id: Int) -> String { "/cohrm/rumors/\(id)/feedback" }
+
+    // MARK: - Profil
+
+    /// Mise a jour du profil
+    /// PUT /cohrm/mobile/profile
+    static let updateProfile = "/cohrm/mobile/profile"
+
+    /// Changement de mot de passe
+    /// PUT /cohrm/mobile/change-password
+    static let changePassword = "/cohrm/mobile/change-password"
+
     // MARK: - Reports
 
     /// Résumé des signalements
     /// GET /cohrm/reports/summary
     static let reportsSummary = "/cohrm/reports/summary"
+
+    /// Tendances des signalements
+    /// GET /cohrm/reports/trends
+    static let reportsTrends = "/cohrm/reports/trends"
+
+    /// Distribution geographique
+    /// GET /cohrm/reports/geographic
+    static let reportsGeographic = "/cohrm/reports/geographic"
+
+    // MARK: - Risk Assessment
+
+    /// Evaluation du risque d'une rumeur
+    /// POST /cohrm/rumors/:id/risk-assessment
+    static func assessRisk(rumorId: Int) -> String { "/cohrm/rumors/\(rumorId)/risk-assessment" }
+
+    // MARK: - Validations
+
+    /// Historique des validations d'une rumeur
+    /// GET /cohrm/rumors/:id/validations
+    static func rumorValidations(_ id: Int) -> String { "/cohrm/rumors/\(id)/validations" }
+
+    // MARK: - Scanner Results
+
+    /// Liste des resultats du scanner
+    /// GET /cohrm/scanner/results
+    static let scannerResults = "/cohrm/scanner/results"
+
+    /// Reviewer un resultat de scan
+    /// PUT /cohrm/scanner/results/:id/review
+    static func reviewScanResult(_ id: Int) -> String { "/cohrm/scanner/results/\(id)/review" }
+
+    /// Convertir un resultat de scan en rumeur
+    /// POST /cohrm/scanner/results/:id/convert
+    static func convertScanResult(_ id: Int) -> String { "/cohrm/scanner/results/\(id)/convert" }
 
     // MARK: - Scanner Config
 

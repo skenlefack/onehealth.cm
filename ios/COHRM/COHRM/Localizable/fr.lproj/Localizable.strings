@@ -360,3 +360,72 @@
 "notifications.status.sent" = "Envoyée";
 "notifications.status.failed" = "Échouée";
 "notifications.status.pending" = "En attente";
+
+// ========================================
+// PHOTOS
+// ========================================
+"photos.empty" = "Aucune photo";
+"photos.load_error" = "Impossible de charger la photo";
+
+// ========================================
+// FEEDBACK
+// ========================================
+"feedback.title" = "Retours";
+"feedback.type.positive" = "Positif";
+"feedback.type.negative" = "Négatif";
+"feedback.type.suggestion" = "Suggestion";
+"feedback.type.question" = "Question";
+"feedback.type.followup" = "Suivi";
+
+// ========================================
+// PROFIL
+// ========================================
+"settings.profile.header" = "Mon compte";
+"settings.profile.title" = "Mon profil";
+"settings.profile.subtitle" = "Modifier vos informations personnelles";
+"profile.title" = "Mon profil";
+"profile.info.header" = "Informations personnelles";
+"profile.info.footer" = "Ces informations sont associées à votre compte COHRM.";
+"profile.first_name" = "Prénom";
+"profile.first_name.placeholder" = "Votre prénom";
+"profile.last_name" = "Nom";
+"profile.last_name.placeholder" = "Votre nom";
+"profile.phone" = "Téléphone";
+"profile.phone.placeholder" = "+237 6XX XXX XXX";
+"profile.save" = "Enregistrer";
+"profile.save.success" = "Profil mis à jour avec succès.";
+"profile.save.error" = "Erreur lors de la mise à jour du profil.";
+"profile.password.header" = "Sécurité";
+"profile.password.footer" = "Le mot de passe doit contenir au moins 6 caractères.";
+"profile.current_password" = "Mot de passe actuel";
+"profile.current_password.placeholder" = "Entrez votre mot de passe actuel";
+"profile.new_password" = "Nouveau mot de passe";
+"profile.new_password.placeholder" = "Minimum 6 caractères";
+"profile.confirm_password" = "Confirmer le mot de passe";
+"profile.confirm_password.placeholder" = "Répétez le nouveau mot de passe";
+"profile.password_mismatch" = "Les mots de passe ne correspondent pas.";
+"profile.change_password" = "Changer le mot de passe";
+"profile.password.success" = "Mot de passe modifié avec succès.";
+"profile.password.error" = "Erreur lors du changement de mot de passe.";
+
+// ========================================
+// RAPPORTS
+// ========================================
+"reports.title" = "Rapports";
+"reports.period" = "Période";
+"reports.total" = "Total";
+"reports.resolved" = "Résolus";
+"reports.pending" = "En attente";
+"reports.high_risk" = "Haut risque";
+"reports.avg_resolution" = "Temps moyen de résolution";
+"reports.by_status" = "Par statut";
+"reports.by_region" = "Par région";
+"reports.no_data" = "Aucune donnée disponible";
+"reports.error.title" = "Erreur de chargement";
+"reports.error.load" = "Impossible de charger les rapports.";
+
+// ========================================
+// ACCUEIL - RAPPORTS
+// ========================================
+"home.reports.title" = "Rapports statistiques";
+"home.reports.subtitle" = "Voir les statistiques et tendances";

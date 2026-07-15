@@ -4,6 +4,7 @@ import cm.onehealth.cohrm.data.remote.dto.DashboardData
 import cm.onehealth.cohrm.data.remote.dto.RumorDetail
 import cm.onehealth.cohrm.data.remote.dto.RumorsListData
 import cm.onehealth.cohrm.data.remote.dto.ActorInfo
+import cm.onehealth.cohrm.data.remote.dto.ValidationItem
 
 interface CohrmRepository {
     suspend fun getDashboard(region: String? = null, period: String? = null): Result<DashboardData>
@@ -22,4 +23,6 @@ interface CohrmRepository {
     suspend fun validateRumor(id: Int, decision: String, notes: String? = null, riskAssessment: String? = null, priorityChange: String? = null): Result<RumorDetail>
     suspend fun addFeedback(id: Int, message: String, type: String = "comment"): Result<RumorDetail>
     suspend fun getActors(region: String? = null, level: Int? = null): Result<List<ActorInfo>>
+    suspend fun assessRisk(id: Int, riskLevel: String, riskDescription: String? = null, riskContext: String? = null, riskExposure: String? = null): Result<Unit>
+    suspend fun getValidations(id: Int): Result<List<ValidationItem>>
 }

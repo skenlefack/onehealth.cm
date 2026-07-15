@@ -76,6 +76,9 @@ struct HomeView: View {
                             // Lien vers le signalement SMS
                             smsReportLink
 
+                            // Lien vers les rapports
+                            reportsLink
+
                             // Derniers signalements
                             recentReportsSection
                         }
@@ -357,6 +360,47 @@ struct HomeView: View {
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(String(localized: "home.sms.subtitle"))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+            .padding(AppDimensions.cardPadding)
+            .cardStyle()
+        }
+        .opacity(isVisible ? 1.0 : 0.0)
+        .offset(y: isVisible ? 0 : 10)
+    }
+
+    // MARK: - Lien rapports
+
+    /// Lien de navigation vers les rapports statistiques
+    private var reportsLink: some View {
+        NavigationLink {
+            ReportsView()
+        } label: {
+            HStack(spacing: AppDimensions.spacingM) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous)
+                        .fill(AppColors.primary.opacity(0.12))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "chart.pie.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(AppColors.primary)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "home.reports.title"))
+                        .font(AppFonts.headline)
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text(String(localized: "home.reports.subtitle"))
                         .font(AppFonts.caption)
                         .foregroundStyle(AppColors.textSecondary)
                 }

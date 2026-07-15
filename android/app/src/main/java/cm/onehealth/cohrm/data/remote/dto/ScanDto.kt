@@ -102,6 +102,38 @@ data class ScanRumorItem(
     val status: String = "",
 )
 
+@JsonClass(generateAdapter = true)
+data class ScannerResultsResponse(
+    val success: Boolean = false,
+    val data: List<ScannerResultItem>? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ScannerResultItem(
+    val id: Int = 0,
+    val title: String? = null,
+    val content: String? = null,
+    val url: String? = null,
+    val source: String? = null,
+    @Json(name = "relevance_score") val relevanceScore: Double? = null,
+    @Json(name = "matched_keywords") val matchedKeywords: String? = null,
+    val status: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+) {
+    fun matchedKeywordsList(): List<String> = parseKeywords(matchedKeywords)
+}
+
+@JsonClass(generateAdapter = true)
+data class ReviewRequest(
+    val status: String, // "reviewed" or "dismissed"
+)
+
+@JsonClass(generateAdapter = true)
+data class ConvertRequest(
+    val title: String? = null,
+    val description: String? = null,
+)
+
 /** Parse keywords that come as JSON string from MySQL (e.g. "[\"cholera\",\"epidemie\"]") */
 private fun parseKeywords(raw: String?): List<String> {
     if (raw.isNullOrBlank()) return emptyList()

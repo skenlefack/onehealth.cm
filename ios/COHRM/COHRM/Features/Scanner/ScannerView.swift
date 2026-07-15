@@ -3,7 +3,7 @@
 
 import SwiftUI
 
-/// Vue du scanner : lancement de scan + historique
+/// Vue du scanner : lancement de scan + historique + resultats
 struct ScannerView: View {
 
     @State private var viewModel = ScannerViewModel()
@@ -16,14 +16,26 @@ struct ScannerView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AppDimensions.spacingL) {
                     launchCard
-                    historySection
+                    tabPicker
+
+                    switch viewModel.selectedTab {
+                    case .history:
+                        historySection
+                    case .results:
+                        resultsSection
+                    }
                 }
                 .padding(.horizontal, AppDimensions.spacing)
                 .padding(.top, AppDimensions.spacingS)
                 .padding(.bottom, AppDimensions.spacingXXL)
             }
             .refreshable {
-                await viewModel.loadHistory()
+                switch viewModel.selectedTab {
+                case .history:
+                    await viewModel.loadHistory()
+                case .results:
+                    await viewModel.loadResults()
+                }
             }
         }
         .navigationTitle(String(localized: "scanner.title"))
@@ -120,6 +132,45 @@ struct ScannerView: View {
         .cardStyle()
     }
 
+    // MARK: - Tab Picker
+
+    private var tabPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(ScannerViewModel.ScannerTab.allCases) { tab in
+                Button {
+                    HapticHelper.selection()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.selectedTab = tab
+
+                        // Charger les resultats au premier affichage
+                        if tab == .results && viewModel.scannerResults.isEmpty {
+                            Task { await viewModel.loadResults() }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: tab.icon)
+                            .font(.caption)
+                        Text(tab.label)
+                            .font(AppFonts.subheadline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppDimensions.spacingM)
+                    .foregroundStyle(
+                        viewModel.selectedTab == tab ? .white : AppColors.primary
+                    )
+                    .background(
+                        viewModel.selectedTab == tab
+                            ? AppColors.primary
+                            : AppColors.primary.opacity(0.08)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusM, style: .continuous))
+    }
+
     // MARK: - Historique
 
     private var historySection: some View {
@@ -168,6 +219,57 @@ struct ScannerView: View {
         }
     }
 
+    // MARK: - Results
+
+    private var resultsSection: some View {
+        VStack(alignment: .leading, spacing: AppDimensions.spacingM) {
+            SectionHeader(
+                title: String(localized: "scanner.results.title"),
+                icon: "list.bullet.rectangle"
+            )
+
+            if viewModel.isLoadingResults && viewModel.scannerResults.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding(AppDimensions.spacingL)
+                    Spacer()
+                }
+            } else if viewModel.scannerResults.isEmpty {
+                emptyResultsView
+            } else {
+                LazyVStack(spacing: AppDimensions.spacingS) {
+                    ForEach(viewModel.scannerResults) { result in
+                        ScannerResultRowView(result: result) { action in
+                            Task {
+                                switch action {
+                                case .convert:
+                                    await viewModel.convertToRumor(id: result.id)
+                                case .dismiss:
+                                    await viewModel.reviewResult(id: result.id, status: "dismissed")
+                                }
+                            }
+                        }
+                        .onAppear {
+                            if result.id == viewModel.scannerResults.last?.id {
+                                Task { await viewModel.loadMoreResults() }
+                            }
+                        }
+                    }
+
+                    if viewModel.isLoadingResults {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding(AppDimensions.spacingS)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var emptyHistoryView: some View {
         VStack(spacing: AppDimensions.spacingM) {
             Image(systemName: "doc.text.magnifyingglass")
@@ -175,6 +277,22 @@ struct ScannerView: View {
                 .foregroundStyle(AppColors.muted)
 
             Text(String(localized: "scanner.history.empty"))
+                .font(AppFonts.callout)
+                .foregroundStyle(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, AppDimensions.spacingXL)
+        .cardStyle()
+    }
+
+    private var emptyResultsView: some View {
+        VStack(spacing: AppDimensions.spacingM) {
+            Image(systemName: "tray")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(AppColors.muted)
+
+            Text(String(localized: "scanner.results.empty"))
                 .font(AppFonts.callout)
                 .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -308,6 +426,191 @@ private struct ScanRowView: View {
         case "queued", "pending": return "clock"
         default: return "questionmark.circle"
         }
+    }
+}
+
+// MARK: - Scanner Result Row
+
+/// Actions disponibles sur un resultat de scan
+enum ScannerResultAction {
+    case convert
+    case dismiss
+}
+
+/// Ligne affichant un resultat du scanner avec actions
+private struct ScannerResultRowView: View {
+    let result: ScannerResultItem
+    let onAction: (ScannerResultAction) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDimensions.spacingS) {
+            // Titre
+            HStack(alignment: .top) {
+                Text(result.title ?? String(localized: "scanner.result.untitled"))
+                    .font(AppFonts.subheadline)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                // Status badge
+                if let status = result.status {
+                    StatusBadge(
+                        status.capitalized,
+                        color: resultStatusColor(for: status)
+                    )
+                }
+            }
+
+            // Content / snippet
+            if let content = result.content, !content.isEmpty {
+                Text(content)
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Source + relevance score
+            HStack(spacing: AppDimensions.spacingM) {
+                // Source
+                if let source = result.source, !source.isEmpty {
+                    Label(source.capitalized, systemImage: sourceIcon(for: source))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+
+                Spacer()
+
+                // Relevance score bar
+                if let score = result.relevanceScore {
+                    RelevanceScoreView(score: score)
+                }
+            }
+
+            // URL
+            if let urlStr = result.url, !urlStr.isEmpty, let url = URL(string: urlStr) {
+                Link(destination: url) {
+                    HStack(spacing: AppDimensions.spacingXS) {
+                        Image(systemName: "link")
+                        Text(urlStr.truncated(to: 50))
+                    }
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.info)
+                    .lineLimit(1)
+                }
+            }
+
+            // Date
+            if let dateStr = result.createdAt {
+                Text(RumorDateHelper.relativeString(from: dateStr))
+                    .font(AppFonts.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+
+            Divider()
+
+            // Action buttons
+            HStack(spacing: AppDimensions.spacingS) {
+                // Convert to rumor
+                Button {
+                    HapticHelper.impact(.light)
+                    onAction(.convert)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "megaphone.fill")
+                            .font(.caption)
+                        Text(String(localized: "scanner.result.convert"))
+                            .font(AppFonts.badge)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppDimensions.spacingS)
+                    .foregroundStyle(.white)
+                    .background(AppColors.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                // Dismiss
+                Button {
+                    HapticHelper.impact(.light)
+                    onAction(.dismiss)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark")
+                            .font(.caption)
+                        Text(String(localized: "scanner.result.dismiss"))
+                            .font(AppFonts.badge)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppDimensions.spacingS)
+                    .foregroundStyle(AppColors.muted)
+                    .background(AppColors.muted.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(AppDimensions.cardPadding)
+        .cardStyle()
+    }
+
+    private func sourceIcon(for source: String) -> String {
+        switch source.lowercased() {
+        case "google": return "magnifyingglass"
+        case "twitter": return "at"
+        case "facebook": return "person.2.fill"
+        case "news": return "newspaper.fill"
+        default: return "globe"
+        }
+    }
+
+    private func resultStatusColor(for status: String) -> Color {
+        switch status.lowercased() {
+        case "new", "pending": return AppColors.info
+        case "reviewed": return AppColors.success
+        case "dismissed": return AppColors.muted
+        case "converted": return AppColors.accent
+        default: return AppColors.muted
+        }
+    }
+}
+
+// MARK: - Relevance Score View
+
+/// Barre de score de pertinence coloree
+private struct RelevanceScoreView: View {
+    let score: Double
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // Score bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(AppColors.muted.opacity(0.2))
+                        .frame(height: 6)
+
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(scoreColor)
+                        .frame(width: geometry.size.width * CGFloat(min(score, 1.0)), height: 6)
+                }
+            }
+            .frame(width: 60, height: 6)
+
+            // Percentage
+            Text(String(format: "%.0f%%", score * 100))
+                .font(AppFonts.badge)
+                .foregroundStyle(scoreColor)
+        }
+    }
+
+    private var scoreColor: Color {
+        if score >= 0.8 { return AppColors.danger }
+        if score >= 0.6 { return AppColors.warning }
+        if score >= 0.4 { return AppColors.info }
+        return AppColors.muted
     }
 }
 

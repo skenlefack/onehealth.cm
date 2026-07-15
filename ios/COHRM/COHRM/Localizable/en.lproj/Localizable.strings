@@ -360,3 +360,72 @@
 "notifications.status.sent" = "Sent";
 "notifications.status.failed" = "Failed";
 "notifications.status.pending" = "Pending";
+
+// ========================================
+// PHOTOS
+// ========================================
+"photos.empty" = "No photos";
+"photos.load_error" = "Unable to load photo";
+
+// ========================================
+// FEEDBACK
+// ========================================
+"feedback.title" = "Feedback";
+"feedback.type.positive" = "Positive";
+"feedback.type.negative" = "Negative";
+"feedback.type.suggestion" = "Suggestion";
+"feedback.type.question" = "Question";
+"feedback.type.followup" = "Follow-up";
+
+// ========================================
+// PROFILE
+// ========================================
+"settings.profile.header" = "My account";
+"settings.profile.title" = "My profile";
+"settings.profile.subtitle" = "Edit your personal information";
+"profile.title" = "My profile";
+"profile.info.header" = "Personal information";
+"profile.info.footer" = "This information is linked to your COHRM account.";
+"profile.first_name" = "First name";
+"profile.first_name.placeholder" = "Your first name";
+"profile.last_name" = "Last name";
+"profile.last_name.placeholder" = "Your last name";
+"profile.phone" = "Phone";
+"profile.phone.placeholder" = "+237 6XX XXX XXX";
+"profile.save" = "Save";
+"profile.save.success" = "Profile updated successfully.";
+"profile.save.error" = "Error updating profile.";
+"profile.password.header" = "Security";
+"profile.password.footer" = "Password must be at least 6 characters.";
+"profile.current_password" = "Current password";
+"profile.current_password.placeholder" = "Enter your current password";
+"profile.new_password" = "New password";
+"profile.new_password.placeholder" = "Minimum 6 characters";
+"profile.confirm_password" = "Confirm password";
+"profile.confirm_password.placeholder" = "Repeat the new password";
+"profile.password_mismatch" = "Passwords do not match.";
+"profile.change_password" = "Change password";
+"profile.password.success" = "Password changed successfully.";
+"profile.password.error" = "Error changing password.";
+
+// ========================================
+// REPORTS
+// ========================================
+"reports.title" = "Reports";
+"reports.period" = "Period";
+"reports.total" = "Total";
+"reports.resolved" = "Resolved";
+"reports.pending" = "Pending";
+"reports.high_risk" = "High risk";
+"reports.avg_resolution" = "Average resolution time";
+"reports.by_status" = "By status";
+"reports.by_region" = "By region";
+"reports.no_data" = "No data available";
+"reports.error.title" = "Loading error";
+"reports.error.load" = "Unable to load reports.";
+
+// ========================================
+// HOME - REPORTS
+// ========================================
+"home.reports.title" = "Statistical reports";
+"home.reports.subtitle" = "View statistics and trends";

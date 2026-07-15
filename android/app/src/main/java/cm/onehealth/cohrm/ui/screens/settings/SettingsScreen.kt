@@ -59,6 +59,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit = {},
+    onNotificationPrefs: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val theme by viewModel.theme.collectAsStateWithLifecycle()
@@ -213,6 +214,13 @@ fun SettingsScreen(
                         checked = rumorNotif,
                         onCheckedChange = { viewModel.setRumorNotif(it) },
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onNotificationPrefs,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.notif_prefs_manage))
+                    }
                 }
             }
 
