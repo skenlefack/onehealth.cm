@@ -20,8 +20,13 @@ import cm.onehealth.cohrm.data.remote.dto.DeviceRegistrationRequest
 import cm.onehealth.cohrm.data.remote.dto.GenericResponse
 import cm.onehealth.cohrm.data.remote.dto.ProfileResponse
 import cm.onehealth.cohrm.data.remote.dto.ProfileUpdateRequest
+import cm.onehealth.cohrm.data.remote.dto.PublicReportRequest
+import cm.onehealth.cohrm.data.remote.dto.RegionsResponse
+import cm.onehealth.cohrm.data.remote.dto.ReportSummaryResponse
+import cm.onehealth.cohrm.data.remote.dto.ScannerConfigResponse
 import cm.onehealth.cohrm.data.remote.dto.SmsRequest
 import cm.onehealth.cohrm.data.remote.dto.SyncResponse
+import cm.onehealth.cohrm.data.remote.dto.TrackingResponse
 import cm.onehealth.cohrm.data.remote.dto.ValidationRequest
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -30,6 +35,7 @@ import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -142,4 +148,34 @@ interface ApiService {
     // Device registration (FCM)
     @POST("mobile/device/register")
     suspend fun registerDevice(@Body request: DeviceRegistrationRequest): GenericResponse
+
+    // Public form (no auth)
+    @POST("cohrm/public/report")
+    suspend fun submitPublicReport(@Body request: PublicReportRequest): ReportResponse
+
+    @GET("cohrm/public/track/{code}")
+    suspend fun trackPublicReport(@Path("code") code: String): TrackingResponse
+
+    @GET("cohrm/public/regions")
+    suspend fun getPublicRegions(): RegionsResponse
+
+    // Reports summary
+    @GET("cohrm/reports/summary")
+    suspend fun getReportSummary(
+        @Query("date_from") dateFrom: String?,
+        @Query("date_to") dateTo: String?,
+        @Query("region") region: String?,
+        @Query("group_by") groupBy: String? = "day",
+    ): ReportSummaryResponse
+
+    // Scanner config
+    @GET("cohrm/scanner/config")
+    suspend fun getScannerConfig(): ScannerConfigResponse
+
+    // Notifications mark read
+    @PUT("cohrm/notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: Int): GenericResponse
+
+    @PUT("cohrm/notifications/read-all")
+    suspend fun markAllNotificationsRead(): GenericResponse
 }

@@ -72,4 +72,29 @@ final class NotificationsViewModel {
     func refresh() async {
         await loadNotifications(page: 1)
     }
+
+    // MARK: - Actions
+
+    /// Marque une notification comme lue
+    func markAsRead(id: Int) async {
+        do {
+            let _ = try await APIService.shared.markNotificationRead(id: id)
+            // Retirer la notification de la liste locale ou la mettre à jour
+            if let index = notifications.firstIndex(where: { $0.id == id }) {
+                notifications.remove(at: index)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Marque toutes les notifications comme lues
+    func markAllAsRead() async {
+        do {
+            let _ = try await APIService.shared.markAllNotificationsRead()
+            notifications.removeAll()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }

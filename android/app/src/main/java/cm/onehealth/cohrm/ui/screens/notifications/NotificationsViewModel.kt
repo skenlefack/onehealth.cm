@@ -107,6 +107,38 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
+    fun markAsRead(id: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.markNotificationRead(id)
+                if (response.success) {
+                    _state.update { current ->
+                        val updated = current.notifications.map { notification ->
+                            if (notification.id == id) notification.copy(status = "read") else notification
+                        }
+                        current.copy(notifications = updated)
+                    }
+                    _unreadCount.value = _state.value.notifications.count { it.status == "pending" }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun markAllAsRead() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.markAllNotificationsRead()
+                if (response.success) {
+                    _state.update { current ->
+                        val updated = current.notifications.map { it.copy(status = "read") }
+                        current.copy(notifications = updated)
+                    }
+                    _unreadCount.value = 0
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(isRefreshing = true, error = null) }

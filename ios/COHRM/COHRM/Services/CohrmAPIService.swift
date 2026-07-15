@@ -196,4 +196,23 @@ actor CohrmAPIService {
             responseType: APIResponse<[NotificationDTO]>.self
         )
     }
+
+    /// Marque une notification comme lue
+    /// - Parameter id: Identifiant de la notification
+    /// - Returns: Reponse de confirmation
+    func markNotificationRead(id: Int) async throws -> APIResponse<EmptyDTO> {
+        return try await client.put(
+            Endpoints.markNotificationRead(id),
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
+
+    /// Marque toutes les notifications comme lues
+    /// - Returns: Reponse de confirmation
+    func markAllNotificationsRead() async throws -> APIResponse<EmptyDTO> {
+        return try await client.put(
+            Endpoints.markAllNotificationsRead,
+            responseType: APIResponse<EmptyDTO>.self
+        )
+    }
 }

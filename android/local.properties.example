@@ -1,0 +1,14 @@
+# Android SDK location (set automatically by Android Studio)
+sdk.dir=/path/to/Android/Sdk
+
+# Google Maps API key — required for map screens
+# Get one from: https://console.cloud.google.com/google/maps-apis
+# Restrict it to package "cm.onehealth.cohrm" + your debug/release SHA-1
+MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY_HERE
+
+# Release signing — only needed to build a signed release APK/AAB
+# The keystore file path is relative to the android/ project root
+KEYSTORE_FILE=keystore/cohrm-release.jks
+KEYSTORE_PASSWORD=YOUR_KEYSTORE_PASSWORD
+KEY_ALIAS=cohrm-release
+KEY_PASSWORD=YOUR_KEY_PASSWORD

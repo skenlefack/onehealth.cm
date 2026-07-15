@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Identifiant du bundle -->
+	<key>CFBundleIdentifier</key>
+	<string>cm.onehealth.cohrm</string>
+
+	<!-- Nom de l'application -->
+	<key>CFBundleDisplayName</key>
+	<string>COHRM Cameroun</string>
+
+	<key>CFBundleName</key>
+	<string>COHRM</string>
+
+	<!-- Version -->
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+
+	<key>CFBundleVersion</key>
+	<string>1</string>
+
+	<!-- Langues supportées -->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>fr</string>
+
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>fr</string>
+		<string>en</string>
+	</array>
+
+	<!-- ================================ -->
+	<!-- PERMISSIONS (descriptions requises par Apple) -->
+	<!-- ================================ -->
+
+	<!-- Localisation - Utilisation en cours -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>COHRM utilise votre position pour localiser automatiquement le lieu du signalement sanitaire. Cela permet aux autorités de santé d'intervenir rapidement dans la zone concernée.</string>
+
+	<!-- Caméra -->
+	<key>NSCameraUsageDescription</key>
+	<string>COHRM peut utiliser l'appareil photo pour prendre des photos illustrant un événement sanitaire signalé. Ces photos sont envoyées de manière sécurisée aux autorités de santé.</string>
+
+	<!-- Bibliothèque de photos -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>COHRM peut accéder à vos photos pour joindre des images pertinentes à un signalement sanitaire. Seules les photos que vous sélectionnez sont utilisées.</string>
+
+	<!-- Ajout à la bibliothèque photos -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>COHRM peut sauvegarder des photos dans votre bibliothèque.</string>
+
+	<!-- ================================ -->
+	<!-- TÂCHES D'ARRIÈRE-PLAN -->
+	<!-- ================================ -->
+
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>cm.onehealth.cohrm.sync</string>
+	</array>
+
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+
+	<!-- ================================ -->
+	<!-- TRANSPORT (ATS) -->
+	<!-- ================================ -->
+
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- En production, utiliser HTTPS strict -->
+		<!-- Exception pour le développement local -->
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+
+	<!-- ================================ -->
+	<!-- ORIENTATIONS SUPPORTÉES -->
+	<!-- ================================ -->
+
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- ================================ -->
+	<!-- APPARENCE -->
+	<!-- ================================ -->
+
+	<!-- Supporter le Dark Mode -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Automatic</string>
+
+	<!-- Barre de statut -->
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+</dict>
+</plist>

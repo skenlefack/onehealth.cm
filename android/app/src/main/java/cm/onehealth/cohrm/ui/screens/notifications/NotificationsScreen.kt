@@ -1,6 +1,7 @@
 package cm.onehealth.cohrm.ui.screens.notifications
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,6 +89,13 @@ fun NotificationsScreen(
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.notifications_back))
+                }
+            },
+            actions = {
+                if (state.notifications.any { it.status == "pending" }) {
+                    TextButton(onClick = { viewModel.markAllAsRead() }) {
+                        Text(stringResource(R.string.public_report_mark_all_read))
+                    }
                 }
             },
         )
@@ -182,7 +190,14 @@ fun NotificationsScreen(
                         item { Spacer(modifier = Modifier.height(4.dp)) }
 
                         items(state.notifications, key = { it.id }) { notification ->
-                            NotificationCard(notification = notification)
+                            NotificationCard(
+                                notification = notification,
+                                onMarkRead = {
+                                    if (notification.status == "pending") {
+                                        viewModel.markAsRead(notification.id)
+                                    }
+                                },
+                            )
                         }
 
                         if (state.isLoadingMore) {
@@ -207,11 +222,16 @@ fun NotificationsScreen(
 }
 
 @Composable
-private fun NotificationCard(notification: NotificationItem) {
+private fun NotificationCard(
+    notification: NotificationItem,
+    onMarkRead: () -> Unit = {},
+) {
     val (icon, iconColor) = getNotificationTypeIcon(notification.notificationType)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onMarkRead() },
         colors = CardDefaults.cardColors(
             containerColor = if (notification.status == "pending") {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)

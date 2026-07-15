@@ -83,4 +83,38 @@ enum Endpoints {
     /// Mes notifications
     /// GET /cohrm/notifications/my
     static let myNotifications = "/cohrm/notifications/my"
+
+    /// Marquer une notification comme lue
+    /// PUT /cohrm/notifications/:id/read
+    static func markNotificationRead(_ id: Int) -> String { "/cohrm/notifications/\(id)/read" }
+
+    /// Marquer toutes les notifications comme lues
+    /// PUT /cohrm/notifications/read-all
+    static let markAllNotificationsRead = "/cohrm/notifications/read-all"
+
+    // MARK: - Public (sans authentification)
+
+    /// Soumettre un signalement public
+    /// POST /cohrm/public/report
+    static let publicReport = "/cohrm/public/report"
+
+    /// Suivre un signalement public par code
+    /// GET /cohrm/public/track/:code
+    static func publicTrack(_ code: String) -> String { "/cohrm/public/track/\(code)" }
+
+    /// Liste des régions publiques
+    /// GET /cohrm/public/regions
+    static let publicRegions = "/cohrm/public/regions"
+
+    // MARK: - Reports
+
+    /// Résumé des signalements
+    /// GET /cohrm/reports/summary
+    static let reportsSummary = "/cohrm/reports/summary"
+
+    // MARK: - Scanner Config
+
+    /// Configuration du scanner
+    /// GET /cohrm/scanner/config
+    static let scannerConfig = "/cohrm/scanner/config"
 }
