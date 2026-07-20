@@ -62,6 +62,9 @@ ALTER TABLE expertise_domains ADD COLUMN parent_id INT;
 ALTER TABLE expertise_domains ADD COLUMN display_order INT DEFAULT 0;
 ALTER TABLE expertise_domains ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
+-- Ensure category ENUM includes all needed values
+ALTER TABLE expertise_domains MODIFY COLUMN category ENUM('health','animal','environment','laboratory','management','human_health','animal_health','environmental_health','food_safety','epidemiology','policy','communication','other') DEFAULT 'other';
+
 -- Pre-populate One Health related expertise domains
 INSERT INTO expertise_domains (name, name_en, slug, category, description, color, display_order) VALUES
 -- Sante Humaine
