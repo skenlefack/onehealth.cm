@@ -1,59 +1,31 @@
--- Fix human_resources table for MySQL 8.0 (no IF NOT EXISTS for columns)
--- This uses stored procedure to safely add columns
+-- Fix human_resources table for MySQL 8.0
+-- Simplified version without DELIMITER (for migration runner compatibility)
+-- All ADD COLUMN will be safely skipped if columns already exist (ER_DUP_FIELDNAME)
 
-DELIMITER //
-
-DROP PROCEDURE IF EXISTS add_column_if_not_exists//
-
-CREATE PROCEDURE add_column_if_not_exists(
-    IN table_name_param VARCHAR(100),
-    IN column_name_param VARCHAR(100),
-    IN column_definition VARCHAR(500)
-)
-BEGIN
-    DECLARE column_exists INT DEFAULT 0;
-
-    SELECT COUNT(*) INTO column_exists
-    FROM information_schema.columns
-    WHERE table_schema = DATABASE()
-      AND table_name = table_name_param
-      AND column_name = column_name_param;
-
-    IF column_exists = 0 THEN
-        SET @sql = CONCAT('ALTER TABLE ', table_name_param, ' ADD COLUMN ', column_name_param, ' ', column_definition);
-        PREPARE stmt FROM @sql;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END//
-
-DELIMITER ;
-
--- Add columns to human_resources
-CALL add_column_if_not_exists('human_resources', 'years_experience', 'INT DEFAULT 0');
-CALL add_column_if_not_exists('human_resources', 'cv_url', 'VARCHAR(500)');
-CALL add_column_if_not_exists('human_resources', 'linkedin_url', 'VARCHAR(255)');
-CALL add_column_if_not_exists('human_resources', 'twitter_url', 'VARCHAR(255)');
-CALL add_column_if_not_exists('human_resources', 'orcid_id', 'VARCHAR(50)');
-CALL add_column_if_not_exists('human_resources', 'google_scholar_url', 'VARCHAR(255)');
-CALL add_column_if_not_exists('human_resources', 'researchgate_url', 'VARCHAR(255)');
-CALL add_column_if_not_exists('human_resources', 'website', 'VARCHAR(255)');
-CALL add_column_if_not_exists('human_resources', 'languages', 'JSON');
-CALL add_column_if_not_exists('human_resources', 'education', 'JSON');
-CALL add_column_if_not_exists('human_resources', 'certifications', 'JSON');
-CALL add_column_if_not_exists('human_resources', 'publications_count', 'INT DEFAULT 0');
-CALL add_column_if_not_exists('human_resources', 'projects_count', 'INT DEFAULT 0');
-CALL add_column_if_not_exists('human_resources', 'awards', 'TEXT');
-CALL add_column_if_not_exists('human_resources', 'research_interests', 'TEXT');
-CALL add_column_if_not_exists('human_resources', 'available_for_collaboration', 'BOOLEAN DEFAULT TRUE');
-CALL add_column_if_not_exists('human_resources', 'consultation_rate', 'VARCHAR(100)');
-CALL add_column_if_not_exists('human_resources', 'expertise_summary', 'TEXT');
-CALL add_column_if_not_exists('human_resources', 'submitted_by', 'INT NULL');
-CALL add_column_if_not_exists('human_resources', 'submission_status', "ENUM('draft', 'pending', 'approved', 'rejected') DEFAULT 'approved'");
-CALL add_column_if_not_exists('human_resources', 'submitted_at', 'DATETIME NULL');
-CALL add_column_if_not_exists('human_resources', 'validated_by', 'INT NULL');
-CALL add_column_if_not_exists('human_resources', 'validated_at', 'DATETIME NULL');
-CALL add_column_if_not_exists('human_resources', 'rejection_reason', 'TEXT NULL');
+ALTER TABLE human_resources ADD COLUMN years_experience INT DEFAULT 0;
+ALTER TABLE human_resources ADD COLUMN cv_url VARCHAR(500);
+ALTER TABLE human_resources ADD COLUMN linkedin_url VARCHAR(255);
+ALTER TABLE human_resources ADD COLUMN twitter_url VARCHAR(255);
+ALTER TABLE human_resources ADD COLUMN orcid_id VARCHAR(50);
+ALTER TABLE human_resources ADD COLUMN google_scholar_url VARCHAR(255);
+ALTER TABLE human_resources ADD COLUMN researchgate_url VARCHAR(255);
+ALTER TABLE human_resources ADD COLUMN website VARCHAR(255);
+ALTER TABLE human_resources ADD COLUMN languages JSON;
+ALTER TABLE human_resources ADD COLUMN education JSON;
+ALTER TABLE human_resources ADD COLUMN certifications JSON;
+ALTER TABLE human_resources ADD COLUMN publications_count INT DEFAULT 0;
+ALTER TABLE human_resources ADD COLUMN projects_count INT DEFAULT 0;
+ALTER TABLE human_resources ADD COLUMN awards TEXT;
+ALTER TABLE human_resources ADD COLUMN research_interests TEXT;
+ALTER TABLE human_resources ADD COLUMN available_for_collaboration BOOLEAN DEFAULT TRUE;
+ALTER TABLE human_resources ADD COLUMN consultation_rate VARCHAR(100);
+ALTER TABLE human_resources ADD COLUMN expertise_summary TEXT;
+ALTER TABLE human_resources ADD COLUMN submitted_by INT NULL;
+ALTER TABLE human_resources ADD COLUMN submission_status ENUM('draft', 'pending', 'approved', 'rejected') DEFAULT 'approved';
+ALTER TABLE human_resources ADD COLUMN submitted_at DATETIME NULL;
+ALTER TABLE human_resources ADD COLUMN validated_by INT NULL;
+ALTER TABLE human_resources ADD COLUMN validated_at DATETIME NULL;
+ALTER TABLE human_resources ADD COLUMN rejection_reason TEXT NULL;
 
 -- Create admin_notifications table if not exists
 CREATE TABLE IF NOT EXISTS admin_notifications (
@@ -97,8 +69,3 @@ CREATE TABLE IF NOT EXISTS expert_expertise (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY unique_expert_expertise (expert_id, expertise_domain_id)
 );
-
--- Clean up procedure
-DROP PROCEDURE IF EXISTS add_column_if_not_exists;
-
-SELECT 'Migration completed successfully!' as status;

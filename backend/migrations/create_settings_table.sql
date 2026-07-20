@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Add columns that may be missing
+ALTER TABLE settings ADD COLUMN autoload TINYINT(1) DEFAULT 1;
+ALTER TABLE settings ADD COLUMN setting_group VARCHAR(100) DEFAULT 'general';
+
 -- Insert default settings
 INSERT IGNORE INTO settings (setting_key, setting_value, setting_group, autoload) VALUES
 ('site_name', 'One Health Cameroon', 'general', 1),
