@@ -11,6 +11,9 @@ const SAFE_ERRORS = [
   'ER_DUP_KEYNAME',
   'ER_CANT_DROP_FIELD_OR_KEY',
   'ER_MULTIPLE_PRI_KEY',
+  'ER_FK_DUP_NAME',
+  'ER_NONEXISTING_GRANT',
+  'ER_CHECK_CONSTRAINT_VIOLATED',
 ];
 
 async function ensureSchemaTable(pool) {
