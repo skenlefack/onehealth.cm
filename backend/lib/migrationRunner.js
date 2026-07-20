@@ -43,7 +43,69 @@ function getMigrationFiles() {
     });
 }
 
+/**
+ * Preprocess SQL to fix MySQL 8.0 incompatibilities:
+ * - Remove "IF NOT EXISTS" from ALTER TABLE ADD COLUMN (MariaDB-only syntax)
+ * - Split multi-ADD-COLUMN ALTER TABLE into individual statements
+ */
+function preprocessSql(sql) {
+  // Remove "IF NOT EXISTS" from ADD COLUMN (not supported in MySQL 8.0)
+  sql = sql.replace(/ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS/gi, 'ADD COLUMN');
+  // Remove "IF NOT EXISTS" from ADD INDEX / ADD CONSTRAINT
+  sql = sql.replace(/ADD\s+INDEX\s+IF\s+NOT\s+EXISTS/gi, 'ADD INDEX');
+  sql = sql.replace(/ADD\s+CONSTRAINT\s+IF\s+NOT\s+EXISTS/gi, 'ADD CONSTRAINT');
+  // CREATE INDEX IF NOT EXISTS is not supported in MySQL < 8.0.29
+  sql = sql.replace(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/gi, 'CREATE INDEX');
+  return sql;
+}
+
+/**
+ * Split multi-ADD-COLUMN ALTER TABLE statements into individual ALTER statements.
+ * e.g. "ALTER TABLE t ADD COLUMN a INT, ADD COLUMN b INT;" becomes two statements.
+ */
+function expandAlterStatements(statements) {
+  const result = [];
+  for (const stmt of statements) {
+    // Match ALTER TABLE ... with multiple ADD COLUMN clauses
+    const alterMatch = stmt.match(/^(ALTER\s+TABLE\s+\S+)\s+(ADD\s+.+)/is);
+    if (alterMatch) {
+      const prefix = alterMatch[1]; // "ALTER TABLE tablename"
+      const body = alterMatch[2];
+      // Split on comma followed by ADD (but not commas inside parentheses like ENUM)
+      const parts = [];
+      let depth = 0;
+      let current = '';
+      for (let i = 0; i < body.length; i++) {
+        const ch = body[i];
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+        else if (ch === ',' && depth === 0) {
+          // Check if next non-whitespace starts with ADD
+          const rest = body.substring(i + 1).trimStart();
+          if (/^ADD\s/i.test(rest)) {
+            parts.push(current.trim());
+            current = '';
+            continue;
+          }
+        }
+        current += ch;
+      }
+      if (current.trim()) parts.push(current.trim());
+
+      if (parts.length > 1) {
+        for (const part of parts) {
+          result.push(`${prefix} ${part}`);
+        }
+        continue;
+      }
+    }
+    result.push(stmt);
+  }
+  return result;
+}
+
 function splitStatements(sql) {
+  sql = preprocessSql(sql);
   // Remove full-line comments and split on semicolons followed by newline
   const lines = sql.split('\n');
   let current = '';
@@ -70,7 +132,7 @@ function splitStatements(sql) {
     statements.push(remaining);
   }
 
-  return statements;
+  return expandAlterStatements(statements);
 }
 
 async function getAppliedMigrations(pool) {
