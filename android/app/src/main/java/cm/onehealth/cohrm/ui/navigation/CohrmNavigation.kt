@@ -58,6 +58,7 @@ import cm.onehealth.cohrm.ui.screens.publicreport.PublicReportScreen
 import cm.onehealth.cohrm.ui.screens.sms.SmsReportScreen
 import cm.onehealth.cohrm.ui.screens.splash.SplashScreen
 import cm.onehealth.cohrm.ui.screens.validation.ValidationScreen
+import cm.onehealth.cohrm.util.NetworkMonitor
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.datastore.preferences.core.edit
 import dagger.hilt.EntryPoint
@@ -106,6 +107,7 @@ data class BottomNavItem(
 interface DataStoreEntryPoint {
     fun dataStore(): DataStore<Preferences>
     fun authInterceptor(): AuthInterceptor
+    fun networkMonitor(): NetworkMonitor
 }
 
 private val baseNavItems = listOf(
@@ -126,8 +128,17 @@ fun CohrmNavigation() {
     val notificationsViewModel: NotificationsViewModel = hiltViewModel()
     val notificationCount by notificationsViewModel.unreadCount.collectAsStateWithLifecycle()
 
-    // Read user info and scanner access from DataStore - re-check when navigation changes
+    // Network connectivity monitoring
     val context = LocalContext.current
+    val networkEntryPoint = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            DataStoreEntryPoint::class.java,
+        )
+    }
+    val isOnline by networkEntryPoint.networkMonitor().isOnline.collectAsStateWithLifecycle()
+
+    // Read user info and scanner access from DataStore - re-check when navigation changes
     var showScanner by remember { mutableStateOf(false) }
     var userName by remember { mutableStateOf("") }
     var userRole by remember { mutableStateOf("") }
@@ -175,6 +186,7 @@ fun CohrmNavigation() {
                     onProfileClick = { navController.navigate(Routes.PROFILE) },
                     onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                     notificationCount = notificationCount,
+                    isOnline = isOnline,
                     onLogout = {
                         // Clear token cache and DataStore, then navigate to login
                         val entryPoint = EntryPointAccessors.fromApplication(

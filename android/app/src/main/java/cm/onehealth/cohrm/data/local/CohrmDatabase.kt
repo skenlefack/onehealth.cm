@@ -7,10 +7,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import cm.onehealth.cohrm.data.local.dao.PhotoDao
 import cm.onehealth.cohrm.data.local.dao.ReferenceDataDao
 import cm.onehealth.cohrm.data.local.dao.ReportDao
+import cm.onehealth.cohrm.data.local.dao.RumorDao
 import cm.onehealth.cohrm.data.local.dao.ScanDao
 import cm.onehealth.cohrm.data.local.entity.PhotoEntity
 import cm.onehealth.cohrm.data.local.entity.ReferenceDataEntity
 import cm.onehealth.cohrm.data.local.entity.ReportEntity
+import cm.onehealth.cohrm.data.local.entity.RumorEntity
 import cm.onehealth.cohrm.data.local.entity.ScanEntity
 import cm.onehealth.cohrm.data.local.entity.ScanResultEntity
 
@@ -21,8 +23,9 @@ import cm.onehealth.cohrm.data.local.entity.ScanResultEntity
         ReferenceDataEntity::class,
         ScanEntity::class,
         ScanResultEntity::class,
+        RumorEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class CohrmDatabase : RoomDatabase() {
@@ -30,6 +33,7 @@ abstract class CohrmDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun referenceDataDao(): ReferenceDataDao
     abstract fun scanDao(): ScanDao
+    abstract fun rumorDao(): RumorDao
 
     companion object {
         const val DATABASE_NAME = "cohrm_database"
@@ -44,6 +48,40 @@ abstract class CohrmDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE reports ADD COLUMN arrondissement TEXT NOT NULL DEFAULT ''")
                 database.execSQL("ALTER TABLE reports ADD COLUMN commune TEXT NOT NULL DEFAULT ''")
                 database.execSQL("ALTER TABLE reports ADD COLUMN aireSante TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS rumors (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        code TEXT NOT NULL DEFAULT '',
+                        title TEXT NOT NULL DEFAULT '',
+                        description TEXT NOT NULL DEFAULT '',
+                        category TEXT NOT NULL DEFAULT '',
+                        species TEXT,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        priority TEXT NOT NULL DEFAULT 'medium',
+                        riskLevel TEXT NOT NULL DEFAULT 'unknown',
+                        source TEXT NOT NULL DEFAULT 'mobile',
+                        region TEXT NOT NULL DEFAULT '',
+                        department TEXT NOT NULL DEFAULT '',
+                        district TEXT,
+                        latitude REAL,
+                        longitude REAL,
+                        symptoms TEXT,
+                        affectedCount INTEGER,
+                        reporterName TEXT,
+                        reporterPhone TEXT,
+                        createdAt TEXT NOT NULL DEFAULT '',
+                        updatedAt TEXT,
+                        assignedTo INTEGER,
+                        assignedName TEXT,
+                        createdByName TEXT,
+                        cachedAt INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
             }
         }
 

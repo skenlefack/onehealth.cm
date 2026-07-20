@@ -6,6 +6,7 @@ import cm.onehealth.cohrm.data.local.CohrmDatabase
 import cm.onehealth.cohrm.data.local.dao.PhotoDao
 import cm.onehealth.cohrm.data.local.dao.ReferenceDataDao
 import cm.onehealth.cohrm.data.local.dao.ReportDao
+import cm.onehealth.cohrm.data.local.dao.RumorDao
 import cm.onehealth.cohrm.data.local.dao.ScanDao
 import dagger.Module
 import dagger.Provides
@@ -26,7 +27,11 @@ object DatabaseModule {
             CohrmDatabase::class.java,
             CohrmDatabase.DATABASE_NAME,
         )
-            .addMigrations(CohrmDatabase.MIGRATION_1_2, CohrmDatabase.MIGRATION_2_3)
+            .addMigrations(
+                CohrmDatabase.MIGRATION_1_2,
+                CohrmDatabase.MIGRATION_2_3,
+                CohrmDatabase.MIGRATION_3_4,
+            )
             .fallbackToDestructiveMigration()
             .build()
 
@@ -41,4 +46,7 @@ object DatabaseModule {
 
     @Provides
     fun provideScanDao(db: CohrmDatabase): ScanDao = db.scanDao()
+
+    @Provides
+    fun provideRumorDao(db: CohrmDatabase): RumorDao = db.rumorDao()
 }

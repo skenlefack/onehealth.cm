@@ -59,6 +59,10 @@ fun ReportWizardScreen(
                     Toast.makeText(context, context.getString(R.string.report_submitted), Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
+                is ReportEvent.Queued -> {
+                    Toast.makeText(context, context.getString(R.string.report_queued_offline), Toast.LENGTH_LONG).show()
+                    onFinished()
+                }
                 is ReportEvent.Error -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }

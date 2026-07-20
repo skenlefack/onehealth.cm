@@ -17,6 +17,8 @@ const { v4: uuidv4 } = require('uuid');
 
 // Service de notifications COHRM
 const cohrmNotificationService = require('../services/cohrmNotificationService');
+const { sendSMS, smsTemplates } = require('../services/smsService');
+const { registerDeviceToken, unregisterDeviceToken } = require('../services/pushService');
 
 // Multer pour upload de photos
 const multer = require('multer');
@@ -1402,7 +1404,13 @@ router.get('/scanner/config', auth, async (req, res) => {
   try {
     const scannerService = require('../services/cohrmScannerService');
     const config = await scannerService.getConfig();
-    res.json({ success: true, data: config });
+    // Mask sensitive tokens in response (show only if configured)
+    const safeConfig = { ...config };
+    safeConfig.twitter_bearer_token = config.twitter_bearer_token ? '••••••••' + config.twitter_bearer_token.slice(-4) : '';
+    safeConfig.facebook_access_token = config.facebook_access_token ? '••••••••' + config.facebook_access_token.slice(-4) : '';
+    safeConfig.twitter_configured = !!config.twitter_bearer_token;
+    safeConfig.facebook_configured = !!config.facebook_access_token;
+    res.json({ success: true, data: safeConfig });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1412,12 +1420,22 @@ router.get('/scanner/config', auth, async (req, res) => {
 router.put('/scanner/config', auth, async (req, res) => {
   try {
     const settings = req.body;
+    // Sensitive keys that should be stored in DB but not logged
+    const sensitiveKeys = ['twitter_bearer_token', 'facebook_access_token'];
+
     for (const [key, value] of Object.entries(settings)) {
+      // Skip masked token values (user didn't change them)
+      if (sensitiveKeys.includes(key) && typeof value === 'string' && value.startsWith('••••')) {
+        continue;
+      }
       // Ne pas doubler le préfixe si la clé commence déjà par scanner_
       const dbKey = key.startsWith('scanner_') ? key : `scanner_${key}`;
+      const description = sensitiveKeys.includes(key)
+        ? `Scanner config: ${key} (sensitive)`
+        : `Scanner config: ${key}`;
       await db.query(
         "INSERT INTO cohrm_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?",
-        [dbKey, String(value), `Scanner config: ${key}`, String(value)]
+        [dbKey, String(value), description, String(value)]
       );
     }
 
@@ -2043,8 +2061,27 @@ router.post('/rumors/:id/feedback', auth, async (req, res) => {
         `, [emailError.message, result.insertId]);
       }
     } else if (channel === 'sms') {
-      // SMS non implémenté pour l'instant - marquer comme pending
-      console.log('SMS sending not yet implemented. Would send to:', recipient_phone);
+      try {
+        const smsMessage = smsTemplates.feedbackSent({
+          rumorCode,
+          message: message ? message.substring(0, 100) : feedback_type
+        });
+        const smsResult = await sendSMS(recipient_phone, smsMessage);
+
+        await db.query(`
+          UPDATE cohrm_feedback
+          SET status = ?, sent_at = ${smsResult.success ? 'NOW()' : 'NULL'},
+              error_message = ?
+          WHERE id = ?
+        `, [smsResult.success ? 'sent' : 'failed', smsResult.error || null, result.insertId]);
+      } catch (smsError) {
+        console.error('Error sending feedback SMS:', smsError);
+        await db.query(`
+          UPDATE cohrm_feedback
+          SET status = 'failed', error_message = ?
+          WHERE id = ?
+        `, [smsError.message, result.insertId]);
+      }
     }
 
     // Ajouter à l'historique de la rumeur
@@ -3022,6 +3059,55 @@ router.get('/my-pending-validations', auth, async (req, res) => {
 // ============================================
 // NOTIFICATIONS COHRM
 // ============================================
+
+// POST /api/cohrm/notifications/register-device - Register FCM device token
+router.post('/notifications/register-device', auth, async (req, res) => {
+  try {
+    const { token, platform, device_info } = req.body;
+
+    if (!token || !platform) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token et platform sont requis'
+      });
+    }
+
+    if (!['android', 'ios', 'web'].includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Platform doit être android, ios ou web'
+      });
+    }
+
+    const result = await registerDeviceToken(req.user.id, token, platform, device_info || null);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Token enregistré avec succès' });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Register device token error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/cohrm/notifications/unregister-device - Unregister FCM device token
+router.delete('/notifications/unregister-device', auth, async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token est requis' });
+    }
+
+    const result = await unregisterDeviceToken(token);
+    res.json({ success: true, message: 'Token supprimé' });
+  } catch (error) {
+    console.error('Unregister device token error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
 
 // GET /api/cohrm/notifications - Historique des notifications
 router.get('/notifications', auth, async (req, res) => {

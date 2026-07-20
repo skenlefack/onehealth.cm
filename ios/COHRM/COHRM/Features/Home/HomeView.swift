@@ -79,6 +79,12 @@ struct HomeView: View {
                             // Lien vers les rapports
                             reportsLink
 
+                            // Lien vers le scanner
+                            scannerLink
+
+                            // Lien vers les notifications
+                            notificationsLink
+
                             // Derniers signalements
                             recentReportsSection
                         }
@@ -212,8 +218,8 @@ struct HomeView: View {
     /// Bouton principal de signalement d'un événement
     private var reportCTASection: some View {
         NavigationLink {
-            // Navigation vers l'assistant de signalement
-            ReportWizardPlaceholderView()
+            ReportWizardView()
+                .environmentObject(networkMonitor)
         } label: {
             HStack(spacing: AppDimensions.spacingM) {
                 // Icône dans un cercle
@@ -340,8 +346,7 @@ struct HomeView: View {
     /// Lien de navigation vers le signalement par SMS
     private var smsReportLink: some View {
         NavigationLink {
-            // Navigation vers la vue de signalement SMS
-            SMSReportPlaceholderView()
+            SMSReportView()
         } label: {
             HStack(spacing: AppDimensions.spacingM) {
                 ZStack {
@@ -401,6 +406,88 @@ struct HomeView: View {
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(String(localized: "home.reports.subtitle"))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+            .padding(AppDimensions.cardPadding)
+            .cardStyle()
+        }
+        .opacity(isVisible ? 1.0 : 0.0)
+        .offset(y: isVisible ? 0 : 10)
+    }
+
+    // MARK: - Lien scanner
+
+    /// Lien de navigation vers le scanner de rumeurs
+    private var scannerLink: some View {
+        NavigationLink {
+            ScannerView()
+        } label: {
+            HStack(spacing: AppDimensions.spacingM) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous)
+                        .fill(AppColors.warning.opacity(0.12))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(AppColors.warning)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "home.scanner.title"))
+                        .font(AppFonts.headline)
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text(String(localized: "home.scanner.subtitle"))
+                        .font(AppFonts.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+            .padding(AppDimensions.cardPadding)
+            .cardStyle()
+        }
+        .opacity(isVisible ? 1.0 : 0.0)
+        .offset(y: isVisible ? 0 : 10)
+    }
+
+    // MARK: - Lien notifications
+
+    /// Lien de navigation vers les notifications
+    private var notificationsLink: some View {
+        NavigationLink {
+            NotificationsView()
+        } label: {
+            HStack(spacing: AppDimensions.spacingM) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusS, style: .continuous)
+                        .fill(AppColors.danger.opacity(0.12))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "bell.badge.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(AppColors.danger)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "home.notifications.title"))
+                        .font(AppFonts.headline)
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text(String(localized: "home.notifications.subtitle"))
                         .font(AppFonts.caption)
                         .foregroundStyle(AppColors.textSecondary)
                 }
@@ -584,56 +671,6 @@ private struct ReportRowView: View {
         }
         .padding(AppDimensions.cardPadding)
         .cardStyle()
-    }
-}
-
-// MARK: - Vues placeholder (à remplacer par les vraies vues)
-
-/// Placeholder pour la vue de signalement (ReportWizardView)
-/// Sera remplacée par la vraie implémentation dans Features/Report
-private struct ReportWizardPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: AppDimensions.spacingL) {
-            Image(systemName: "doc.badge.plus")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(AppColors.primary)
-
-            Text(String(localized: "home.cta.title"))
-                .font(AppFonts.title)
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text(String(localized: "report.wizard.placeholder"))
-                .font(AppFonts.callout)
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(AppDimensions.spacingXL)
-        .navigationTitle(String(localized: "home.cta.title"))
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-/// Placeholder pour la vue de signalement SMS
-/// Sera remplacée par la vraie implémentation dans Features/SMSReport
-private struct SMSReportPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: AppDimensions.spacingL) {
-            Image(systemName: "message.badge.waveform.fill")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(AppColors.accent)
-
-            Text(String(localized: "home.sms.title"))
-                .font(AppFonts.title)
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text(String(localized: "sms.report.placeholder"))
-                .font(AppFonts.callout)
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(AppDimensions.spacingXL)
-        .navigationTitle(String(localized: "home.sms.title"))
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

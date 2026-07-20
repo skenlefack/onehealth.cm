@@ -8,5 +8,13 @@ module.exports = {
     'lib/**/*.js',
   ],
   coverageDirectory: 'coverage',
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 50,
+      lines: 60,
+      statements: 60,
+    },
+  },
   verbose: true,
 };

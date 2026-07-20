@@ -1,0 +1,75 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build the iOS app"
+  lane :build do
+    build_app(
+      scheme: "COHRM",
+      workspace: "../COHRM/COHRM.xcworkspace",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "COHRM.ipa",
+      clean: true
+    )
+  end
+
+  desc "Build for development/testing"
+  lane :build_dev do
+    build_app(
+      scheme: "COHRM",
+      workspace: "../COHRM/COHRM.xcworkspace",
+      export_method: "development",
+      output_directory: "./build",
+      output_name: "COHRM-dev.ipa",
+      clean: true
+    )
+  end
+
+  desc "Run unit tests"
+  lane :test do
+    run_tests(
+      scheme: "COHRM",
+      workspace: "../COHRM/COHRM.xcworkspace",
+      devices: ["iPhone 15"],
+      clean: true
+    )
+  end
+
+  desc "Upload to TestFlight"
+  lane :deploy_testflight do
+    build
+
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      apple_id: "YOUR_APPLE_ID",
+      ipa: "./build/COHRM.ipa"
+    )
+  end
+
+  desc "Deploy to App Store"
+  lane :deploy_appstore do
+    build
+
+    deliver(
+      ipa: "./build/COHRM.ipa",
+      submit_for_review: false,
+      automatic_release: false,
+      force: true
+    )
+  end
+
+  desc "Increment build number"
+  lane :increment_build do
+    increment_build_number(
+      xcodeproj: "../COHRM/COHRM.xcodeproj"
+    )
+  end
+
+  desc "Increment version number"
+  lane :increment_version do |options|
+    increment_version_number(
+      bump_type: options[:bump] || "patch",
+      xcodeproj: "../COHRM/COHRM.xcodeproj"
+    )
+  end
+end

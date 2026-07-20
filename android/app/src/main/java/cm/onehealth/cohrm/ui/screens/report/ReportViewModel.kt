@@ -8,6 +8,7 @@ import cm.onehealth.cohrm.domain.model.Report
 import cm.onehealth.cohrm.domain.model.SyncStatus
 import cm.onehealth.cohrm.domain.repository.ReportRepository
 import cm.onehealth.cohrm.util.DeviceHelper
+import cm.onehealth.cohrm.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +50,8 @@ data class ReportFormState(
 sealed interface ReportEvent {
     data object Saved : ReportEvent
     data object Submitted : ReportEvent
+    /** Report was saved locally and will be sent when connectivity returns */
+    data object Queued : ReportEvent
     data class Error(val message: String) : ReportEvent
 }
 
@@ -56,6 +59,7 @@ sealed interface ReportEvent {
 class ReportViewModel @Inject constructor(
     private val reportRepository: ReportRepository,
     private val deviceHelper: DeviceHelper,
+    private val networkMonitor: NetworkMonitor,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -173,17 +177,25 @@ class ReportViewModel @Inject constructor(
                 val report = buildReport(SyncStatus.PENDING)
                 _state.update { it.copy(submissionProgress = 0.2f) }
                 val id = reportRepository.saveReport(report)
-                _state.update { it.copy(submissionProgress = 0.5f) }
-                val result = reportRepository.submitReport(id)
-                _state.update { it.copy(submissionProgress = 1f) }
-                if (result.isSuccess) {
-                    _events.emit(ReportEvent.Submitted)
+
+                if (!networkMonitor.isOnline.value) {
+                    // Offline: queue for later sync via SyncWorker
+                    _state.update { it.copy(submissionProgress = 1f) }
+                    _events.emit(ReportEvent.Queued)
                 } else {
-                    // Saved as pending, will sync later
-                    _events.emit(ReportEvent.Submitted)
+                    _state.update { it.copy(submissionProgress = 0.5f) }
+                    val result = reportRepository.submitReport(id)
+                    _state.update { it.copy(submissionProgress = 1f) }
+                    if (result.isSuccess) {
+                        _events.emit(ReportEvent.Submitted)
+                    } else {
+                        // Saved as pending, will sync later via SyncWorker
+                        _events.emit(ReportEvent.Queued)
+                    }
                 }
             } catch (e: Exception) {
-                _events.emit(ReportEvent.Error(e.message ?: "Unknown error"))
+                // Even on error, report is saved locally as PENDING
+                _events.emit(ReportEvent.Queued)
             } finally {
                 _state.update { it.copy(isSubmitting = false, submissionProgress = null) }
             }

@@ -1,5 +1,6 @@
 package cm.onehealth.cohrm.ui.screens.notifications
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.ReportProblem
@@ -33,10 +35,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -190,14 +195,16 @@ fun NotificationsScreen(
                         item { Spacer(modifier = Modifier.height(4.dp)) }
 
                         items(state.notifications, key = { it.id }) { notification ->
-                            NotificationCard(
-                                notification = notification,
-                                onMarkRead = {
-                                    if (notification.status == "pending") {
-                                        viewModel.markAsRead(notification.id)
-                                    }
-                                },
-                            )
+                            if (notification.status == "pending") {
+                                SwipeToMarkReadItem(
+                                    notification = notification,
+                                    onMarkRead = { viewModel.markAsRead(notification.id) },
+                                )
+                            } else {
+                                NotificationCard(
+                                    notification = notification,
+                                )
+                            }
                         }
 
                         if (state.isLoadingMore) {
@@ -218,6 +225,71 @@ fun NotificationsScreen(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToMarkReadItem(
+    notification: NotificationItem,
+    onMarkRead: () -> Unit,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart ||
+                value == SwipeToDismissBoxValue.StartToEnd
+            ) {
+                onMarkRead()
+                true
+            } else {
+                false
+            }
+        },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            val color by animateColorAsState(
+                targetValue = when (dismissState.targetValue) {
+                    SwipeToDismissBoxValue.Settled -> Color.Transparent
+                    else -> Color(0xFF4CAF50).copy(alpha = 0.85f)
+                },
+                label = "swipe_bg_color",
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(color)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd) {
+                    Alignment.CenterStart
+                } else {
+                    Alignment.CenterEnd
+                },
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.DoneAll,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.notifications_mark_read),
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        },
+    ) {
+        NotificationCard(
+            notification = notification,
+            onMarkRead = onMarkRead,
+        )
     }
 }
 

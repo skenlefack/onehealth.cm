@@ -25,6 +25,20 @@ struct NotificationsView: View {
         }
         .navigationTitle(String(localized: "notifications.title"))
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if !viewModel.notifications.isEmpty {
+                    Button {
+                        Task { await viewModel.markAllAsRead() }
+                    } label: {
+                        Label(
+                            String(localized: "notifications.mark_all_read"),
+                            systemImage: "checkmark.circle"
+                        )
+                    }
+                }
+            }
+        }
         .refreshable {
             await viewModel.refresh()
         }
@@ -42,6 +56,19 @@ struct NotificationsView: View {
             LazyVStack(spacing: AppDimensions.spacingS) {
                 ForEach(viewModel.notifications) { notification in
                     NotificationRowView(notification: notification)
+                        .swipeActions(edge: .trailing) {
+                            if !notification.isRead {
+                                Button {
+                                    Task { await viewModel.markAsRead(id: notification.id) }
+                                } label: {
+                                    Label(
+                                        String(localized: "notifications.mark_read"),
+                                        systemImage: "checkmark.circle.fill"
+                                    )
+                                }
+                                .tint(AppColors.success)
+                            }
+                        }
                         .onAppear {
                             if notification.id == viewModel.notifications.last?.id {
                                 Task { await viewModel.loadMore() }
@@ -217,7 +244,17 @@ private struct NotificationRowView: View {
             }
         }
         .padding(AppDimensions.cardPadding)
-        .cardStyle()
+        .background(notification.isRead ? AppColors.cardBackground : AppColors.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: AppDimensions.cornerRadiusL, style: .continuous))
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .overlay(alignment: .topLeading) {
+            if !notification.isRead {
+                Circle()
+                    .fill(AppColors.primary)
+                    .frame(width: 8, height: 8)
+                    .offset(x: 6, y: 6)
+            }
+        }
     }
 
     // MARK: - Type helpers

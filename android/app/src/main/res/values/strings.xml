@@ -161,6 +161,7 @@
     <string name="report_submitted">Signalement soumis avec succès</string>
     <string name="report_saved">Brouillon enregistré</string>
     <string name="report_submit_error">Erreur lors de la soumission</string>
+    <string name="report_queued_offline">Signalement enregistré. Il sera envoyé automatiquement dès le retour de la connexion.</string>
 
     <!-- Step 1: Category -->
     <string name="step1_title">Type d\'événement</string>
@@ -394,6 +395,9 @@
     <string name="notifications_status_pending">En attente</string>
     <string name="notifications_status_failed">Échec</string>
     <string name="notifications_status_read">Lue</string>
+    <string name="notifications_mark_read">Marquer comme lue</string>
+    <string name="connectivity_online">En ligne</string>
+    <string name="connectivity_offline">Hors ligne</string>
     <string name="scan_completed_title">Scan COHRM terminé</string>
     <string name="scan_completed_text">%1$d nouvelle(s) rumeur(s) détectée(s)</string>
 

@@ -28,6 +28,11 @@ final class NotificationsViewModel {
     /// Indique s'il y a plus de pages
     var hasMorePages = false
 
+    /// Nombre de notifications non lues (pour le badge)
+    var unreadCount: Int {
+        notifications.filter { !$0.isRead }.count
+    }
+
     // MARK: - Chargement
 
     /// Charge une page de notifications

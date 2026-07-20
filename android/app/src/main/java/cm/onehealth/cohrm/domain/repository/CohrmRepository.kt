@@ -5,6 +5,7 @@ import cm.onehealth.cohrm.data.remote.dto.RumorDetail
 import cm.onehealth.cohrm.data.remote.dto.RumorsListData
 import cm.onehealth.cohrm.data.remote.dto.ActorInfo
 import cm.onehealth.cohrm.data.remote.dto.ValidationItem
+import kotlinx.coroutines.flow.Flow
 
 interface CohrmRepository {
     suspend fun getDashboard(region: String? = null, period: String? = null): Result<DashboardData>
@@ -25,4 +26,10 @@ interface CohrmRepository {
     suspend fun getActors(region: String? = null, level: Int? = null): Result<List<ActorInfo>>
     suspend fun assessRisk(id: Int, riskLevel: String, riskDescription: String? = null, riskContext: String? = null, riskExposure: String? = null): Result<Unit>
     suspend fun getValidations(id: Int): Result<List<ValidationItem>>
+
+    /** Get cached rumors from Room for offline viewing */
+    fun getCachedRumors(): Flow<List<RumorDetail>>
+
+    /** Get a single cached rumor by ID */
+    suspend fun getCachedRumorDetail(id: Int): RumorDetail?
 }

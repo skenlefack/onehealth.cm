@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import cm.onehealth.cohrm.BuildConfig
 import cm.onehealth.cohrm.data.remote.ApiService
 import cm.onehealth.cohrm.data.remote.AuthInterceptor
+import cm.onehealth.cohrm.data.remote.TokenProvider
 import com.squareup.moshi.Moshi
 import dagger.Module
 import dagger.Provides
@@ -28,8 +29,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(dataStore: DataStore<Preferences>): AuthInterceptor =
-        AuthInterceptor(dataStore)
+    fun provideAuthInterceptor(tokenProvider: TokenProvider, dataStore: DataStore<Preferences>): AuthInterceptor =
+        AuthInterceptor(tokenProvider, dataStore)
 
     @Provides
     @Singleton

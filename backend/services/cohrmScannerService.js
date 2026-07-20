@@ -14,10 +14,11 @@
 const db = require('../config/db');
 const cron = require('node-cron');
 
-let cheerio, fetch, RssParser;
+let cheerio, fetch, RssParser, TwitterApi;
 try { cheerio = require('cheerio'); } catch (e) { console.warn('[Scanner] cheerio not installed'); }
 try { fetch = require('node-fetch'); } catch (e) { console.warn('[Scanner] node-fetch not installed'); }
 try { RssParser = require('rss-parser'); } catch (e) { console.warn('[Scanner] rss-parser not installed'); }
+try { TwitterApi = require('twitter-api-v2').default || require('twitter-api-v2'); } catch (e) { console.warn('[Scanner] twitter-api-v2 not installed'); }
 
 // Référence au socket service (injectée depuis server.js)
 let socketService = null;
@@ -41,6 +42,7 @@ const DEFAULT_CONFIG = {
   notify_on_new_results: true,    // Notifier quand résultats trouvés
   notify_on_auto_rumor: true,     // Notifier quand rumeur auto-créée
   scan_interval_minutes: 60,      // Intervalle par défaut entre scans
+  social_scan_enabled: true,      // Activer/désactiver les scans réseaux sociaux
 };
 
 /**
@@ -66,6 +68,11 @@ const getConfig = async () => {
   } catch (e) {
     console.warn('[Scanner] Could not load config:', e.message);
   }
+
+  // Social media tokens: env vars take priority, DB settings as fallback
+  config.twitter_bearer_token = process.env.TWITTER_BEARER_TOKEN || config.twitter_bearer_token || '';
+  config.facebook_access_token = process.env.FACEBOOK_ACCESS_TOKEN || config.facebook_access_token || '';
+
   return config;
 };
 
@@ -182,6 +189,234 @@ const scrapeRssSource = async (source) => {
   }
 
   return articles;
+};
+
+// ============================================
+// TWITTER/X SCRAPING
+// ============================================
+
+/**
+ * Scrape Twitter/X via API v2 (recent search)
+ * @param {object} source - Source DB row
+ * @param {array} keywords - Active keywords from DB
+ * @param {object} config - Scanner config (with twitter_bearer_token)
+ * @returns {array} articles formatted for scoring
+ */
+const scrapeTwitterSource = async (source, keywords, config) => {
+  const bearerToken = config.twitter_bearer_token;
+  if (!bearerToken) {
+    console.warn('[Scanner] Twitter API key not configured, skipping Twitter sources');
+    return [];
+  }
+
+  if (!TwitterApi) {
+    console.warn('[Scanner] twitter-api-v2 not installed, skipping Twitter sources');
+    return [];
+  }
+
+  // Parse source config for custom search queries
+  let sourceConfig = {};
+  try {
+    sourceConfig = typeof source.config === 'string' ? JSON.parse(source.config) : (source.config || {});
+  } catch { sourceConfig = {}; }
+
+  // Build search queries from source config or keywords
+  let searchQueries = sourceConfig.search_queries || sourceConfig.search_terms || [];
+  if (searchQueries.length === 0) {
+    // Build from active keywords (combine with OR, max ~512 chars for free tier)
+    const kwTerms = keywords
+      .filter(k => k.is_active)
+      .map(k => k.keyword)
+      .slice(0, 15);
+    if (kwTerms.length > 0) {
+      searchQueries = [kwTerms.join(' OR ')];
+    }
+  }
+
+  if (searchQueries.length === 0) {
+    console.warn('[Scanner] No search queries for Twitter source:', source.name);
+    return [];
+  }
+
+  const client = new TwitterApi(bearerToken);
+  const readOnly = client.readOnly || client;
+  const articles = [];
+  const maxPerQuery = Math.ceil((config.max_articles_per_source || 50) / searchQueries.length);
+
+  for (const query of searchQueries) {
+    if (articles.length >= (config.max_articles_per_source || 50)) break;
+
+    try {
+      // Add lang/geo filters for Cameroon health context
+      const fullQuery = `(${query}) lang:fr OR lang:en -is:retweet`;
+
+      const result = await retryWithBackoff(async () => {
+        return await readOnly.v2.search(fullQuery, {
+          max_results: Math.min(maxPerQuery, 100), // API max is 100 per request
+          'tweet.fields': 'created_at,author_id,text,public_metrics',
+          expansions: 'author_id',
+          'user.fields': 'username,name',
+        });
+      }, 3);
+
+      if (!result || !result.data) continue;
+
+      // Build author lookup map
+      const authorMap = {};
+      if (result.includes && result.includes.users) {
+        for (const user of result.includes.users) {
+          authorMap[user.id] = user;
+        }
+      }
+
+      const tweets = result.data.data || result.data || [];
+      for (const tweet of tweets) {
+        if (articles.length >= (config.max_articles_per_source || 50)) break;
+
+        const author = authorMap[tweet.author_id];
+        const authorName = author ? `@${author.username}` : tweet.author_id || 'unknown';
+        const tweetUrl = `https://x.com/${author ? author.username : 'i'}/status/${tweet.id}`;
+
+        articles.push({
+          title: (tweet.text || '').substring(0, 280),
+          content: tweet.text || '',
+          url: tweetUrl,
+          published_at: parseDate(tweet.created_at),
+          author: authorName,
+          source_type: 'twitter',
+        });
+      }
+    } catch (err) {
+      // Handle rate limits and other errors gracefully
+      if (err.code === 429 || (err.data && err.data.status === 429)) {
+        console.warn(`[Scanner] Twitter rate limit hit for query "${query.substring(0, 40)}...", skipping remaining queries`);
+        break;
+      }
+      console.warn(`[Scanner] Twitter query error for "${query.substring(0, 40)}...":`, err.message);
+    }
+  }
+
+  return articles;
+};
+
+// ============================================
+// FACEBOOK SCRAPING
+// ============================================
+
+/**
+ * Scrape Facebook public page posts via Graph API
+ * @param {object} source - Source DB row
+ * @param {array} keywords - Active keywords (for scoring, not filtering)
+ * @param {object} config - Scanner config (with facebook_access_token)
+ * @returns {array} articles formatted for scoring
+ */
+const scrapeFacebookSource = async (source, keywords, config) => {
+  const accessToken = config.facebook_access_token;
+  if (!accessToken) {
+    console.warn('[Scanner] Facebook access token not configured, skipping Facebook sources');
+    return [];
+  }
+
+  if (!fetch) {
+    console.warn('[Scanner] node-fetch not installed, skipping Facebook sources');
+    return [];
+  }
+
+  // Parse source config for page IDs
+  let sourceConfig = {};
+  try {
+    sourceConfig = typeof source.config === 'string' ? JSON.parse(source.config) : (source.config || {});
+  } catch { sourceConfig = {}; }
+
+  const pageIds = sourceConfig.pages || sourceConfig.page_ids || [];
+  if (pageIds.length === 0) {
+    console.warn('[Scanner] No Facebook page IDs configured for source:', source.name);
+    return [];
+  }
+
+  const articles = [];
+  const maxPerPage = Math.ceil((config.max_articles_per_source || 50) / pageIds.length);
+  // Base URL — use source URL if it contains graph.facebook.com, otherwise default
+  const baseUrl = (source.url && source.url.includes('graph.facebook.com'))
+    ? source.url.replace(/\/$/, '')
+    : 'https://graph.facebook.com/v18.0';
+
+  for (const pageId of pageIds) {
+    if (articles.length >= (config.max_articles_per_source || 50)) break;
+
+    try {
+      const url = `${baseUrl}/${pageId}/posts?fields=message,created_time,permalink_url,from&limit=${maxPerPage}&access_token=${accessToken}`;
+
+      const response = await fetch(url, {
+        timeout: config.scan_timeout_ms || 20000,
+        headers: { 'Accept': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        // Handle token expiry
+        if (response.status === 401 || response.status === 190 || errBody.includes('OAuthException')) {
+          console.warn(`[Scanner] Facebook token expired or invalid for page ${pageId}. Please refresh the access token.`);
+          continue;
+        }
+        throw new Error(`Facebook API HTTP ${response.status}: ${errBody.substring(0, 200)}`);
+      }
+
+      const data = await response.json();
+      const posts = (data.data || []);
+
+      for (const post of posts) {
+        if (articles.length >= (config.max_articles_per_source || 50)) break;
+        if (!post.message) continue; // Skip posts without text
+
+        const authorName = (post.from && post.from.name) ? post.from.name : pageId;
+
+        articles.push({
+          title: (post.message || '').substring(0, 280),
+          content: post.message || '',
+          url: post.permalink_url || `https://www.facebook.com/${pageId}`,
+          published_at: parseDate(post.created_time),
+          author: authorName,
+          source_type: 'facebook',
+        });
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Facebook error for page ${pageId}:`, err.message);
+    }
+  }
+
+  return articles;
+};
+
+// ============================================
+// RETRY WITH BACKOFF (for rate-limited APIs)
+// ============================================
+
+/**
+ * Retry an async function with exponential backoff
+ * @param {function} fn - Async function to retry
+ * @param {number} maxRetries - Max number of retries
+ * @param {number} baseDelayMs - Base delay in ms (doubles each retry)
+ * @returns {*} Result of the function
+ */
+const retryWithBackoff = async (fn, maxRetries = 3, baseDelayMs = 1000) => {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const isRateLimit = err.code === 429 || (err.data && err.data.status === 429) ||
+        (err.rateLimit && err.rateLimit.remaining === 0);
+
+      if (!isRateLimit || attempt === maxRetries) throw err;
+
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      console.warn(`[Scanner] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
 };
 
 // ============================================
@@ -341,7 +576,19 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
 
       // Choisir la méthode de scraping selon le type
       let articles = [];
-      if (source.type === 'rss' || source.url.includes('/rss') || source.url.includes('/feed') || source.url.endsWith('.xml')) {
+      if (source.type === 'twitter') {
+        if (!config.social_scan_enabled) {
+          console.log(`[Scanner]   → Social scan disabled, skipping ${source.name}`);
+          continue;
+        }
+        articles = await scrapeTwitterSource(source, keywords, config);
+      } else if (source.type === 'facebook') {
+        if (!config.social_scan_enabled) {
+          console.log(`[Scanner]   → Social scan disabled, skipping ${source.name}`);
+          continue;
+        }
+        articles = await scrapeFacebookSource(source, keywords, config);
+      } else if (source.type === 'rss' || source.url.includes('/rss') || source.url.includes('/feed') || source.url.endsWith('.xml')) {
         articles = await scrapeRssSource(source);
       } else {
         articles = await scrapeWebSource(source, keywords);
@@ -739,6 +986,8 @@ module.exports = {
   runScan,
   scanSource: scrapeWebSource,
   scrapeRssSource,
+  scrapeTwitterSource,
+  scrapeFacebookSource,
   scoreRelevance,
   isDuplicate,
   autoCreateRumor,

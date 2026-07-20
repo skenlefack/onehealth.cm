@@ -42,6 +42,15 @@ final class RumorsViewModel {
         }
     }
 
+    /// Priorite selectionnee (nil = toutes)
+    var selectedPriority: String? = nil {
+        didSet {
+            if oldValue != selectedPriority {
+                Task { await refresh() }
+            }
+        }
+    }
+
     /// Texte de recherche
     var searchText: String = "" {
         didSet {
@@ -72,6 +81,15 @@ final class RumorsViewModel {
         ("closed", String(localized: "rumors.filter.closed")),
     ]
 
+    /// Liste des priorites de filtre
+    static let priorities: [(key: String?, label: String)] = [
+        (nil, String(localized: "rumors.filter.all_priorities")),
+        ("low", String(localized: "rumors.priority.low")),
+        ("medium", String(localized: "rumors.priority.medium")),
+        ("high", String(localized: "rumors.priority.high")),
+        ("critical", String(localized: "rumors.priority.critical")),
+    ]
+
     // MARK: - Chargement
 
     /// Charge une page de rumeurs avec les filtres courants
@@ -84,10 +102,11 @@ final class RumorsViewModel {
         errorMessage = nil
 
         do {
-            let response = try await APIService.shared.getRumors(
+            let response = try await CohrmAPIService.shared.getRumors(
                 page: page,
                 limit: 20,
                 status: selectedStatus,
+                priority: selectedPriority,
                 search: searchText.isEmpty ? nil : searchText
             )
 

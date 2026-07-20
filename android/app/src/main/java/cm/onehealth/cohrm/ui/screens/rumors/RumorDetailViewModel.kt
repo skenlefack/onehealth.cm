@@ -59,7 +59,15 @@ class RumorDetailViewModel @Inject constructor(
         viewModelScope.launch {
             cohrmRepository.getRumorDetail(rumorId).fold(
                 onSuccess = { rumor -> _state.update { it.copy(isLoading = false, rumor = rumor) } },
-                onFailure = { e -> _state.update { it.copy(isLoading = false, error = e.localizedMessage) } },
+                onFailure = { e ->
+                    // Try loading from cache when network fails
+                    val cached = cohrmRepository.getCachedRumorDetail(rumorId)
+                    if (cached != null) {
+                        _state.update { it.copy(isLoading = false, rumor = cached, error = null) }
+                    } else {
+                        _state.update { it.copy(isLoading = false, error = e.localizedMessage) }
+                    }
+                },
             )
         }
     }

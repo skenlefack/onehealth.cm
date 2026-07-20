@@ -1,5 +1,7 @@
 package cm.onehealth.cohrm.data.repository
 
+import cm.onehealth.cohrm.data.local.dao.RumorDao
+import cm.onehealth.cohrm.data.local.entity.RumorEntity
 import cm.onehealth.cohrm.data.remote.ApiService
 import cm.onehealth.cohrm.data.remote.dto.ActorInfo
 import cm.onehealth.cohrm.data.remote.dto.DashboardData
@@ -11,12 +13,15 @@ import cm.onehealth.cohrm.data.remote.dto.RumorsListData
 import cm.onehealth.cohrm.data.remote.dto.ValidationItem
 import cm.onehealth.cohrm.data.remote.dto.ValidationRequest
 import cm.onehealth.cohrm.domain.repository.CohrmRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class CohrmRepositoryImpl @Inject constructor(
     private val apiService: ApiService,
+    private val rumorDao: RumorDao,
 ) : CohrmRepository {
 
     override suspend fun getDashboard(region: String?, period: String?): Result<DashboardData> =
@@ -36,13 +41,48 @@ class CohrmRepositoryImpl @Inject constructor(
         search: String?,
     ): Result<RumorsListData> = runCatching {
         val response = apiService.getRumors(page, perPage, status, category, region, priority, source, search)
-        response.data ?: RumorsListData()
+        val data = response.data ?: RumorsListData()
+
+        // Cache page-1 results for offline viewing (no filters = main list)
+        if (page == 1 && status == null && category == null && region == null &&
+            priority == null && source == null && search.isNullOrBlank()
+        ) {
+            try {
+                val entities = data.rumors.map { it.toEntity() }
+                rumorDao.deleteAll()
+                rumorDao.insertAll(entities)
+            } catch (_: Exception) {
+                // Caching failure should not break the API result
+            }
+        } else if (data.rumors.isNotEmpty()) {
+            // Still cache individual rumors for offline detail view
+            try {
+                rumorDao.insertAll(data.rumors.map { it.toEntity() })
+            } catch (_: Exception) {}
+        }
+
+        data
     }
 
     override suspend fun getRumorDetail(id: Int): Result<RumorDetail> = runCatching {
         val response = apiService.getRumorDetail(id)
-        response.data ?: throw Exception("Rumor not found")
+        val detail = response.data ?: throw Exception("Rumor not found")
+
+        // Cache for offline viewing
+        try {
+            rumorDao.insert(detail.toEntity())
+        } catch (_: Exception) {}
+
+        detail
     }
+
+    override fun getCachedRumors(): Flow<List<RumorDetail>> =
+        rumorDao.getRecent(100).map { entities ->
+            entities.map { it.toDomain() }
+        }
+
+    override suspend fun getCachedRumorDetail(id: Int): RumorDetail? =
+        rumorDao.getById(id)?.toDomain()
 
     override suspend fun updateRumor(
         id: Int,
@@ -98,3 +138,60 @@ class CohrmRepositoryImpl @Inject constructor(
             response.data ?: emptyList()
         }
 }
+
+// ---- Entity <-> DTO mapping ----
+
+private fun RumorDetail.toEntity(): RumorEntity = RumorEntity(
+    id = id,
+    code = code,
+    title = title,
+    description = description,
+    category = category,
+    species = species,
+    status = status,
+    priority = priority,
+    riskLevel = riskLevel,
+    source = source,
+    region = region,
+    department = department,
+    district = district,
+    latitude = latitude,
+    longitude = longitude,
+    symptoms = symptoms,
+    affectedCount = affectedCount,
+    reporterName = reporterName,
+    reporterPhone = reporterPhone,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    assignedTo = assignedTo,
+    assignedName = assignedName,
+    createdByName = createdByName,
+    cachedAt = System.currentTimeMillis(),
+)
+
+private fun RumorEntity.toDomain(): RumorDetail = RumorDetail(
+    id = id,
+    code = code,
+    title = title,
+    description = description,
+    category = category,
+    species = species,
+    status = status,
+    priority = priority,
+    riskLevel = riskLevel,
+    source = source,
+    region = region,
+    department = department,
+    district = district,
+    latitude = latitude,
+    longitude = longitude,
+    symptoms = symptoms,
+    affectedCount = affectedCount,
+    reporterName = reporterName,
+    reporterPhone = reporterPhone,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    assignedTo = assignedTo,
+    assignedName = assignedName,
+    createdByName = createdByName,
+)

@@ -5,6 +5,8 @@
 
 const nodemailer = require('nodemailer');
 const db = require('../config/db');
+const { sendSMS, smsTemplates } = require('./smsService');
+const { sendPushToUser, pushTemplates } = require('./pushService');
 
 // Configuration du transporteur email
 const createTransporter = () => {
@@ -488,35 +490,46 @@ async function sendEmail(to, template, data) {
  * Notifie les validateurs d'une nouvelle rumeur
  */
 async function notifyNewRumor(rumor) {
-  const assignees = await getAssigneesToNotify(rumor.validation_level || 1, rumor.region);
+  const level = rumor.validation_level || 1;
+  const emailAssignees = await getAssigneesToNotify(level, rumor.region, 'email');
+  const smsAssignees = await getAssigneesToNotify(level, rumor.region, 'sms');
   const results = [];
 
-  for (const assignee of assignees) {
+  const notifData = {
+    rumorId: rumor.id,
+    rumorCode: rumor.code,
+    title: rumor.title,
+    category: rumor.category,
+    location: [rumor.region, rumor.department, rumor.district].filter(Boolean).join(', ') || 'Non spécifiée',
+    dateDetection: rumor.date_detection ? new Date(rumor.date_detection).toLocaleDateString('fr-FR') : null,
+    level
+  };
+
+  // Send emails
+  for (const assignee of emailAssignees) {
     const notificationId = await logNotification({
-      rumorId: rumor.id,
-      userId: assignee.user_id,
-      notificationType: 'new_rumor',
-      channel: 'email',
+      rumorId: rumor.id, userId: assignee.user_id,
+      notificationType: 'new_rumor', channel: 'email',
       recipientEmail: assignee.email,
       subject: `Nouvelle rumeur à traiter - ${rumor.code}`
     });
 
     const result = await sendEmail(assignee.email, emailTemplates.newRumorAssigned, {
-      userName: assignee.full_name || assignee.first_name,
-      rumorId: rumor.id,
-      rumorCode: rumor.code,
-      title: rumor.title,
-      category: rumor.category,
-      location: [rumor.region, rumor.department, rumor.district].filter(Boolean).join(', ') || 'Non spécifiée',
-      dateDetection: rumor.date_detection ? new Date(rumor.date_detection).toLocaleDateString('fr-FR') : null,
-      level: rumor.validation_level || 1
+      ...notifData, userName: assignee.full_name || assignee.first_name
     });
 
     if (notificationId) {
       await updateNotificationStatus(notificationId, result.success ? 'sent' : 'failed', result.error);
     }
+    results.push({ assignee: assignee.email, channel: 'email', ...result });
 
-    results.push({ assignee: assignee.email, ...result });
+    // Send push notification
+    await sendPushForNotification(assignee.user_id, 'newRumorAssigned', notifData, rumor.id);
+  }
+
+  // Send SMS
+  for (const assignee of smsAssignees) {
+    await sendSmsForNotification(assignee, 'newRumorAssigned', notifData, rumor.id, results);
   }
 
   return results;
@@ -526,35 +539,40 @@ async function notifyNewRumor(rumor) {
  * Notifie les validateurs d'une escalade
  */
 async function notifyEscalation(rumor, fromLevel, toLevel, escalatedBy, reason) {
-  const assignees = await getAssigneesToNotify(toLevel, rumor.region);
+  const emailAssignees = await getAssigneesToNotify(toLevel, rumor.region, 'email');
+  const smsAssignees = await getAssigneesToNotify(toLevel, rumor.region, 'sms');
   const results = [];
 
-  for (const assignee of assignees) {
+  const notifData = {
+    rumorId: rumor.id, rumorCode: rumor.code, title: rumor.title,
+    fromLevel, toLevel, escalatedBy, escalationReason: reason
+  };
+
+  // Send emails
+  for (const assignee of emailAssignees) {
     const notificationId = await logNotification({
-      rumorId: rumor.id,
-      userId: assignee.user_id,
-      notificationType: 'escalation',
-      channel: 'email',
+      rumorId: rumor.id, userId: assignee.user_id,
+      notificationType: 'escalation', channel: 'email',
       recipientEmail: assignee.email,
       subject: `Rumeur escaladée - ${rumor.code}`
     });
 
     const result = await sendEmail(assignee.email, emailTemplates.rumorEscalated, {
-      userName: assignee.full_name || assignee.first_name,
-      rumorId: rumor.id,
-      rumorCode: rumor.code,
-      title: rumor.title,
-      fromLevel,
-      toLevel,
-      escalatedBy,
-      escalationReason: reason
+      ...notifData, userName: assignee.full_name || assignee.first_name
     });
 
     if (notificationId) {
       await updateNotificationStatus(notificationId, result.success ? 'sent' : 'failed', result.error);
     }
+    results.push({ assignee: assignee.email, channel: 'email', ...result });
 
-    results.push({ assignee: assignee.email, ...result });
+    // Send push notification
+    await sendPushForNotification(assignee.user_id, 'rumorEscalated', notifData, rumor.id);
+  }
+
+  // Send SMS
+  for (const assignee of smsAssignees) {
+    await sendSmsForNotification(assignee, 'rumorEscalated', notifData, rumor.id, results);
   }
 
   return results;
@@ -566,37 +584,53 @@ async function notifyEscalation(rumor, fromLevel, toLevel, escalatedBy, reason) 
 async function notifyValidation(rumor, validatedBy, notes) {
   // Notifier les validateurs du niveau suivant
   const nextLevel = (rumor.validation_level || 1) + 1;
-  if (nextLevel > 5) return [];
-
-  const assignees = await getAssigneesToNotify(nextLevel, rumor.region);
   const results = [];
 
-  for (const assignee of assignees) {
+  const notifData = {
+    rumorId: rumor.id, rumorCode: rumor.code, title: rumor.title,
+    level: rumor.validation_level, currentLevel: nextLevel, validatedBy, notes
+  };
+
+  // If all 5 levels complete, send push to relevant users about completion
+  if (nextLevel > 5) {
+    // Notify level 4 and 5 assignees about completion via push
+    for (const level of [4, 5]) {
+      const assignees = await getAssigneesToNotify(level, rumor.region, 'email');
+      for (const assignee of assignees) {
+        await sendPushForNotification(assignee.user_id, 'validationCompleted', notifData, rumor.id);
+      }
+    }
+    return results;
+  }
+
+  const emailAssignees = await getAssigneesToNotify(nextLevel, rumor.region, 'email');
+  const smsAssignees = await getAssigneesToNotify(nextLevel, rumor.region, 'sms');
+
+  // Send emails
+  for (const assignee of emailAssignees) {
     const notificationId = await logNotification({
-      rumorId: rumor.id,
-      userId: assignee.user_id,
-      notificationType: 'validation',
-      channel: 'email',
+      rumorId: rumor.id, userId: assignee.user_id,
+      notificationType: 'validation', channel: 'email',
       recipientEmail: assignee.email,
       subject: `Rumeur validée - ${rumor.code}`
     });
 
     const result = await sendEmail(assignee.email, emailTemplates.rumorValidated, {
-      userName: assignee.full_name || assignee.first_name,
-      rumorId: rumor.id,
-      rumorCode: rumor.code,
-      title: rumor.title,
-      level: rumor.validation_level,
-      currentLevel: nextLevel,
-      validatedBy,
-      notes
+      ...notifData, userName: assignee.full_name || assignee.first_name
     });
 
     if (notificationId) {
       await updateNotificationStatus(notificationId, result.success ? 'sent' : 'failed', result.error);
     }
+    results.push({ assignee: assignee.email, channel: 'email', ...result });
 
-    results.push({ assignee: assignee.email, ...result });
+    // Send push notification
+    await sendPushForNotification(assignee.user_id, 'rumorValidated', notifData, rumor.id);
+  }
+
+  // Send SMS
+  for (const assignee of smsAssignees) {
+    await sendSmsForNotification(assignee, 'rumorValidated', notifData, rumor.id, results);
   }
 
   return results;
@@ -650,35 +684,43 @@ async function notifyRiskAssessment(rumor, assessedBy, riskLevel, riskDescriptio
   // Notifier les validateurs de niveau 4 et 5 pour les risques élevés
   const levelsToNotify = riskLevel === 'very_high' || riskLevel === 'high' ? [4, 5] : [4];
   const results = [];
+  const isHighRisk = riskLevel === 'very_high' || riskLevel === 'high';
+
+  const notifData = {
+    rumorId: rumor.id, rumorCode: rumor.code, title: rumor.title,
+    riskLevel, riskDescription, assessedBy
+  };
 
   for (const level of levelsToNotify) {
-    const assignees = await getAssigneesToNotify(level, rumor.region);
+    const emailAssignees = await getAssigneesToNotify(level, rumor.region, 'email');
 
-    for (const assignee of assignees) {
+    for (const assignee of emailAssignees) {
       const notificationId = await logNotification({
-        rumorId: rumor.id,
-        userId: assignee.user_id,
-        notificationType: 'risk_assessment',
-        channel: 'email',
+        rumorId: rumor.id, userId: assignee.user_id,
+        notificationType: 'risk_assessment', channel: 'email',
         recipientEmail: assignee.email,
         subject: `Évaluation des risques - ${rumor.code}`
       });
 
       const result = await sendEmail(assignee.email, emailTemplates.riskAssessmentCompleted, {
-        userName: assignee.full_name || assignee.first_name,
-        rumorId: rumor.id,
-        rumorCode: rumor.code,
-        title: rumor.title,
-        riskLevel,
-        riskDescription,
-        assessedBy
+        ...notifData, userName: assignee.full_name || assignee.first_name
       });
 
       if (notificationId) {
         await updateNotificationStatus(notificationId, result.success ? 'sent' : 'failed', result.error);
       }
+      results.push({ assignee: assignee.email, channel: 'email', ...result });
 
-      results.push({ assignee: assignee.email, ...result });
+      // Send push notification (especially important for high/very_high risk)
+      await sendPushForNotification(assignee.user_id, 'riskLevelChanged', notifData, rumor.id);
+    }
+
+    // Send SMS for high risk levels
+    if (isHighRisk) {
+      const smsAssignees = await getAssigneesToNotify(level, rumor.region, 'sms');
+      for (const assignee of smsAssignees) {
+        await sendSmsForNotification(assignee, 'riskAssessmentHigh', notifData, rumor.id, results);
+      }
     }
   }
 
@@ -720,18 +762,34 @@ async function sendPendingReminders() {
       const oldestRumor = oldestRumors[0];
       const waitingDays = oldestRumor ? Math.floor((Date.now() - new Date(oldestRumor.created_at)) / (1000 * 60 * 60 * 24)) : 0;
 
+      const notifData = {
+        level: pending.validation_level,
+        pendingCount: pending.pending_count,
+        oldestRumor: oldestRumor ? {
+          code: oldestRumor.code,
+          waitingTime: waitingDays > 0 ? `${waitingDays} jour(s)` : 'Moins d\'un jour'
+        } : null
+      };
+
       for (const assignee of assignees) {
         const result = await sendEmail(assignee.email, emailTemplates.pendingValidationReminder, {
-          userName: assignee.full_name || assignee.first_name,
-          level: pending.validation_level,
-          pendingCount: pending.pending_count,
-          oldestRumor: oldestRumor ? {
-            code: oldestRumor.code,
-            waitingTime: waitingDays > 0 ? `${waitingDays} jour(s)` : 'Moins d\'un jour'
-          } : null
+          ...notifData,
+          userName: assignee.full_name || assignee.first_name
         });
 
-        results.push({ assignee: assignee.email, ...result });
+        results.push({ assignee: assignee.email, channel: 'email', ...result });
+
+        // Send push reminder
+        await sendPushForNotification(assignee.user_id, 'newRumorAssigned', {
+          ...notifData, rumorCode: `${pending.pending_count} en attente`,
+          title: `${pending.pending_count} rumeur(s) en attente`
+        }, null);
+      }
+
+      // Send SMS reminders
+      const smsAssignees = await getAssigneesToNotify(pending.validation_level, pending.region, 'sms');
+      for (const assignee of smsAssignees) {
+        await sendSmsForNotification(assignee, 'pendingReminder', notifData, null, results);
       }
     }
 
@@ -764,6 +822,80 @@ async function sendFeedbackEmail(recipientEmail, rumorCode, feedbackType, messag
   return result;
 }
 
+// ============================================
+// HELPER: Send SMS for a notification
+// ============================================
+
+async function sendSmsForNotification(assignee, templateName, data, rumorId, results) {
+  try {
+    // Get phone number from user record if not on assignee
+    let phone = assignee.phone || assignee.phone_number;
+    if (!phone) {
+      const [users] = await db.query('SELECT phone FROM users WHERE id = ?', [assignee.user_id]);
+      phone = users[0]?.phone;
+    }
+    if (!phone) return;
+
+    const template = smsTemplates[templateName];
+    if (!template) return;
+
+    const message = template(data);
+
+    const notificationId = await logNotification({
+      rumorId: rumorId,
+      userId: assignee.user_id,
+      notificationType: templateName,
+      channel: 'sms',
+      recipientPhone: phone,
+      subject: `SMS - ${templateName}`
+    });
+
+    const smsResult = await sendSMS(phone, message);
+
+    if (notificationId) {
+      await updateNotificationStatus(notificationId, smsResult.success ? 'sent' : 'failed', smsResult.error);
+    }
+
+    if (results) {
+      results.push({ assignee: phone, channel: 'sms', ...smsResult });
+    }
+  } catch (error) {
+    console.error('Error sending SMS notification:', error.message);
+  }
+}
+
+// ============================================
+// HELPER: Send push notification for a notification event
+// ============================================
+
+async function sendPushForNotification(userId, templateName, data, rumorId) {
+  try {
+    const template = pushTemplates[templateName];
+    if (!template) return;
+
+    const pushData = template(data);
+
+    const notificationId = await logNotification({
+      rumorId: rumorId,
+      userId: userId,
+      notificationType: templateName,
+      channel: 'push',
+      subject: pushData.title,
+      message: pushData.body
+    });
+
+    const result = await sendPushToUser(userId, pushData.title, pushData.body, pushData.data || {});
+
+    if (notificationId) {
+      await updateNotificationStatus(notificationId, result.success ? 'sent' : 'failed',
+        result.results?.filter(r => !r.success).map(r => r.error).join('; ') || null
+      );
+    }
+  } catch (error) {
+    console.error('Error sending push notification:', error.message);
+  }
+}
+
 module.exports = {
   notifyNewRumor,
   notifyEscalation,
@@ -775,5 +907,7 @@ module.exports = {
   getAssigneesToNotify,
   logNotification,
   updateNotificationStatus,
-  emailTemplates
+  emailTemplates,
+  sendSmsForNotification,
+  sendPushForNotification
 };

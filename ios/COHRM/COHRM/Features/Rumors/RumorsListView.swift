@@ -14,12 +14,19 @@ struct RumorsListView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Chips de filtrage
+                // Chips de filtrage par statut
                 FilterChipsView(
                     selectedStatus: $viewModel.selectedStatus,
                     options: RumorsViewModel.statuses
                 )
-                .padding(.vertical, AppDimensions.spacingS)
+                .padding(.vertical, AppDimensions.spacingXS)
+
+                // Chips de filtrage par priorite
+                FilterChipsView(
+                    selectedStatus: $viewModel.selectedPriority,
+                    options: RumorsViewModel.priorities
+                )
+                .padding(.bottom, AppDimensions.spacingS)
 
                 // Contenu principal
                 if viewModel.isLoading && viewModel.rumors.isEmpty {

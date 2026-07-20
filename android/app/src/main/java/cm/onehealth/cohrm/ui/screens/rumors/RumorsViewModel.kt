@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cm.onehealth.cohrm.data.remote.dto.RumorDetail
 import cm.onehealth.cohrm.domain.repository.CohrmRepository
+import cm.onehealth.cohrm.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,15 +28,19 @@ data class RumorsUiState(
     val filterSource: String? = null,
     val searchQuery: String = "",
     val isLoadingMore: Boolean = false,
+    val isOfflineData: Boolean = false,
 )
 
 @HiltViewModel
 class RumorsViewModel @Inject constructor(
     private val cohrmRepository: CohrmRepository,
+    private val networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RumorsUiState())
     val state: StateFlow<RumorsUiState> = _state.asStateFlow()
+
+    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
 
     init {
         loadRumors()
@@ -66,6 +72,7 @@ class RumorsViewModel @Inject constructor(
                                 total = data.total,
                                 page = data.page,
                                 totalPages = data.totalPages,
+                                isOfflineData = false,
                             )
                         } else {
                             it.copy(
@@ -75,20 +82,57 @@ class RumorsViewModel @Inject constructor(
                                 total = data.total,
                                 page = data.page,
                                 totalPages = data.totalPages,
+                                isOfflineData = false,
                             )
                         }
                     }
                 },
                 onFailure = { error ->
-                    _state.update { it.copy(isLoading = false, isLoadingMore = false, error = error.localizedMessage) }
+                    // If network call fails and we have no data, try loading from cache
+                    if (resetPage && _state.value.rumors.isEmpty()) {
+                        loadCachedRumors(error.localizedMessage)
+                    } else {
+                        _state.update {
+                            it.copy(isLoading = false, isLoadingMore = false, error = error.localizedMessage)
+                        }
+                    }
                 },
             )
         }
     }
 
+    private fun loadCachedRumors(networkError: String?) {
+        viewModelScope.launch {
+            try {
+                val cached = cohrmRepository.getCachedRumors().first()
+                if (cached.isNotEmpty()) {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            rumors = cached,
+                            total = cached.size,
+                            page = 1,
+                            totalPages = 1,
+                            error = null,
+                            isOfflineData = true,
+                        )
+                    }
+                } else {
+                    _state.update {
+                        it.copy(isLoading = false, error = networkError)
+                    }
+                }
+            } catch (_: Exception) {
+                _state.update {
+                    it.copy(isLoading = false, error = networkError)
+                }
+            }
+        }
+    }
+
     fun loadMore() {
         val s = _state.value
-        if (s.isLoadingMore || s.page >= s.totalPages) return
+        if (s.isLoadingMore || s.page >= s.totalPages || s.isOfflineData) return
         _state.update { it.copy(isLoadingMore = true, page = it.page + 1) }
         loadRumors(resetPage = false)
     }

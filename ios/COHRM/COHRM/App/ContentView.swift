@@ -26,10 +26,11 @@ struct ContentView: View {
     }
 }
 
-/// TabView principal avec 5 onglets
+/// TabView principal avec 7 onglets (More tab pour Scanner, Notifications, Rapports)
 struct MainTabView: View {
 
     @State private var selectedTab = 0
+    @State private var notificationsVM = NotificationsViewModel()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -67,6 +68,29 @@ struct MainTabView: View {
             .tag(2)
 
             NavigationStack {
+                ScannerView()
+            }
+            .tabItem {
+                Label(
+                    String(localized: "tab.scanner"),
+                    systemImage: "doc.text.magnifyingglass"
+                )
+            }
+            .tag(3)
+
+            NavigationStack {
+                NotificationsView()
+            }
+            .tabItem {
+                Label(
+                    String(localized: "tab.notifications"),
+                    systemImage: "bell.fill"
+                )
+            }
+            .tag(4)
+            .badge(notificationsVM.unreadCount)
+
+            NavigationStack {
                 HistoryView()
             }
             .tabItem {
@@ -75,7 +99,7 @@ struct MainTabView: View {
                     systemImage: "clock.arrow.circlepath"
                 )
             }
-            .tag(3)
+            .tag(5)
 
             NavigationStack {
                 SettingsView()
@@ -86,9 +110,12 @@ struct MainTabView: View {
                     systemImage: "gearshape.fill"
                 )
             }
-            .tag(4)
+            .tag(6)
         }
         .tint(AppColors.primary)
+        .task {
+            await notificationsVM.loadNotifications()
+        }
     }
 }
 

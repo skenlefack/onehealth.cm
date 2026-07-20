@@ -58,6 +58,7 @@ fun CohrmTopBar(
     onLogout: () -> Unit,
     onNotificationsClick: () -> Unit = {},
     notificationCount: Int = 0,
+    isOnline: Boolean = true,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -102,6 +103,22 @@ fun CohrmTopBar(
                         fontSize = 18.sp,
                         letterSpacing = 2.sp,
                     )
+                    if (!isOnline) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF44336)),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.connectivity_offline),
+                            color = Color(0xFFF44336),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 10.sp,
+                        )
+                    }
                 }
 
                 // RIGHT: Bell + Avatar
