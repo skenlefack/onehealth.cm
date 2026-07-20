@@ -55,6 +55,13 @@ ALTER TABLE human_resources
   ADD COLUMN IF NOT EXISTS consultation_rate VARCHAR(100),
   ADD COLUMN IF NOT EXISTS expertise_summary TEXT;
 
+-- Add columns that may be missing if table was created by a different migration
+ALTER TABLE expertise_domains ADD COLUMN name_en VARCHAR(255);
+ALTER TABLE expertise_domains ADD COLUMN color VARCHAR(20);
+ALTER TABLE expertise_domains ADD COLUMN parent_id INT;
+ALTER TABLE expertise_domains ADD COLUMN display_order INT DEFAULT 0;
+ALTER TABLE expertise_domains ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
 -- Pre-populate One Health related expertise domains
 INSERT INTO expertise_domains (name, name_en, slug, category, description, color, display_order) VALUES
 -- Sante Humaine
