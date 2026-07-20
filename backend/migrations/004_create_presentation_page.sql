@@ -2,7 +2,8 @@
 -- Date: 2026-01-14
 
 -- Insert the Presentation page with modular sections for easy updates
-INSERT INTO pages (
+-- Uses INSERT IGNORE to skip if slug already exists (UNIQUE constraint)
+INSERT IGNORE INTO pages (
   title, slug, content, sections, template, status,
   meta_title, meta_description, show_title, show_breadcrumb, author_id
 ) VALUES (
@@ -135,10 +136,7 @@ INSERT INTO pages (
   1,
   1,
   1
-) ON DUPLICATE KEY UPDATE
-  sections = VALUES(sections),
-  meta_title = VALUES(meta_title),
-  meta_description = VALUES(meta_description);
+);
 
 -- Note: Upload the following images to /uploads/pages/:
 -- 1. one-health-strategy-diagram.png - The diagram showing National Strategy with NPPFERZ and Program/Projects
