@@ -137,6 +137,17 @@ const server = http.createServer(app);
 const cohrmSocketService = require('./services/cohrmSocketService');
 cohrmSocketService.initialize(server);
 
+// Run pending migrations before starting
+const { runMigrations } = require('./lib/migrationRunner');
+const pool = require('./config/db');
+runMigrations(pool, { verbose: true }).then(result => {
+  if (result.failed) {
+    console.warn(`⚠️  Migration failed at ${result.failed}, server starting anyway...`);
+  }
+}).catch(err => {
+  console.warn('⚠️  Migration runner error:', err.message);
+});
+
 server.listen(PORT, () => {
   console.log(`🚀 One Health CMS Server running on port ${PORT}`);
   console.log(`📚 API: http://localhost:${PORT}/api`);

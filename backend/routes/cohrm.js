@@ -3922,13 +3922,20 @@ router.get('/reports/performance', auth, async (req, res) => {
 // GET /api/cohrm/reports/epidemiological
 router.get('/reports/epidemiological', auth, async (req, res) => {
   try {
-    const { date_from, date_to, category, region } = req.query;
+    const { date_from, date_to, category, region, department, district, granularity } = req.query;
     let whereClause = 'WHERE 1=1';
     const params = [];
     if (date_from) { whereClause += ' AND DATE(created_at) >= ?'; params.push(date_from); }
     if (date_to) { whereClause += ' AND DATE(created_at) <= ?'; params.push(date_to); }
     if (category) { whereClause += ' AND category = ?'; params.push(category); }
     if (region) { whereClause += ' AND region = ?'; params.push(region); }
+    if (department) { whereClause += ' AND department = ?'; params.push(department); }
+    if (district) { whereClause += ' AND district = ?'; params.push(district); }
+
+    // Date grouping expression based on granularity
+    let dateExpr = 'DATE(created_at)';
+    if (granularity === 'week') dateExpr = "DATE_FORMAT(created_at, '%x-W%v')";
+    else if (granularity === 'month') dateExpr = "DATE_FORMAT(created_at, '%Y-%m')";
 
     const [bySpecies] = await db.query(
       `SELECT species, COUNT(*) as count, SUM(affected_count) as total_affected, SUM(dead_count) as total_dead
@@ -3940,14 +3947,47 @@ router.get('/reports/epidemiological', auth, async (req, res) => {
       `SELECT category, COUNT(*) as count FROM cohrm_rumors ${whereClause} GROUP BY category`, params
     );
 
-    // Courbe épidémique
+    // Courbe épidémique (grouped by date + category for stacked view)
     const [epiCurve] = await db.query(
-      `SELECT DATE(created_at) as date, COUNT(*) as count, category
+      `SELECT ${dateExpr} as date, COUNT(*) as count, category
        FROM cohrm_rumors ${whereClause}
-       GROUP BY DATE(created_at), category ORDER BY date`, params
+       GROUP BY ${dateExpr}, category ORDER BY date`, params
     );
 
-    res.json({ success: true, data: { bySpecies, byCategory, epiCurve } });
+    // Distribution par priorité
+    const [byPriority] = await db.query(
+      `SELECT COALESCE(priority, 'unknown') as priority, COUNT(*) as count
+       FROM cohrm_rumors ${whereClause} GROUP BY priority`, params
+    );
+
+    // Distribution par source
+    const [bySource] = await db.query(
+      `SELECT COALESCE(source, 'unknown') as source, COUNT(*) as count
+       FROM cohrm_rumors ${whereClause} GROUP BY source`, params
+    );
+
+    // Distribution par statut
+    const [byStatus] = await db.query(
+      `SELECT COALESCE(status, 'unknown') as status, COUNT(*) as count
+       FROM cohrm_rumors ${whereClause} GROUP BY status`, params
+    );
+
+    // Départements et districts disponibles (pour filtres dynamiques)
+    const [departments] = await db.query(
+      `SELECT DISTINCT department FROM cohrm_rumors WHERE department IS NOT NULL AND department != '' ORDER BY department`
+    );
+    const [districts] = await db.query(
+      `SELECT DISTINCT district FROM cohrm_rumors WHERE district IS NOT NULL AND district != '' ORDER BY district`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        bySpecies, byCategory, epiCurve, byPriority, bySource, byStatus,
+        departments: departments.map(d => d.department),
+        districts: districts.map(d => d.district),
+      },
+    });
   } catch (error) {
     console.error('Epi report error:', error);
     res.status(500).json({ success: false, message: error.message });
