@@ -54,7 +54,7 @@ INSERT INTO courses (
     '["Aucun prérequis - Cours ouvert à tous"]'
 );
 
-SET @course_id = LAST_INSERT_ID();
+SET @course_id = (SELECT id FROM courses WHERE slug = 'one-health-approche-integree' LIMIT 1);
 
 -- ============================================
 -- MODULE 1 : Introduction à One Health
