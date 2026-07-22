@@ -9,7 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +21,39 @@ import cm.onehealth.cohrm.R
 import cm.onehealth.cohrm.domain.model.CameroonRegions
 import cm.onehealth.cohrm.ui.screens.report.ReportFormState
 import cm.onehealth.cohrm.ui.screens.report.ReportViewModel
+
+private fun formatCategory(code: String): String = when (code) {
+    "human_health" -> "Sante humaine"
+    "animal_health" -> "Sante animale"
+    "environmental" -> "Sante environnement"
+    "safety" -> "Securite"
+    "disaster" -> "Catastrophe"
+    "other" -> "Autre"
+    else -> code.replace("_", " ").replaceFirstChar { it.uppercase() }
+}
+
+private fun formatSpecies(code: String): String = when (code) {
+    "HUM" -> "Humain"
+    "BOV" -> "Bovin"
+    "OVI" -> "Ovin/Caprin"
+    "VOL" -> "Volaille"
+    "POR" -> "Porcin"
+    "SAU" -> "Faune sauvage"
+    "CHI" -> "Chien/Chat"
+    "AUT" -> "Autre"
+    else -> code.replace("_", " ").replaceFirstChar { it.uppercase() }
+}
+
+private fun formatSourceType(code: String): String = when (code) {
+    "mobile_app" -> "Application mobile"
+    "direct" -> "Signalement direct"
+    "field" -> "Agent de terrain"
+    "sms" -> "SMS"
+    "web" -> "Formulaire web"
+    "media" -> "Medias"
+    "social_media" -> "Reseaux sociaux"
+    else -> code.replace("_", " ").replaceFirstChar { it.uppercase() }
+}
 
 @Composable
 fun Step5ReviewScreen(
@@ -55,60 +88,62 @@ fun Step5ReviewScreen(
             ),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                ReviewRow(stringResource(R.string.review_category), state.category)
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                ReviewRow(stringResource(R.string.review_species), state.species)
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                ReviewRow(stringResource(R.string.review_category), formatCategory(state.category))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                ReviewRow(stringResource(R.string.review_species), formatSpecies(state.species))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 ReviewRow(
                     stringResource(R.string.review_location),
                     listOfNotNull(regionName, state.department.ifBlank { null }, state.district.ifBlank { null })
-                        .joinToString(", ")
+                        .joinToString(" > ")
                 )
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 ReviewRow(stringResource(R.string.review_title), state.title)
                 if (state.description.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_description), state.description)
                 }
                 if (state.symptoms.isNotEmpty()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_symptoms), state.symptoms.joinToString(", "))
                 }
                 if (state.affectedCount.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_affected), state.affectedCount)
                 }
                 if (state.photos.isNotEmpty()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-                    ReviewRow(stringResource(R.string.review_photos), "${state.photos.size}")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    ReviewRow(stringResource(R.string.review_photos), "${state.photos.size} photo(s)")
                 }
-                if (state.sourceType.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-                    ReviewRow(stringResource(R.string.review_source_type), state.sourceType)
-                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                ReviewRow(stringResource(R.string.review_source_type), formatSourceType(state.sourceType))
                 if (state.dateDetection.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_date_detection), state.dateDetection)
                 }
                 if (state.themes.isNotEmpty()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_themes), state.themes.joinToString(", "))
                 }
                 if (state.gravityComment.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_gravity_comment), state.gravityComment)
                 }
                 if (state.arrondissement.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_arrondissement), state.arrondissement)
                 }
                 if (state.commune.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_commune), state.commune)
                 }
                 if (state.aireSante.isNotBlank()) {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     ReviewRow(stringResource(R.string.review_aire_sante), state.aireSante)
+                }
+                if (state.latitude != null && state.longitude != null) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    ReviewRow("Coordonnees GPS", "${state.latitude}, ${state.longitude}")
                 }
             }
         }

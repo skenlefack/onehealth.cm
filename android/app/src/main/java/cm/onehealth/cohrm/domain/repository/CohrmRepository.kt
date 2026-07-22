@@ -25,6 +25,7 @@ interface CohrmRepository {
     suspend fun addFeedback(id: Int, message: String, type: String = "comment"): Result<RumorDetail>
     suspend fun getActors(region: String? = null, level: Int? = null): Result<List<ActorInfo>>
     suspend fun assessRisk(id: Int, riskLevel: String, riskDescription: String? = null, riskContext: String? = null, riskExposure: String? = null): Result<Unit>
+    suspend fun deleteRumor(id: Int): Result<Unit>
     suspend fun getValidations(id: Int): Result<List<ValidationItem>>
 
     /** Get cached rumors from Room for offline viewing */

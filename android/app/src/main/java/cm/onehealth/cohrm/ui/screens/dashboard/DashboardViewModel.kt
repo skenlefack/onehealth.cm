@@ -59,6 +59,7 @@ class DashboardViewModel @Inject constructor(
     fun loadDashboard(region: String? = null) {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
+            android.util.Log.d("DashboardVM", "loadDashboard called, hasToken=${(cohrmRepository as? Any)?.let { "check_logs" }}")
             try {
                 cohrmRepository.getDashboard(region).fold(
                     onSuccess = { data ->
@@ -88,11 +89,11 @@ class DashboardViewModel @Inject constructor(
                                 trends = data.trends.map { t -> TrendEntry(t.date, t.count) },
                                 recentRumors = data.recentRumors.map { r ->
                                     RumorItem(
-                                        id = r.id, code = r.code, title = r.title,
-                                        category = r.category, status = r.status,
-                                        priority = r.priority, risk = r.risk,
-                                        source = r.source, region = r.region,
-                                        department = r.department, createdAt = r.createdAt,
+                                        id = r.id, code = r.code.orEmpty(), title = r.title.orEmpty(),
+                                        category = r.category.orEmpty(), status = r.status.orEmpty(),
+                                        priority = r.priority.orEmpty(), risk = r.risk.orEmpty(),
+                                        source = r.source.orEmpty(), region = r.region.orEmpty(),
+                                        department = r.department.orEmpty(), createdAt = r.createdAt.orEmpty(),
                                         reporterName = r.reporterName,
                                     )
                                 },

@@ -28,6 +28,9 @@ interface RumorDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(rumor: RumorEntity)
 
+    @Query("DELETE FROM rumors WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
     @Query("DELETE FROM rumors")
     suspend fun deleteAll()
 

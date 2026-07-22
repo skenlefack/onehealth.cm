@@ -29,6 +29,9 @@ data class RumorsUiState(
     val searchQuery: String = "",
     val isLoadingMore: Boolean = false,
     val isOfflineData: Boolean = false,
+    val selectedIds: Set<Int> = emptySet(),
+    val isSelectionMode: Boolean = false,
+    val isBatchActionLoading: Boolean = false,
 )
 
 @HiltViewModel
@@ -167,5 +170,66 @@ class RumorsViewModel @Inject constructor(
             )
         }
         loadRumors()
+    }
+
+    // --- Selection mode ---
+
+    fun toggleSelection(id: Int) {
+        _state.update {
+            val newSet = it.selectedIds.toMutableSet()
+            if (newSet.contains(id)) newSet.remove(id) else newSet.add(id)
+            it.copy(selectedIds = newSet, isSelectionMode = newSet.isNotEmpty())
+        }
+    }
+
+    fun selectAll() {
+        _state.update { it.copy(selectedIds = it.rumors.map { r -> r.id }.toSet(), isSelectionMode = true) }
+    }
+
+    fun clearSelection() {
+        _state.update { it.copy(selectedIds = emptySet(), isSelectionMode = false) }
+    }
+
+    fun batchUpdateStatus(status: String) {
+        val ids = _state.value.selectedIds.toList()
+        if (ids.isEmpty()) return
+        _state.update { it.copy(isBatchActionLoading = true) }
+        viewModelScope.launch {
+            var success = 0
+            for (id in ids) {
+                cohrmRepository.updateRumor(id, status = status).fold(
+                    onSuccess = { success++ },
+                    onFailure = {},
+                )
+            }
+            _state.update { it.copy(isBatchActionLoading = false, selectedIds = emptySet(), isSelectionMode = false) }
+            loadRumors()
+        }
+    }
+
+    fun batchDelete() {
+        val ids = _state.value.selectedIds.toList()
+        if (ids.isEmpty()) return
+        _state.update { it.copy(isBatchActionLoading = true) }
+        viewModelScope.launch {
+            for (id in ids) {
+                cohrmRepository.deleteRumor(id).fold(onSuccess = {}, onFailure = {})
+            }
+            _state.update { it.copy(isBatchActionLoading = false, selectedIds = emptySet(), isSelectionMode = false) }
+            loadRumors()
+        }
+    }
+
+    fun batchValidate(decision: String) {
+        val ids = _state.value.selectedIds.toList()
+        if (ids.isEmpty()) return
+        _state.update { it.copy(isBatchActionLoading = true) }
+        viewModelScope.launch {
+            for (id in ids) {
+                cohrmRepository.validateRumor(id, decision = decision).fold(onSuccess = {}, onFailure = {})
+            }
+            _state.update { it.copy(isBatchActionLoading = false, selectedIds = emptySet(), isSelectionMode = false) }
+            loadRumors()
+        }
     }
 }

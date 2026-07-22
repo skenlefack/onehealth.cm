@@ -520,7 +520,9 @@ router.put('/rumors/:id', auth, async (req, res) => {
       `, [id, req.user.id, `Statut modifié: ${oldStatus} → ${status}`]);
     }
 
-    res.json({ success: true, message: 'Rumeur mise à jour' });
+    // Return updated rumor
+    const [updated] = await db.query('SELECT * FROM cohrm_rumors WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Rumeur mise à jour', data: updated[0] || null });
   } catch (error) {
     console.error('Update rumor error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });

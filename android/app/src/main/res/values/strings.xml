@@ -259,6 +259,7 @@
     <string name="step4_title">Photos</string>
     <string name="step4_subtitle">Ajoutez des photos (optionnel, max 3)</string>
     <string name="photo_take">Prendre une photo</string>
+    <string name="photo_camera">Camera</string>
     <string name="photo_gallery">Galerie</string>
     <string name="photo_remove">Supprimer</string>
     <string name="photo_count">%1$d / 3 photos</string>

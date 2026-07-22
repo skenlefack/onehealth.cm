@@ -22,7 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Share
@@ -87,8 +89,17 @@ fun RumorDetailScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is RumorDetailEvent.Success -> {}
-                is RumorDetailEvent.Error -> {}
+                is RumorDetailEvent.Success -> {
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                    if (event.message.contains("supprim", ignoreCase = true)) {
+                        onBack()
+                    } else {
+                        viewModel.loadRumor()
+                    }
+                }
+                is RumorDetailEvent.Error -> {
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -190,10 +201,15 @@ fun RumorDetailScreen(
                     )
 
                     // Action buttons
-                    if (rumor.status != "closed") {
+                    if (rumor.status != "closed" && rumor.status != "false_alarm") {
+                        val currentLevel = rumor.validations.filter { it.decision == "approved" }
+                            .maxOfOrNull { it.actorLevel } ?: 0
                         ActionButtons(
                             rumor = rumor,
+                            validationLevel = currentLevel + 1,
                             onValidate = { onValidate(rumor.id) },
+                            onDelete = { viewModel.deleteRumor() },
+                            onInvestigate = { viewModel.updateStatus("investigating") },
                         )
                     }
 
@@ -366,7 +382,13 @@ private fun ValidationTimeline(validations: List<ValidationItem>) {
 }
 
 @Composable
-private fun ActionButtons(rumor: RumorDetail, onValidate: () -> Unit) {
+private fun ActionButtons(
+    rumor: RumorDetail,
+    validationLevel: Int,
+    onValidate: () -> Unit,
+    onDelete: () -> Unit,
+    onInvestigate: () -> Unit,
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -380,14 +402,48 @@ private fun ActionButtons(rumor: RumorDetail, onValidate: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(8.dp))
+
+            // Investigate button (if pending)
+            if (rumor.status == "pending") {
+                Button(
+                    onClick = onInvestigate,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Info),
+                    shape = RoundedCornerShape(10.dp),
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Lancer l'investigation")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Validate button (always)
             Button(
                 onClick = onValidate,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                shape = RoundedCornerShape(10.dp),
             ) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.rumor_validate))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Level-specific buttons
+            if (validationLevel <= 1) {
+                // N1: Delete button
+                Button(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Danger),
+                    shape = RoundedCornerShape(10.dp),
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Supprimer la rumeur")
+                }
             }
         }
     }

@@ -4,7 +4,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -229,42 +228,48 @@ fun DashboardScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KpiSection(state: DashboardUiState) {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         KpiCard(
             label = stringResource(R.string.dashboard_total),
             value = "${state.stats.total}",
             color = Primary,
             icon = Icons.Default.Assessment,
+            modifier = Modifier.weight(1f),
         )
         KpiCard(
             label = stringResource(R.string.status_pending),
             value = "${state.stats.pending}",
             color = Warning,
             icon = Icons.Default.Notifications,
+            modifier = Modifier.weight(1f),
         )
         KpiCard(
             label = stringResource(R.string.status_investigating),
             value = "${state.stats.investigating}",
             color = Info,
+            modifier = Modifier.weight(1f),
         )
         KpiCard(
             label = stringResource(R.string.status_confirmed),
             value = "${state.stats.confirmed}",
             color = Accent,
+            modifier = Modifier.weight(1f),
         )
         KpiCard(
             label = stringResource(R.string.dashboard_alerts),
             value = "${state.stats.highPriority + state.stats.critical}",
             color = Danger,
             icon = Icons.Default.Warning,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -275,9 +280,10 @@ private fun KpiCard(
     value: String,
     color: Color,
     icon: ImageVector? = null,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.width(140.dp),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
         shape = RoundedCornerShape(16.dp),
     ) {

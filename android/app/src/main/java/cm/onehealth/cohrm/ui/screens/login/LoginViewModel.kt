@@ -98,7 +98,9 @@ class LoginViewModel @Inject constructor(
                     val actor = data.actor
 
                     // Update in-memory token cache immediately (non-blocking)
+                    android.util.Log.d("LoginVM", "LOGIN OK - token received: ${data.token?.take(30)}... (len=${data.token?.length})")
                     authInterceptor.updateToken(data.token)
+                    android.util.Log.d("LoginVM", "Token saved to interceptor, hasToken=${authInterceptor.hasToken()}")
 
                     try {
                         dataStore.edit { prefs ->
@@ -175,11 +177,34 @@ class LoginViewModel @Inject constructor(
     }
 
     suspend fun isLoggedIn(): Boolean {
-        // Preload the cached token from DataStore so the interceptor
-        // can attach it without blocking the HTTP thread.
-        authInterceptor.preloadToken()
-
         val prefs = dataStore.data.first()
-        return prefs[IS_LOGGED_IN] == true && !prefs[AUTH_TOKEN].isNullOrEmpty()
+        val token = prefs[AUTH_TOKEN]
+
+        if (token.isNullOrEmpty() || prefs[IS_LOGGED_IN] != true) return false
+
+        // Check if JWT token is expired by decoding the payload
+        if (isTokenExpired(token)) {
+            android.util.Log.w("LoginVM", "Token expired, clearing session")
+            authInterceptor.clearToken()
+            dataStore.edit { it.clear() }
+            return false
+        }
+
+        // Pre-warm the interceptor's in-memory cache
+        authInterceptor.updateToken(token)
+        return true
+    }
+
+    private fun isTokenExpired(jwt: String): Boolean {
+        return try {
+            val parts = jwt.split(".")
+            if (parts.size < 2) return true
+            val payload = String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP))
+            val exp = org.json.JSONObject(payload).optLong("exp", 0L)
+            if (exp == 0L) return false
+            System.currentTimeMillis() / 1000 >= exp
+        } catch (_: Exception) {
+            false
+        }
     }
 }

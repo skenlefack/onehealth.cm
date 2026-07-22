@@ -110,10 +110,28 @@ class RumorDetailViewModel @Inject constructor(
         }
     }
 
+    fun deleteRumor() {
+        viewModelScope.launch {
+            cohrmRepository.deleteRumor(rumorId).fold(
+                onSuccess = { _events.emit(RumorDetailEvent.Success("Rumeur supprimee")) },
+                onFailure = { e -> _events.emit(RumorDetailEvent.Error(e.localizedMessage ?: "Erreur")) },
+            )
+        }
+    }
+
     fun updateStatus(status: String) {
         viewModelScope.launch {
             cohrmRepository.updateRumor(rumorId, status = status).fold(
-                onSuccess = { rumor -> _state.update { it.copy(rumor = rumor) } },
+                onSuccess = { rumor ->
+                    _state.update { it.copy(rumor = rumor) }
+                    val label = when (status) {
+                        "investigating" -> "Investigation lancee"
+                        "confirmed" -> "Rumeur confirmee"
+                        "closed" -> "Rumeur cloturee"
+                        else -> "Statut mis a jour"
+                    }
+                    _events.emit(RumorDetailEvent.Success(label))
+                },
                 onFailure = { e -> _events.emit(RumorDetailEvent.Error(e.localizedMessage ?: "Erreur")) },
             )
         }

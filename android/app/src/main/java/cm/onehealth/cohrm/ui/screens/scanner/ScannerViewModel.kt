@@ -69,8 +69,8 @@ class ScannerViewModel @Inject constructor(
 
     init {
         checkAccess()
-        loadHistory()
         loadSchedulePrefs()
+        loadHistory()
         loadScannerResults()
     }
 

@@ -99,7 +99,10 @@ interface ApiService {
     @GET("rumors/{id}")
     suspend fun getRumorDetail(@Path("id") id: Int): RumorDetailResponse
 
-    @PATCH("rumors/{id}")
+    @retrofit2.http.DELETE("rumors/{id}")
+    suspend fun deleteRumor(@Path("id") id: Int): GenericResponse
+
+    @PUT("rumors/{id}")
     suspend fun updateRumor(
         @Path("id") id: Int,
         @Body request: RumorUpdateRequest,

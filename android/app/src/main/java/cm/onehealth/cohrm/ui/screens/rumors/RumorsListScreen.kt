@@ -1,7 +1,9 @@
 package cm.onehealth.cohrm.ui.screens.rumors
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +62,11 @@ import cm.onehealth.cohrm.data.remote.dto.RumorDetail
 import cm.onehealth.cohrm.ui.theme.Accent
 import cm.onehealth.cohrm.ui.theme.Alert
 import cm.onehealth.cohrm.ui.theme.Danger
+import cm.onehealth.cohrm.ui.theme.Info
+import cm.onehealth.cohrm.ui.theme.Primary
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import cm.onehealth.cohrm.ui.theme.Info
 import cm.onehealth.cohrm.ui.theme.Muted
 import cm.onehealth.cohrm.ui.theme.Primary
@@ -198,8 +205,33 @@ fun RumorsListScreen(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.rumors, key = { it.id }) { rumor ->
-                        RumorListItem(rumor = rumor, onClick = { onRumorClick(rumor.id) })
+                    // Selection action bar
+                    if (state.isSelectionMode) {
+                        item {
+                            SelectionActionBar(
+                                selectedCount = state.selectedIds.size,
+                                isLoading = state.isBatchActionLoading,
+                                onSelectAll = { viewModel.selectAll() },
+                                onClearSelection = { viewModel.clearSelection() },
+                                onBatchValidate = { viewModel.batchValidate("approved") },
+                                onBatchReject = { viewModel.batchValidate("rejected") },
+                                onBatchInvestigate = { viewModel.batchUpdateStatus("investigating") },
+                                onBatchDelete = { viewModel.batchDelete() },
+                            )
+                        }
+                    }
+
+                    items(state.rumors.distinctBy { it.id }, key = { it.id }) { rumor ->
+                        RumorListItem(
+                            rumor = rumor,
+                            isSelected = state.selectedIds.contains(rumor.id),
+                            isSelectionMode = state.isSelectionMode,
+                            onClick = {
+                                if (state.isSelectionMode) viewModel.toggleSelection(rumor.id)
+                                else onRumorClick(rumor.id)
+                            },
+                            onLongClick = { viewModel.toggleSelection(rumor.id) },
+                        )
                     }
                     if (state.isLoadingMore) {
                         item {
@@ -215,12 +247,91 @@ fun RumorsListScreen(
 }
 
 @Composable
-private fun RumorListItem(rumor: RumorDetail, onClick: () -> Unit) {
+private fun SelectionActionBar(
+    selectedCount: Int,
+    isLoading: Boolean,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onBatchValidate: () -> Unit,
+    onBatchReject: () -> Unit,
+    onBatchInvestigate: () -> Unit,
+    onBatchDelete: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Primary.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "$selectedCount selectionne(s)",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Primary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    androidx.compose.material3.TextButton(onClick = onSelectAll) {
+                        Text("Tout", style = MaterialTheme.typography.labelSmall)
+                    }
+                    androidx.compose.material3.TextButton(onClick = onClearSelection) {
+                        Text("Annuler", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+            if (isLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    SmallActionButton("Valider", Accent, Modifier.weight(1f), onBatchValidate)
+                    SmallActionButton("Rejeter", Danger, Modifier.weight(1f), onBatchReject)
+                    SmallActionButton("Investiguer", Info, Modifier.weight(1f), onBatchInvestigate)
+                    SmallActionButton("Supprimer", Danger, Modifier.weight(1f), onBatchDelete)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmallActionButton(label: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(34.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = color),
+        shape = RoundedCornerShape(8.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, maxLines = 1)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RumorListItem(
+    rumor: RumorDetail,
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) Primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+        ),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, Primary) else null,
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {

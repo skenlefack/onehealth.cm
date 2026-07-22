@@ -157,7 +157,7 @@ fun ScannerScreen(
         }
 
         // Scan history cards
-        items(state.scans, key = { it.id }) { scan ->
+        items(state.scans.distinctBy { it.id }, key = { it.id }) { scan ->
             ScanHistoryCard(scan = scan, onClick = { onScanClick(scan.id) })
         }
 
@@ -212,7 +212,7 @@ fun ScannerScreen(
             }
         }
 
-        items(state.scannerResults, key = { it.id }) { result ->
+        items(state.scannerResults.distinctBy { it.id }, key = { it.id }) { result ->
             ScannerResultCard(
                 result = result,
                 onReview = { viewModel.reviewResult(result.id, "reviewed") },

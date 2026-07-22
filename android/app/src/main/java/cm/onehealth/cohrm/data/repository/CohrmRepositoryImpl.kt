@@ -132,6 +132,12 @@ class CohrmRepositoryImpl @Inject constructor(
         if (!response.success) throw Exception(response.message ?: "Risk assessment failed")
     }
 
+    override suspend fun deleteRumor(id: Int): Result<Unit> = runCatching {
+        val response = apiService.deleteRumor(id)
+        if (!response.success) throw Exception(response.message ?: "Delete failed")
+        try { rumorDao.deleteById(id) } catch (_: Exception) {}
+    }
+
     override suspend fun getValidations(id: Int): Result<List<ValidationItem>> =
         runCatching {
             val response = apiService.getValidations(id)

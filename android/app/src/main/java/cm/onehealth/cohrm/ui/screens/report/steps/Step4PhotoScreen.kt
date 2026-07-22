@@ -1,6 +1,9 @@
 package cm.onehealth.cohrm.ui.screens.report.steps
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -28,7 +32,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import cm.onehealth.cohrm.R
 import cm.onehealth.cohrm.domain.model.Photo
 import cm.onehealth.cohrm.ui.screens.report.ReportFormState
@@ -53,6 +62,20 @@ fun Step4PhotoScreen(
     val context = LocalContext.current
     val photoHelper = remember { PhotoHelper(context) }
 
+    // Temporary file for camera capture
+    var cameraImageFile by remember { mutableStateOf<File?>(null) }
+
+    // Helper to create temp file and URI for camera
+    fun createCameraUri(): Uri {
+        val file = File(context.cacheDir, "cohrm_photo_${System.currentTimeMillis()}.jpg")
+        cameraImageFile = file
+        return FileProvider.getUriForFile(
+            context,
+            "cm.onehealth.cohrm.fileprovider",
+            file,
+        )
+    }
+
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -67,9 +90,37 @@ fun Step4PhotoScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        // Photo is already saved at the temp file path
         if (success) {
-            // The photo was saved by the camera intent to the URI we provided
+            cameraImageFile?.let { file ->
+                if (file.exists() && file.length() > 0) {
+                    viewModel.addPhoto(Photo(localPath = file.absolutePath))
+                }
+            }
+        }
+    }
+
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val uri = createCameraUri()
+            cameraLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "Permission camera requise", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun launchCamera() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            val uri = createCameraUri()
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -138,12 +189,23 @@ fun Step4PhotoScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Camera button
+                OutlinedButton(
+                    onClick = { launchCamera() },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.photo_camera))
+                }
+
+                // Gallery button
                 OutlinedButton(
                     onClick = { galleryLauncher.launch("image/*") },
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(stringResource(R.string.photo_gallery))
                 }
             }
