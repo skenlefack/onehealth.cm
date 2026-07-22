@@ -2,6 +2,7 @@ package cm.onehealth.cohrm.ui.screens.rumors
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -80,6 +81,39 @@ fun RumorsListScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showSearch by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is RumorsEvent.BatchResult -> {
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                }
+                is RumorsEvent.Error -> {
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // Delete confirmation dialog
+    if (showDeleteConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Confirmer la suppression") },
+            text = { Text("Supprimer ${state.selectedIds.size} rumeur(s) ? Cette action est irreversible.") },
+            confirmButton = {
+                Button(
+                    onClick = { showDeleteConfirm = false; viewModel.batchDelete() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Danger),
+                ) { Text("Supprimer") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) { Text("Annuler") }
+            },
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -216,7 +250,7 @@ fun RumorsListScreen(
                                 onBatchValidate = { viewModel.batchValidate("approved") },
                                 onBatchReject = { viewModel.batchValidate("rejected") },
                                 onBatchInvestigate = { viewModel.batchUpdateStatus("investigating") },
-                                onBatchDelete = { viewModel.batchDelete() },
+                                onBatchDelete = { showDeleteConfirm = true },
                             )
                         }
                     }

@@ -6,8 +6,11 @@ import cm.onehealth.cohrm.data.remote.dto.RumorDetail
 import cm.onehealth.cohrm.domain.repository.CohrmRepository
 import cm.onehealth.cohrm.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -32,7 +35,13 @@ data class RumorsUiState(
     val selectedIds: Set<Int> = emptySet(),
     val isSelectionMode: Boolean = false,
     val isBatchActionLoading: Boolean = false,
+    val batchResultMessage: String? = null,
 )
+
+sealed interface RumorsEvent {
+    data class BatchResult(val message: String) : RumorsEvent
+    data class Error(val message: String) : RumorsEvent
+}
 
 @HiltViewModel
 class RumorsViewModel @Inject constructor(
@@ -42,6 +51,9 @@ class RumorsViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(RumorsUiState())
     val state: StateFlow<RumorsUiState> = _state.asStateFlow()
+
+    private val _events = MutableSharedFlow<RumorsEvent>()
+    val events: SharedFlow<RumorsEvent> = _events.asSharedFlow()
 
     val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
 
@@ -194,15 +206,23 @@ class RumorsViewModel @Inject constructor(
         val ids = _state.value.selectedIds.toList()
         if (ids.isEmpty()) return
         _state.update { it.copy(isBatchActionLoading = true) }
+        val label = when (status) {
+            "investigating" -> "investigation"
+            "confirmed" -> "confirmation"
+            "closed" -> "cloture"
+            else -> "mise a jour"
+        }
         viewModelScope.launch {
             var success = 0
+            var failed = 0
             for (id in ids) {
                 cohrmRepository.updateRumor(id, status = status).fold(
                     onSuccess = { success++ },
-                    onFailure = {},
+                    onFailure = { failed++ },
                 )
             }
             _state.update { it.copy(isBatchActionLoading = false, selectedIds = emptySet(), isSelectionMode = false) }
+            _events.emit(RumorsEvent.BatchResult("$label: $success/${ids.size} reussie(s)" + if (failed > 0) " ($failed echec)" else ""))
             loadRumors()
         }
     }
@@ -212,10 +232,16 @@ class RumorsViewModel @Inject constructor(
         if (ids.isEmpty()) return
         _state.update { it.copy(isBatchActionLoading = true) }
         viewModelScope.launch {
+            var success = 0
+            var failed = 0
             for (id in ids) {
-                cohrmRepository.deleteRumor(id).fold(onSuccess = {}, onFailure = {})
+                cohrmRepository.deleteRumor(id).fold(
+                    onSuccess = { success++ },
+                    onFailure = { failed++ },
+                )
             }
             _state.update { it.copy(isBatchActionLoading = false, selectedIds = emptySet(), isSelectionMode = false) }
+            _events.emit(RumorsEvent.BatchResult("Suppression: $success/${ids.size} reussie(s)" + if (failed > 0) " ($failed echec)" else ""))
             loadRumors()
         }
     }
@@ -224,11 +250,18 @@ class RumorsViewModel @Inject constructor(
         val ids = _state.value.selectedIds.toList()
         if (ids.isEmpty()) return
         _state.update { it.copy(isBatchActionLoading = true) }
+        val label = if (decision == "approved") "Validation" else "Rejet"
         viewModelScope.launch {
+            var success = 0
+            var failed = 0
             for (id in ids) {
-                cohrmRepository.validateRumor(id, decision = decision).fold(onSuccess = {}, onFailure = {})
+                cohrmRepository.validateRumor(id, decision = decision).fold(
+                    onSuccess = { success++ },
+                    onFailure = { failed++ },
+                )
             }
             _state.update { it.copy(isBatchActionLoading = false, selectedIds = emptySet(), isSelectionMode = false) }
+            _events.emit(RumorsEvent.BatchResult("$label: $success/${ids.size} reussie(s)" + if (failed > 0) " ($failed echec)" else ""))
             loadRumors()
         }
     }

@@ -167,13 +167,17 @@ fun RumorDetailScreen(
                         }
                     }
 
-                    // Location
-                    SectionCard(stringResource(R.string.rumor_location)) {
-                        DetailRow(stringResource(R.string.rumor_region), rumor.region)
-                        DetailRow(stringResource(R.string.rumor_department), rumor.department)
-                        rumor.district?.let { DetailRow(stringResource(R.string.rumor_district), it) }
-                        if (rumor.latitude != null && rumor.longitude != null) {
-                            DetailRow("GPS", "${rumor.latitude}, ${rumor.longitude}")
+                    // Location (only show if at least one field is filled)
+                    val hasLocation = rumor.region.isNotEmpty() || rumor.department.isNotEmpty() ||
+                        !rumor.district.isNullOrEmpty() || (rumor.latitude != null && rumor.longitude != null)
+                    if (hasLocation) {
+                        SectionCard(stringResource(R.string.rumor_location)) {
+                            if (rumor.region.isNotEmpty()) DetailRow(stringResource(R.string.rumor_region), rumor.region)
+                            if (rumor.department.isNotEmpty()) DetailRow(stringResource(R.string.rumor_department), rumor.department)
+                            rumor.district?.takeIf { it.isNotEmpty() }?.let { DetailRow(stringResource(R.string.rumor_district), it) }
+                            if (rumor.latitude != null && rumor.longitude != null) {
+                                DetailRow("GPS", "${rumor.latitude}, ${rumor.longitude}")
+                            }
                         }
                     }
 

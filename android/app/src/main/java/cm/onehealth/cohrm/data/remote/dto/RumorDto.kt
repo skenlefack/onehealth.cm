@@ -91,10 +91,10 @@ data class FeedbackItem(
 
 @JsonClass(generateAdapter = true)
 data class ValidationRequest(
-    val decision: String,
+    val status: String,
+    @Json(name = "action_type") val actionType: String = "validation",
     val notes: String? = null,
-    @Json(name = "risk_assessment") val riskAssessment: String? = null,
-    @Json(name = "priority_change") val priorityChange: String? = null,
+    @Json(name = "rejection_reason") val rejectionReason: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

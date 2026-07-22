@@ -113,7 +113,7 @@ interface ApiService {
     suspend fun validateRumor(
         @Path("id") id: Int,
         @Body request: ValidationRequest,
-    ): RumorDetailResponse
+    ): GenericResponse
 
     // Risk Assessment
     @POST("cohrm/rumors/{id}/risk-assessment")

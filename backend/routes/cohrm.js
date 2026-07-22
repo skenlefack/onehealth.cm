@@ -348,12 +348,24 @@ router.get('/rumors/:id', auth, async (req, res) => {
       ORDER BY n.created_at DESC
     `, [req.params.id]);
 
+    const rumor = rumors[0];
     res.json({
       success: true,
       data: {
-        ...rumors[0],
+        ...rumor,
+        code: rumor.code || '',
+        title: rumor.title || '',
+        description: rumor.description || '',
+        category: rumor.category || '',
+        status: rumor.status || 'pending',
+        priority: rumor.priority || 'medium',
+        risk_level: rumor.risk_level || 'unknown',
+        source: rumor.source || '',
+        region: rumor.region || '',
+        department: rumor.department || '',
+        created_at: rumor.created_at || '',
         history,
-        notes
+        notes,
       }
     });
   } catch (error) {

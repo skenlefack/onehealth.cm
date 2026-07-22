@@ -102,8 +102,38 @@ class CohrmRepositoryImpl @Inject constructor(
         riskAssessment: String?,
         priorityChange: String?,
     ): Result<RumorDetail> = runCatching {
-        val response = apiService.validateRumor(id, ValidationRequest(decision, notes, riskAssessment, priorityChange))
-        response.data ?: throw Exception("Validation failed")
+        // Map mobile decision names to backend status values
+        val backendStatus = when (decision) {
+            "approved" -> "validated"
+            "rejected" -> "rejected"
+            "escalated" -> "escalated"
+            "needs_info" -> "needs_info"
+            else -> decision
+        }
+        val actionType = when (decision) {
+            "approved" -> "validation"
+            "rejected" -> "rejection"
+            "escalated" -> "escalation"
+            "needs_info" -> "needs_info"
+            else -> "validation"
+        }
+        val rejectionReason = if (decision == "rejected") notes else null
+        val validationNotes = if (decision != "rejected") notes else null
+
+        val response = apiService.validateRumor(
+            id,
+            ValidationRequest(
+                status = backendStatus,
+                actionType = actionType,
+                notes = validationNotes,
+                rejectionReason = rejectionReason,
+            ),
+        )
+        if (!response.success) throw Exception(response.message ?: "Validation failed")
+
+        // Reload the rumor to get updated data
+        val detail = apiService.getRumorDetail(id)
+        detail.data ?: throw Exception("Could not reload rumor")
     }
 
     override suspend fun addFeedback(id: Int, message: String, type: String): Result<RumorDetail> =
