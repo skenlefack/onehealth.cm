@@ -281,15 +281,31 @@ router.get('/rumors', auth, async (req, res) => {
 
     const [rumors] = await db.query(query, params);
 
+    // Sanitize null fields for mobile clients (Moshi strict null-safety)
+    const sanitized = rumors.map(r => ({
+      ...r,
+      code: r.code || '',
+      title: r.title || '',
+      description: r.description || '',
+      category: r.category || '',
+      status: r.status || 'pending',
+      priority: r.priority || 'medium',
+      risk_level: r.risk_level || 'unknown',
+      source: r.source || '',
+      region: r.region || '',
+      department: r.department || '',
+      created_at: r.created_at || '',
+    }));
+
     res.json({
       success: true,
-      data: rumors,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+      data: {
+        rumors: sanitized,
         total,
-        pages: Math.ceil(total / limit)
-      }
+        page: pageNum,
+        per_page: limitNum,
+        total_pages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Get rumors error:', error);
@@ -1128,10 +1144,10 @@ router.get('/mobile/dashboard', auth, async (req, res) => {
         by_risk: byRisk,
         trends: trends.map(t => ({ date: t.date, count: t.count })),
         recent_rumors: recentRumors.map(r => ({
-          id: r.id, code: r.code, title: r.title, category: r.category,
-          status: r.status, priority: r.priority, risk: r.riskLevel || 'unknown',
-          source: r.source, region: r.region, department: r.department,
-          created_at: r.created_at, reporter_name: r.reporter_name
+          id: r.id, code: r.code || '', title: r.title || '', category: r.category || '',
+          status: r.status || 'pending', priority: r.priority || 'medium', risk: r.riskLevel || r.risk_level || 'unknown',
+          source: r.source || '', region: r.region || '', department: r.department || '',
+          created_at: r.created_at || '', reporter_name: r.reporter_name || null
         }))
       }
     });
