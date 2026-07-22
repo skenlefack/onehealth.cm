@@ -541,6 +541,52 @@ export const getNotificationPreferences = () => cohrmClient.get('/notification-p
 export const updateNotificationPreferences = (data) => cohrmClient.put('/notification-preferences', data);
 
 // ============================================
+// VALIDATION ASSIGNEES (Gestion des validateurs)
+// ============================================
+
+/**
+ * Récupère toutes les assignations de validation
+ * @param {object} params - Filtres (level, region, is_active)
+ */
+export const getValidationAssignees = (params) => cohrmClient.get('/validation-assignees', { params });
+
+/**
+ * Récupère les assignés pour un niveau spécifique
+ * @param {number} level - Niveau de validation (1-5)
+ */
+export const getValidationAssigneesByLevel = (level) => cohrmClient.get(`/validation-assignees/level/${level}`);
+
+/**
+ * Récupère les utilisateurs disponibles pour assignation à un niveau
+ * @param {number} level - Niveau de validation
+ */
+export const getAvailableUsersForAssignment = (level) => cohrmClient.get('/validation-assignees/available-users', { params: { level } });
+
+/**
+ * Assigne un utilisateur à un niveau de validation
+ * @param {object} data - Données d'assignation
+ */
+export const createValidationAssignee = (data) => cohrmClient.post('/validation-assignees', data);
+
+/**
+ * Met à jour une assignation de validation
+ * @param {number|string} id - ID de l'assignation
+ * @param {object} data - Données à mettre à jour
+ */
+export const updateValidationAssignee = (id, data) => cohrmClient.put(`/validation-assignees/${id}`, data);
+
+/**
+ * Supprime (désactive) une assignation de validation
+ * @param {number|string} id - ID de l'assignation
+ */
+export const deleteValidationAssignee = (id) => cohrmClient.delete(`/validation-assignees/${id}`);
+
+/**
+ * Récupère les niveaux assignés à l'utilisateur connecté
+ */
+export const getMyValidationLevels = () => cohrmClient.get('/validation-assignees/my-levels');
+
+// ============================================
 // EXPORT PAR DÉFAUT
 // ============================================
 
@@ -634,6 +680,14 @@ const cohrmApi = {
   sendTestNotification,
   getNotificationPreferences,
   updateNotificationPreferences,
+  // Validation assignees
+  getValidationAssignees,
+  getValidationAssigneesByLevel,
+  getAvailableUsersForAssignment,
+  createValidationAssignee,
+  updateValidationAssignee,
+  deleteValidationAssignee,
+  getMyValidationLevels,
 };
 
 export default cohrmApi;

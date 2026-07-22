@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import {
   BarChart3, Megaphone, CheckCircle, Map, Shield, MessageCircle,
   Globe, Users, Download, Settings, Bell, ChevronLeft, Menu,
-  ArrowLeft, Radar, Activity,
+  ArrowLeft, Radar, Activity, UserCheck,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { COHRM_NAV_ITEMS, COHRM_COLORS } from '../utils/constants';
@@ -26,7 +26,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 // Mapping des noms d'icônes vers les composants Lucide
 const ICON_MAP = {
   BarChart3, Megaphone, CheckCircle, Map, Shield, MessageCircle,
-  Globe, Users, Download, Settings, Bell, Activity,
+  Globe, Users, Download, Settings, Bell, Activity, UserCheck,
 };
 
 /**

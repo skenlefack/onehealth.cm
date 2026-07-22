@@ -28,6 +28,7 @@ const PERMISSION_MATRIX = {
   'actor-create': { view: 4, edit: 4 },
   'actor-edit':   { view: 4, edit: 4 },
   'actor-detail': { view: 4, edit: 4 },
+  'validation-assignees': { view: 4, edit: 4 },
   notifications: { view: 3, edit: 5 },
   reports:      { view: 2, edit: 2 },
   'epi-report': { view: 3, edit: 3 },

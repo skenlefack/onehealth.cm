@@ -268,6 +268,24 @@ router.get('/rumors', auth, async (req, res) => {
       params.push(date_to);
     }
 
+    // Filter by validation level for non-admin users with assignations
+    if (req.user.role !== 'admin') {
+      const [assignments] = await db.query(
+        'SELECT validation_level, region, department FROM cohrm_validation_assignees WHERE user_id = ? AND is_active = 1',
+        [req.user.id]
+      );
+      if (assignments.length > 0) {
+        const levelConditions = assignments.map(a => {
+          let cond = 'r.validation_level = ?';
+          params.push(a.validation_level);
+          if (a.region) { cond += ' AND r.region = ?'; params.push(a.region); }
+          if (a.department) { cond += ' AND r.department = ?'; params.push(a.department); }
+          return `(${cond})`;
+        });
+        query += ` AND (${levelConditions.join(' OR ')})`;
+      }
+    }
+
     // Count total
     const countQuery = query.replace("SELECT r.*,\n        CONCAT(u.first_name, ' ', u.last_name) as assigned_user_name,\n        CONCAT(reporter.first_name, ' ', reporter.last_name) as reported_by_name", 'SELECT COUNT(*) as total');
     const [[{ total }]] = await db.query(countQuery, params);

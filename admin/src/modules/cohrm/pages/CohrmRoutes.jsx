@@ -30,6 +30,7 @@ import NotificationsCenter from './NotificationsCenter';
 import ReportsPage from './ReportsPage';
 import EpiReportPage from './EpiReportPage';
 import PublicFormSettings from './PublicFormSettings';
+import ValidationAssigneesPage from './ValidationAssigneesPage';
 
 /**
  * Composant de routing COHRM
@@ -158,6 +159,14 @@ const CohrmRoutes = ({ user, isDark }) => {
         return (
           <ProtectedRoute user={user} section="actor-detail" isDark={isDark}>
             <ActorDetail isDark={isDark} user={user} />
+          </ProtectedRoute>
+        );
+
+      // ---- Validation Assignees (niveau 4+) ----
+      case 'validation-assignees':
+        return (
+          <ProtectedRoute user={user} section="validation-assignees" isDark={isDark}>
+            <ValidationAssigneesPage isDark={isDark} user={user} />
           </ProtectedRoute>
         );
 

@@ -303,6 +303,7 @@ export const COHRM_NAV_ITEMS = [
   { id: 'sms', label: 'SMS', icon: 'MessageCircle', minLevel: 3 },
   { id: 'scanner', label: 'Scanner Web', icon: 'Globe', minLevel: 3 },
   { id: 'actors', label: 'Acteurs', icon: 'Users', minLevel: 4 },
+  { id: 'validation-assignees', label: 'Validateurs', icon: 'UserCheck', minLevel: 4 },
   { id: 'reports', label: 'Rapports', icon: 'BarChart3', minLevel: 2 },
   { id: 'epi-report', label: 'Rapport Épi', icon: 'Activity', minLevel: 3 },
   { id: 'notifications', label: 'Notifications', icon: 'Bell', minLevel: 3 },
