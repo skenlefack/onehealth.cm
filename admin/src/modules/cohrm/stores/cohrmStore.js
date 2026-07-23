@@ -143,9 +143,15 @@ const useCohrmStore = create((set, get) => ({
     try {
       const response = await getRumors(filters);
       if (response.success) {
+        // Handle both formats: { data: [...], pagination } and { data: { rumors: [...], total, ... } }
+        const isWrapped = response.data && !Array.isArray(response.data) && response.data.rumors;
+        const rumors = isWrapped ? response.data.rumors : (Array.isArray(response.data) ? response.data : []);
+        const pagination = isWrapped
+          ? { page: response.data.page, limit: response.data.per_page, total: response.data.total, pages: response.data.total_pages }
+          : (response.pagination || { page: 1, limit: 20, total: 0, pages: 0 });
         set({
-          rumors: response.data,
-          pagination: response.pagination || { page: 1, limit: 20, total: 0, pages: 0 },
+          rumors,
+          pagination,
           loading: false,
         });
       } else {
