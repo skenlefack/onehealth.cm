@@ -274,7 +274,8 @@ const useCohrmStore = create((set, get) => ({
     try {
       const response = await getRumors({ page: 1, limit: 10 });
       if (response.success) {
-        set({ recentRumors: response.data });
+        const rumors = Array.isArray(response.data) ? response.data : (response.data?.rumors || []);
+        set({ recentRumors: rumors });
       }
     } catch (err) {
       console.error('Erreur chargement rumeurs récentes:', err);
