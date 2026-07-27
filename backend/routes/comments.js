@@ -1,7 +1,16 @@
 const express = require('express');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
 const { auth, authorize, optionalAuth } = require('../middleware/auth');
+
+// Rate limiter for comment submissions
+const commentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 comments per 15 minutes
+  message: { success: false, message: 'Too many comments. Please try again later.' },
+});
 
 // GET comments for a post
 router.get('/post/:postId', async (req, res) => {
@@ -62,9 +71,20 @@ router.get('/', auth, authorize('admin', 'editor'), async (req, res) => {
   }
 });
 
-// POST create comment
-router.post('/', optionalAuth, async (req, res) => {
+// POST create comment (with input validation and rate limiting)
+router.post('/', commentLimiter, optionalAuth, [
+  body('post_id').isInt().withMessage('Invalid post ID'),
+  body('content').trim().isLength({ min: 1, max: 5000 }).withMessage('Comment must be 1-5000 characters').escape(),
+  body('author_name').optional().trim().isLength({ max: 100 }).escape(),
+  body('author_email').optional().isEmail().normalizeEmail(),
+  body('parent_id').optional().isInt(),
+], async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
     const { post_id, content, author_name, author_email, parent_id } = req.body;
 
     const [result] = await db.query(

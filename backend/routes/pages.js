@@ -3,6 +3,44 @@ const router = express.Router();
 const db = require('../config/db');
 const { auth, adminOnly } = require('../middleware/auth');
 
+// Sanitize custom CSS/JS to prevent XSS injection
+function sanitizeCustomCSS(css) {
+  if (!css) return css;
+  // Remove JavaScript expressions, import statements, and url() with javascript:
+  return css
+    .replace(/expression\s*\(/gi, '/* blocked */(')
+    .replace(/@import\s/gi, '/* blocked-import */ ')
+    .replace(/javascript\s*:/gi, '/* blocked */:')
+    .replace(/behavior\s*:/gi, '/* blocked */:')
+    .replace(/-moz-binding\s*:/gi, '/* blocked */:');
+}
+
+function sanitizeCustomJS(js) {
+  if (!js) return js;
+  // Block dangerous patterns in custom JS
+  const dangerous = [
+    /document\.cookie/gi,
+    /localStorage/gi,
+    /sessionStorage/gi,
+    /eval\s*\(/gi,
+    /Function\s*\(/gi,
+    /fetch\s*\(/gi,
+    /XMLHttpRequest/gi,
+    /\.src\s*=/gi,
+    /window\.location/gi,
+    /document\.write/gi,
+    /innerHTML/gi,
+    /outerHTML/gi,
+  ];
+  let sanitized = js;
+  for (const pattern of dangerous) {
+    if (pattern.test(sanitized)) {
+      return '/* Custom JS blocked: contains dangerous patterns */';
+    }
+  }
+  return sanitized;
+}
+
 // @route   GET /api/pages
 // @desc    Get all pages
 router.get('/', async (req, res) => {
@@ -82,6 +120,10 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Slug already exists' });
     }
 
+    // Sanitize custom CSS/JS to prevent stored XSS
+    const safeCss = sanitizeCustomCSS(css_custom);
+    const safeJs = sanitizeCustomJS(js_custom);
+
     const [result] = await db.query(`
       INSERT INTO pages (
         title, slug, content, sections, template, parent_id, author_id,
@@ -92,7 +134,7 @@ router.post('/', auth, async (req, res) => {
     `, [
       title, slug, content, sections, template || 'default', parent_id || null,
       req.user.id, status || 'draft', featured_image, meta_title, meta_description,
-      meta_keywords, css_custom, js_custom, sort_order || 0,
+      meta_keywords, safeCss, safeJs, sort_order || 0,
       show_title !== false, show_breadcrumb !== false
     ]);
 
@@ -121,6 +163,10 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Slug already exists' });
     }
 
+    // Sanitize custom CSS/JS to prevent stored XSS
+    const safeCss = sanitizeCustomCSS(css_custom);
+    const safeJs = sanitizeCustomJS(js_custom);
+
     await db.query(`
       UPDATE pages SET
         title = ?, slug = ?, content = ?, sections = ?, template = ?,
@@ -131,7 +177,7 @@ router.put('/:id', auth, async (req, res) => {
     `, [
       title, slug, content, sections, template, parent_id || null,
       status, featured_image, meta_title, meta_description,
-      meta_keywords, css_custom, js_custom, sort_order,
+      meta_keywords, safeCss, safeJs, sort_order,
       show_title, show_breadcrumb, req.params.id
     ]);
 

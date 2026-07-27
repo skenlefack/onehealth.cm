@@ -3,26 +3,54 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
 const { auth } = require('../middleware/auth');
 const { generateVerificationToken, sendVerificationEmail, sendAccountActivatedEmail } = require('../services/emailService');
+
+// Rate limiters for auth endpoints
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 login attempts per window
+  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 registrations per hour per IP
+  message: { success: false, message: 'Too many registration attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 resend attempts
+  message: { success: false, message: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Generate JWT token
 const generateToken = (user) => {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '7d' }
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
   );
 };
 
 // @route   POST /api/auth/register
 // @desc    Register new user
 // @access  Public
-router.post('/register', [
+router.post('/register', registerLimiter, [
   body('username').trim().isLength({ min: 3 }).escape(),
   body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 })
+  body('password').isLength({ min: 12 }).withMessage('Password must be at least 12 characters')
+    .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one number')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -80,7 +108,7 @@ router.post('/register', [
 // @route   POST /api/auth/login
 // @desc    Login user
 // @access  Public
-router.post('/login', [
+router.post('/login', loginLimiter, [
   body('email').isEmail().normalizeEmail(),
   body('password').exists()
 ], async (req, res) => {
@@ -218,7 +246,9 @@ router.put('/profile', auth, async (req, res) => {
 // @access  Private
 router.put('/password', auth, [
   body('currentPassword').exists(),
-  body('newPassword').isLength({ min: 6 })
+  body('newPassword').isLength({ min: 12 }).withMessage('Password must be at least 12 characters')
+    .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one number')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -295,7 +325,7 @@ router.get('/verify-email/:token', async (req, res) => {
 // @route   POST /api/auth/resend-verification
 // @desc    Resend verification email
 // @access  Public
-router.post('/resend-verification', [
+router.post('/resend-verification', verificationLimiter, [
   body('email').isEmail().normalizeEmail()
 ], async (req, res) => {
   try {

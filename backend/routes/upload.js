@@ -60,10 +60,15 @@ const documentFilter = (req, file, cb) => {
   }
 };
 
+// Allowed image upload types
+const ALLOWED_IMAGE_TYPES = ['experts', 'organizations', 'materials', 'general', 'avatars', 'media', 'cohrm'];
+
 // Storage configuration for images
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const type = req.params.type || 'general';
+    const rawType = req.params.type || 'general';
+    // Sanitize: only allow whitelisted types to prevent path traversal
+    const type = ALLOWED_IMAGE_TYPES.includes(rawType) ? rawType : 'general';
     const uploadPath = path.join(__dirname, '..', 'uploads', type);
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -467,12 +472,39 @@ router.post('/elearning/thumbnail', auth, uploadImage.single('file'), async (req
   }
 });
 
-// Delete file
+// Allowed upload subdirectories (whitelist)
+const ALLOWED_UPLOAD_TYPES = [
+  'experts', 'organizations', 'materials', 'documents', 'thumbnails', 'general',
+  'elearning', 'cohrm', 'media', 'images', 'avatars'
+];
+
+// Delete file (with path traversal protection)
 router.delete('/:type/:filename', auth, async (req, res) => {
   try {
     const { type, filename } = req.params;
-    const filePath = path.join(__dirname, '..', 'uploads', type, filename);
-    const thumbPath = path.join(__dirname, '..', 'uploads', 'thumbnails', filename);
+
+    // Sanitize: use only basename to prevent path traversal (../../etc/passwd)
+    const safeType = path.basename(type);
+    const safeFilename = path.basename(filename);
+
+    // Validate type against whitelist
+    if (!ALLOWED_UPLOAD_TYPES.includes(safeType)) {
+      return res.status(400).json({ success: false, message: 'Type de fichier invalide' });
+    }
+
+    // Validate filename doesn't contain suspicious characters
+    if (/[^a-zA-Z0-9._-]/.test(safeFilename)) {
+      return res.status(400).json({ success: false, message: 'Nom de fichier invalide' });
+    }
+
+    const uploadsRoot = path.resolve(__dirname, '..', 'uploads');
+    const filePath = path.resolve(uploadsRoot, safeType, safeFilename);
+    const thumbPath = path.resolve(uploadsRoot, 'thumbnails', safeFilename);
+
+    // Extra safety: ensure resolved path is still within uploads directory
+    if (!filePath.startsWith(uploadsRoot) || !thumbPath.startsWith(uploadsRoot)) {
+      return res.status(400).json({ success: false, message: 'Chemin invalide' });
+    }
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -483,7 +515,7 @@ router.delete('/:type/:filename', auth, async (req, res) => {
 
     res.json({ success: true, message: 'Fichier supprimé' });
   } catch (error) {
-    console.error('Delete file error:', error);
+    console.error('Delete file error:', error.message);
     res.status(500).json({ success: false, message: 'Erreur lors de la suppression' });
   }
 });

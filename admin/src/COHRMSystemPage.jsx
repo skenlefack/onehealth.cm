@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, Marker as GoogleMarker, Polyline as GooglePolyline, Polygon as GooglePolygon, Autocomplete } from '@react-google-maps/api';
 
-// Google Maps API Key - à mettre dans .env en production
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'AIzaSyBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+// Google Maps API Key - must be set via REACT_APP_GOOGLE_MAPS_API_KEY env var
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 const GOOGLE_MAPS_LIBRARIES = ['places', 'drawing'];
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';

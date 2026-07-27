@@ -324,7 +324,7 @@ const SearchableSelect = ({
 };
 
 // ============== GOOGLE MAPS API KEY ==============
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAg1WgVWG_g28PoTcUmbVrqAqOx19Hd0WQ';
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 
 const googleMapsLibraries = ['places', 'drawing'];
 

@@ -12,10 +12,14 @@ const dbConfig = {
   database: process.env.DB_NAME || 'onehealth_cms'
 };
 
+// Generate a secure random password
+const crypto = require('crypto');
+const generatedPassword = crypto.randomBytes(16).toString('base64url');
+
 const adminUser = {
-  username: 'admin',
-  email: 'admin@onehealth.cm',
-  password: 'admin123',  // Ce mot de passe sera hashé
+  username: process.env.ADMIN_USERNAME || 'admin',
+  email: process.env.ADMIN_EMAIL || 'admin@onehealth.cm',
+  password: process.env.ADMIN_PASSWORD || generatedPassword,
   first_name: 'Admin',
   last_name: 'OneHealth',
   role: 'admin',
@@ -70,8 +74,9 @@ async function createAdmin() {
     console.log('\n========================================');
     console.log('🎉 UTILISATEUR ADMIN CRÉÉ AVEC SUCCÈS !');
     console.log('========================================');
-    console.log('📧 Email:    admin@onehealth.cm');
-    console.log('🔑 Password: admin123');
+    console.log(`📧 Email:    ${adminUser.email}`);
+    console.log(`🔑 Password: ${adminUser.password}`);
+    console.log('⚠️  IMPORTANT: Save this password now and change it after first login!');
     console.log('========================================\n');
 
   } catch (error) {

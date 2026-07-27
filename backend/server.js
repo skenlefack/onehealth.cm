@@ -25,17 +25,41 @@ const allowedOrigins = [
   'https://admin.onehealth.cm'
 ];
 
-// Security middleware
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+// Security middleware with enhanced headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://cdn.tiny.cloud"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.tiny.cloud"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://maps.googleapis.com", "wss:", "ws:"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  frameguard: { action: 'deny' },
+}));
 
 // Configuration CORS dynamique
 app.use(cors({
   origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow in development
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
@@ -114,11 +138,21 @@ app.get('/api/health', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  // Log error server-side only (sanitized)
+  console.error(`[${new Date().toISOString()}] Error: ${err.message}`);
+  if (process.env.NODE_ENV === 'development') {
+    console.error(err.stack);
+  }
+
+  // CORS errors
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ success: false, message: 'Origin not allowed' });
+  }
+
+  // Never expose stack traces or internal error details in production
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : (err.message || 'Internal Server Error')
   });
 });
 

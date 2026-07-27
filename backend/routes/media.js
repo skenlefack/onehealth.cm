@@ -7,12 +7,17 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const { auth, authorize } = require('../middleware/auth');
 
+// Allowed folders whitelist to prevent path traversal
+const ALLOWED_MEDIA_FOLDERS = ['general', 'images', 'documents', 'avatars', 'media', 'thumbnails'];
+
 // Multer configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const folder = req.body.folder || 'general';
+    const rawFolder = req.body.folder || 'general';
+    // Sanitize folder name - only allow whitelisted values
+    const folder = ALLOWED_MEDIA_FOLDERS.includes(rawFolder) ? rawFolder : 'general';
     const uploadPath = path.join(__dirname, '../uploads', folder);
-    
+
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }

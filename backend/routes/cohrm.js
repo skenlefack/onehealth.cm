@@ -825,8 +825,33 @@ router.put('/settings', auth, authorize('admin'), async (req, res) => {
 // API MOBILE
 // ============================================
 
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter for mobile login - prevent brute force
+const mobileLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  message: { success: false, message: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for mobile report submissions
+const mobileReportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // 20 reports per hour
+  message: { success: false, message: 'Trop de soumissions. Réessayez plus tard.' },
+});
+
+// Rate limiter for SMS webhook
+const smsWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 SMS per minute
+  message: { success: false, message: 'Rate limit exceeded' },
+});
+
 // POST /api/cohrm/mobile/login - Connexion mobile (auth via users + infos acteur COHRM)
-router.post('/mobile/login', async (req, res) => {
+router.post('/mobile/login', mobileLoginLimiter, async (req, res) => {
   const bcrypt = require('bcryptjs');
   const jwt = require('jsonwebtoken');
 
@@ -894,8 +919,8 @@ router.post('/mobile/login', async (req, res) => {
     // 8. Generate JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '30d' }
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
     );
 
     // 9. Update last login
@@ -954,8 +979,8 @@ router.post('/mobile/login', async (req, res) => {
   }
 });
 
-// POST /api/cohrm/mobile/report - Signaler une rumeur depuis l'app mobile
-router.post('/mobile/report', async (req, res) => {
+// POST /api/cohrm/mobile/report - Signaler une rumeur depuis l'app mobile (auth required)
+router.post('/mobile/report', auth, mobileReportLimiter, async (req, res) => {
   try {
     const {
       title,
@@ -1044,8 +1069,16 @@ router.post('/mobile/report', async (req, res) => {
 });
 
 // POST /api/cohrm/mobile/sms - Recevoir un SMS (webhook pour gateway SMS)
-router.post('/mobile/sms', async (req, res) => {
+// Secured with API key validation for SMS gateway
+router.post('/mobile/sms', smsWebhookLimiter, async (req, res) => {
   try {
+    // Validate SMS gateway API key
+    const apiKey = req.header('X-SMS-API-Key') || req.query.api_key;
+    const expectedKey = process.env.SMS_GATEWAY_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      return res.status(401).json({ success: false, message: 'Invalid SMS gateway API key' });
+    }
+
     const { from, text, timestamp } = req.body;
 
     if (!text) {
@@ -1189,8 +1222,8 @@ router.get('/mobile/dashboard', auth, async (req, res) => {
   }
 });
 
-// GET /api/cohrm/mobile/sync - Synchronisation pour l'app mobile
-router.get('/mobile/sync', async (req, res) => {
+// GET /api/cohrm/mobile/sync - Synchronisation pour l'app mobile (auth required)
+router.get('/mobile/sync', auth, async (req, res) => {
   try {
     const { device_id, last_sync } = req.query;
 
@@ -3765,8 +3798,8 @@ router.delete('/rumors/:id/photos/:photoId', auth, async (req, res) => {
 // FORMULAIRE PUBLIC (sans authentification)
 // ============================================
 
-const rateLimit = require('express-rate-limit');
-const publicLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: { success: false, message: 'Trop de soumissions. Réessayez dans 1 heure.' } });
+// rateLimit already imported above for mobile endpoints
+const publicLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, message: { success: false, message: 'Trop de soumissions. Réessayez dans 1 heure.' } });
 
 // POST /api/cohrm/public/report - Signalement public
 router.post('/public/report', publicLimiter, async (req, res) => {
