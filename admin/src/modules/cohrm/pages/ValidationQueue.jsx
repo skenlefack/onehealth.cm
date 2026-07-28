@@ -61,7 +61,8 @@ const ValidationQueue = ({ user, isDark = false }) => {
         limit: 200,
       });
       if (response.success) {
-        setRumors(response.data || []);
+        const data = Array.isArray(response.data) ? response.data : (response.data?.rumors || []);
+        setRumors(data);
       } else {
         setError(response.message);
       }
