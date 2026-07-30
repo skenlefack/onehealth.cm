@@ -515,7 +515,7 @@ const isDuplicate = async (article, dedupDays = 30) => {
  * @param {boolean} isAutomatic - true si lancé par le scheduler
  * @returns {object} Résumé du scan
  */
-const runScan = async (sourceId = null, isAutomatic = false) => {
+const runScan = async (sourceId = null, isAutomatic = false, existingScanId = null) => {
   const config = await getConfig();
   const startTime = Date.now();
 
@@ -529,6 +529,10 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
 
   if (sources.length === 0) {
     console.log('[Scanner] Aucune source active');
+    if (existingScanId) {
+      await db.query('UPDATE cohrm_web_scans SET status = ?, completed_at = NOW(), results_count = 0 WHERE id = ?',
+        ['completed', existingScanId]);
+    }
     return { scanned: 0, results: 0, rumors_created: 0, errors: 0 };
   }
 
@@ -546,13 +550,23 @@ const runScan = async (sourceId = null, isAutomatic = false) => {
     [keywords] = await db.query('SELECT * FROM cohrm_scan_keywords WHERE is_active = 1');
   }
 
-  // Créer l'entrée de scan dans l'historique
-  const [scanEntry] = await db.query(
-    `INSERT INTO cohrm_web_scans (source, status, keywords, started_at, created_at)
-     VALUES (?, 'running', ?, NOW(), NOW())`,
-    [sourceId ? `source_${sourceId}` : 'all', JSON.stringify(keywords.map(k => k.keyword))]
-  );
-  const scanId = scanEntry.insertId;
+  // Use existing scan entry or create a new one
+  let scanId;
+  if (existingScanId) {
+    scanId = existingScanId;
+    // Update the pre-created entry with keywords
+    await db.query(
+      'UPDATE cohrm_web_scans SET keywords = ?, source = ? WHERE id = ?',
+      [JSON.stringify(keywords.map(k => k.keyword)), sourceId ? `source_${sourceId}` : 'all', scanId]
+    );
+  } else {
+    const [scanEntry] = await db.query(
+      `INSERT INTO cohrm_web_scans (source, status, keywords, started_at, created_at)
+       VALUES (?, 'running', ?, NOW(), NOW())`,
+      [sourceId ? `source_${sourceId}` : 'all', JSON.stringify(keywords.map(k => k.keyword))]
+    );
+    scanId = scanEntry.insertId;
+  }
 
   let totalResults = 0;
   let rumorsCreated = 0;

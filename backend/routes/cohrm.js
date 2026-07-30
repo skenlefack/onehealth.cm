@@ -1464,15 +1464,32 @@ router.get('/scan-results/:scanId/rumors', auth, async (req, res) => {
 // POST /api/cohrm/scan/run - Lancer un scan (réel, via cohrmScannerService)
 router.post('/scan/run', auth, async (req, res) => {
   try {
-    const { source_id } = req.body;
+    const { source_id, source } = req.body;
+    // Accept both source_id (numeric) and source (string like 'all', 'news', etc.)
+    const effectiveSourceId = source_id || (source && source !== 'all' ? source : null);
     const scannerService = require('../services/cohrmScannerService');
 
-    // Répondre immédiatement, le scan tourne en arrière-plan
-    res.json({ success: true, message: 'Scan lancé avec succès' });
+    // Create scan entry first to get the scan_id
+    const [scanEntry] = await db.query(
+      `INSERT INTO cohrm_web_scans (source, status, keywords, started_at, created_at)
+       VALUES (?, 'running', '[]', NOW(), NOW())`,
+      [effectiveSourceId ? `source_${effectiveSourceId}` : 'all']
+    );
+    const scanId = scanEntry.insertId;
 
-    // Lancer le scan réel en arrière-plan
-    scannerService.runScan(source_id || null, false).catch(err => {
+    // Respond immediately with scan_id so frontend can poll for results
+    res.json({
+      success: true,
+      message: 'Scan lancé avec succès',
+      data: { scan_id: scanId }
+    });
+
+    // Run the actual scan in background, passing the pre-created scanId
+    scannerService.runScan(effectiveSourceId || null, false, scanId).catch(err => {
       console.error('Background scan error:', err.message);
+      // Mark scan as failed
+      db.query('UPDATE cohrm_web_scans SET status = ?, completed_at = NOW() WHERE id = ?',
+        ['failed', scanId]).catch(() => {});
     });
   } catch (error) {
     console.error('Run scan error:', error);
@@ -1534,19 +1551,26 @@ router.put('/scanner/config', auth, async (req, res) => {
 router.post('/scanner/toggle', auth, async (req, res) => {
   try {
     const { enabled } = req.body;
+    const enabledBool = !!enabled;
     await db.query(
       "INSERT INTO cohrm_settings (`key`, value, description) VALUES ('scanner_enabled', ?, 'Scanner automatique activé') ON DUPLICATE KEY UPDATE value = ?",
-      [String(!!enabled), String(!!enabled)]
+      [String(enabledBool), String(enabledBool)]
     );
 
     const scannerService = require('../services/cohrmScannerService');
-    if (enabled) {
+    if (enabledBool) {
       await scannerService.startScheduler();
     } else {
       scannerService.stopScheduler();
     }
 
-    res.json({ success: true, message: enabled ? 'Scanner activé' : 'Scanner désactivé' });
+    // Return the updated config so frontend can sync state
+    const config = await scannerService.getConfig();
+    res.json({
+      success: true,
+      message: enabledBool ? 'Scanner activé' : 'Scanner désactivé',
+      data: { enabled: enabledBool, config }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

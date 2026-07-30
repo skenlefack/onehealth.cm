@@ -256,24 +256,61 @@ const WebScanner = ({ isDark, user }) => {
 
       clearInterval(progressInterval);
 
-      if (res.success && res.data?.scan_id) {
-        setScanId(res.data.scan_id);
-        setScanProgress(90);
+      if (res.success) {
+        const scanIdFromResponse = res.data?.scan_id;
+        if (scanIdFromResponse) {
+          setScanId(scanIdFromResponse);
+        }
+        setScanProgress(85);
         setScanStep(SCAN_PROGRESS_STEPS.length - 1);
 
-        // Attendre un peu puis récupérer les résultats (le backend simule en 5s)
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        // Poll for scan completion (check every 3 seconds, max 60 seconds)
+        const pollScanId = scanIdFromResponse;
+        let scanComplete = false;
+        const maxAttempts = 20;
 
-        const detail = await getScanDetail(res.data.scan_id);
-        if (detail.success && detail.data?.results) {
+        if (pollScanId) {
+          for (let attempt = 0; attempt < maxAttempts && !scanComplete; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            try {
+              const detail = await getScanDetail(pollScanId);
+              if (detail.success && detail.data) {
+                const scanStatus = detail.data.status;
+                if (scanStatus === 'completed' || scanStatus === 'failed' || detail.data.results?.length > 0) {
+                  scanComplete = true;
+                  setScanProgress(100);
+                  if (detail.data.results && detail.data.results.length > 0) {
+                    setResults(detail.data.results);
+                    // Affichage progressif des résultats
+                    const allResults = detail.data.results;
+                    for (let i = 0; i < allResults.length; i++) {
+                      await new Promise(resolve => setTimeout(resolve, 300));
+                      setVisibleResults(prev => [...prev, allResults[i]]);
+                    }
+                  } else {
+                    setResults([]);
+                  }
+                } else {
+                  setScanProgress(85 + (attempt / maxAttempts) * 10);
+                }
+              }
+            } catch (pollErr) {
+              console.warn('Poll error:', pollErr);
+            }
+          }
+        }
+
+        if (!scanComplete) {
           setScanProgress(100);
-          setResults(detail.data.results);
-
-          // Affichage progressif des résultats
-          const allResults = detail.data.results;
-          for (let i = 0; i < allResults.length; i++) {
-            await new Promise(resolve => setTimeout(resolve, 400));
-            setVisibleResults(prev => [...prev, allResults[i]]);
+          // Final attempt to get results
+          if (pollScanId) {
+            try {
+              const finalDetail = await getScanDetail(pollScanId);
+              if (finalDetail.success && finalDetail.data?.results) {
+                setResults(finalDetail.data.results);
+                setVisibleResults(finalDetail.data.results);
+              }
+            } catch {}
           }
         }
       }
@@ -1552,8 +1589,13 @@ const WebScanner = ({ isDark, user }) => {
           onClick={async () => {
             const newState = !scannerConfig?.enabled;
             try {
-              await toggleScanner(newState);
-              setScannerConfig(prev => ({ ...prev, enabled: newState }));
+              const res = await toggleScanner(newState);
+              // Sync state from server response to ensure persistence
+              if (res.success && res.data) {
+                setScannerConfig(prev => ({ ...prev, enabled: res.data.enabled }));
+              } else {
+                setScannerConfig(prev => ({ ...prev, enabled: newState }));
+              }
             } catch (e) { console.error(e); }
           }}
           style={{
