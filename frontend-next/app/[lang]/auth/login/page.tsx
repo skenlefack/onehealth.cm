@@ -31,7 +31,7 @@ export default async function LoginPage({ params, searchParams }: LoginPageProps
       </div>
 
       {/* Right side - Animated Background */}
-      <AuthBackground lang={lang} variant="login" />
+      <AuthBackground lang={lang} variant="login" redirectTo={redirect} />
     </div>
   );
 }

@@ -1,90 +1,208 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, Heart, Leaf, Users, BookOpen, Award } from 'lucide-react';
+import { Shield, Heart, Leaf, Users, BookOpen, Award, MapPin, Globe, AlertTriangle, Radar, FileText, Building } from 'lucide-react';
 import { Language } from '@/lib/types';
 
 interface AuthBackgroundProps {
   lang: Language;
   variant: 'login' | 'register';
+  redirectTo?: string;
 }
 
-const floatingIcons = [
-  { Icon: Shield, delay: 0 },
-  { Icon: Heart, delay: 1 },
-  { Icon: Leaf, delay: 2 },
-  { Icon: Users, delay: 0.5 },
-  { Icon: BookOpen, delay: 1.5 },
-  { Icon: Award, delay: 2.5 },
-];
+// Detect which module the user is coming from
+function detectModule(redirectTo?: string): 'elearning' | 'ohwr' | 'cohrm' | 'default' {
+  if (!redirectTo) return 'default';
+  if (redirectTo.includes('oh-elearning')) return 'elearning';
+  if (redirectTo.includes('ohwr-mapping')) return 'ohwr';
+  if (redirectTo.includes('cohrm')) return 'cohrm';
+  if (redirectTo.includes('dashboard')) return 'elearning';
+  return 'default';
+}
 
-export function AuthBackground({ lang, variant }: AuthBackgroundProps) {
+const moduleIcons = {
+  elearning: [
+    { Icon: BookOpen, delay: 0 },
+    { Icon: Award, delay: 1 },
+    { Icon: Users, delay: 2 },
+    { Icon: FileText, delay: 0.5 },
+    { Icon: Shield, delay: 1.5 },
+    { Icon: Heart, delay: 2.5 },
+  ],
+  ohwr: [
+    { Icon: MapPin, delay: 0 },
+    { Icon: Globe, delay: 1 },
+    { Icon: Building, delay: 2 },
+    { Icon: Users, delay: 0.5 },
+    { Icon: FileText, delay: 1.5 },
+    { Icon: Leaf, delay: 2.5 },
+  ],
+  cohrm: [
+    { Icon: Radar, delay: 0 },
+    { Icon: AlertTriangle, delay: 1 },
+    { Icon: Shield, delay: 2 },
+    { Icon: Heart, delay: 0.5 },
+    { Icon: Leaf, delay: 1.5 },
+    { Icon: MapPin, delay: 2.5 },
+  ],
+  default: [
+    { Icon: Shield, delay: 0 },
+    { Icon: Heart, delay: 1 },
+    { Icon: Leaf, delay: 2 },
+    { Icon: Users, delay: 0.5 },
+    { Icon: BookOpen, delay: 1.5 },
+    { Icon: Award, delay: 2.5 },
+  ],
+};
+
+const moduleGradients = {
+  elearning: 'bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800',
+  ohwr: 'bg-gradient-to-br from-emerald-600 via-teal-700 to-green-800',
+  cohrm: 'bg-gradient-to-br from-red-600 via-rose-700 to-orange-800',
+  default: 'bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800',
+};
+
+const moduleContent = {
+  elearning: {
+    fr: {
+      badge: 'OH E-Learning',
+      title: 'Formation One Health',
+      subtitle: 'Connectez-vous pour continuer',
+      description: "Accédez à vos cours, suivez votre progression et obtenez des certificats reconnus dans l'approche One Health.",
+      stats: [
+        { value: '50+', label: 'Cours disponibles' },
+        { value: '1000+', label: 'Apprenants actifs' },
+        { value: '100%', label: 'Certifiant' },
+      ],
+    },
+    en: {
+      badge: 'OH E-Learning',
+      title: 'One Health Training',
+      subtitle: 'Sign in to continue',
+      description: 'Access your courses, track your progress and earn recognized certificates in the One Health approach.',
+      stats: [
+        { value: '50+', label: 'Available courses' },
+        { value: '1000+', label: 'Active learners' },
+        { value: '100%', label: 'Certified' },
+      ],
+    },
+  },
+  ohwr: {
+    fr: {
+      badge: 'OHWR-Mapping',
+      title: 'Cartographie des Ressources',
+      subtitle: 'Connectez-vous pour continuer',
+      description: "Explorez la cartographie interactive des experts, organisations, matériels et documents One Health à travers les 10 régions du Cameroun.",
+      stats: [
+        { value: '10', label: 'Régions couvertes' },
+        { value: '500+', label: 'Experts répertoriés' },
+        { value: '200+', label: 'Organisations' },
+      ],
+    },
+    en: {
+      badge: 'OHWR-Mapping',
+      title: 'Resource Mapping',
+      subtitle: 'Sign in to continue',
+      description: 'Explore the interactive mapping of One Health experts, organizations, materials and documents across Cameroon\'s 10 regions.',
+      stats: [
+        { value: '10', label: 'Regions covered' },
+        { value: '500+', label: 'Listed experts' },
+        { value: '200+', label: 'Organizations' },
+      ],
+    },
+  },
+  cohrm: {
+    fr: {
+      badge: 'COHRM-System',
+      title: 'Surveillance Sanitaire',
+      subtitle: 'Connectez-vous pour continuer',
+      description: "Accédez au système de gestion des rumeurs sanitaires One Health : signalement, vérification, évaluation des risques et coordination de la réponse.",
+      stats: [
+        { value: '24/7', label: 'Veille sanitaire' },
+        { value: '5', label: "Niveaux de validation" },
+        { value: '10', label: 'Régions surveillées' },
+      ],
+    },
+    en: {
+      badge: 'COHRM-System',
+      title: 'Health Surveillance',
+      subtitle: 'Sign in to continue',
+      description: 'Access the One Health rumor management system: reporting, verification, risk assessment and response coordination.',
+      stats: [
+        { value: '24/7', label: 'Health monitoring' },
+        { value: '5', label: 'Validation levels' },
+        { value: '10', label: 'Regions monitored' },
+      ],
+    },
+  },
+  default: {
+    fr: {
+      badge: 'One Health Cameroun',
+      title: 'Bienvenue',
+      subtitle: 'Connectez-vous pour continuer',
+      description: "Accédez à l'ensemble des ressources de la plateforme One Health Cameroun : formations, cartographie, surveillance sanitaire.",
+      stats: [
+        { value: '50+', label: 'Cours disponibles' },
+        { value: '500+', label: 'Experts répertoriés' },
+        { value: '2500+', label: 'Ressources' },
+      ],
+    },
+    en: {
+      badge: 'One Health Cameroon',
+      title: 'Welcome',
+      subtitle: 'Sign in to continue',
+      description: 'Access the full One Health Cameroon platform: training, resource mapping, health surveillance.',
+      stats: [
+        { value: '50+', label: 'Available courses' },
+        { value: '500+', label: 'Listed experts' },
+        { value: '2500+', label: 'Resources' },
+      ],
+    },
+  },
+};
+
+const registerContent = {
+  fr: {
+    badge: 'One Health Cameroun',
+    title: 'Rejoignez-nous',
+    subtitle: 'Créez votre compte gratuitement',
+    description: "Accédez à des formations de qualité sur l'approche One Health et obtenez des certificats reconnus.",
+    stats: [
+      { value: '50+', label: 'Cours' },
+      { value: '1000+', label: 'Apprenants' },
+      { value: '2500+', label: 'Ressources' },
+    ],
+  },
+  en: {
+    badge: 'One Health Cameroon',
+    title: 'Join Us',
+    subtitle: 'Create your account for free',
+    description: 'Access quality training on the One Health approach and earn recognized certificates.',
+    stats: [
+      { value: '50+', label: 'Courses' },
+      { value: '1000+', label: 'Learners' },
+      { value: '2500+', label: 'Resources' },
+    ],
+  },
+};
+
+export function AuthBackground({ lang, variant, redirectTo }: AuthBackgroundProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const content = {
-    login: {
-      fr: {
-        title: 'Bienvenue',
-        subtitle: 'Connectez-vous pour continuer',
-        description: "Accédez à vos cours, ressources et suivez votre progression dans l'approche One Health.",
-        stats: [
-          { value: '50+', label: 'Cours disponibles' },
-          { value: '1000+', label: 'Apprenants actifs' },
-          { value: '2500+', label: 'Ressources disponibles' },
-        ],
-      },
-      en: {
-        title: 'Welcome',
-        subtitle: 'Sign in to continue',
-        description: 'Access your courses, resources and track your progress in the One Health approach.',
-        stats: [
-          { value: '50+', label: 'Available courses' },
-          { value: '1000+', label: 'Active learners' },
-          { value: '2500+', label: 'Available resources' },
-        ],
-      },
-    },
-    register: {
-      fr: {
-        title: 'Rejoignez-nous',
-        subtitle: 'Créez votre compte gratuitement',
-        description: "Accédez à des formations de qualité sur l'approche One Health et obtenez des certificats reconnus.",
-        stats: [
-          { value: '50+', label: 'Cours' },
-          { value: '1000+', label: 'Apprenants' },
-          { value: '2500+', label: 'Ressources disponibles' },
-        ],
-      },
-      en: {
-        title: 'Join Us',
-        subtitle: 'Create your account for free',
-        description: 'Access quality training on the One Health approach and earn recognized certificates.',
-        stats: [
-          { value: '50+', label: 'Courses' },
-          { value: '1000+', label: 'Learners' },
-          { value: '2500+', label: 'Available resources' },
-        ],
-      },
-    },
-  };
-
-  const t = content[variant][lang];
+  const module = detectModule(redirectTo);
   const isLogin = variant === 'login';
+  const t = isLogin ? moduleContent[module][lang] : registerContent[lang];
+  const floatingIcons = moduleIcons[module];
+  const gradientClass = isLogin ? moduleGradients[module] : 'bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800';
 
   return (
     <div className="hidden lg:block relative w-0 flex-1 overflow-hidden">
       {/* Gradient Background */}
-      <div
-        className={`absolute inset-0 ${
-          isLogin
-            ? 'bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800'
-            : 'bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800'
-        }`}
-      />
+      <div className={`absolute inset-0 ${gradientClass}`} />
 
       {/* Animated Circles */}
       <div className="absolute inset-0 overflow-hidden">
@@ -204,7 +322,7 @@ export function AuthBackground({ lang, variant }: AuthBackgroundProps) {
             }`}
           >
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm font-medium">One Health Cameroun</span>
+            <span className="text-sm font-medium">{t.badge}</span>
           </div>
 
           {/* Title */}
