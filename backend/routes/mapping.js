@@ -1336,6 +1336,13 @@ router.post('/documents', auth, async (req, res) => {
       const parsed = parseInt(n, 10);
       return Number.isNaN(parsed) ? null : parsed;
     };
+    // Convert ISO dates to MySQL DATE format (YYYY-MM-DD)
+    const nzDate = (v) => {
+      const n = nz(v);
+      if (n === null) return null;
+      const d = new Date(n);
+      return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+    };
 
     // Generate slug
     const slug = title.toLowerCase()
@@ -1363,7 +1370,7 @@ router.post('/documents', auth, async (req, res) => {
       title, finalSlug, type || 'article',
       nz(description), nz(content), nz(file_path), nz(file_type), nzInt(file_size), nz(thumbnail),
       JSON.stringify(authors || []),
-      nzInt(organization_id), nz(publication_date), language || 'fr',
+      nzInt(organization_id), nzDate(publication_date), language || 'fr',
       JSON.stringify(themes || []),
       nz(doi), nz(isbn), nzInt(pages_count), nz(video_url), nzInt(video_duration),
       access_level || 'public', is_featured ? 1 : 0
@@ -1410,6 +1417,14 @@ router.put('/documents/:id', auth, async (req, res) => {
         } else if (value === undefined || value === '') {
           // Empty strings would fail INT/DATE columns; coerce to null
           params.push(intFields.includes(key) || dateFields.includes(key) ? null : value === undefined ? null : value);
+        } else if (dateFields.includes(key)) {
+          // Convert ISO dates (2026-07-03T00:00:00.000Z) to MySQL DATE format (YYYY-MM-DD)
+          if (value) {
+            const d = new Date(value);
+            params.push(isNaN(d.getTime()) ? null : d.toISOString().split('T')[0]);
+          } else {
+            params.push(null);
+          }
         } else if (intFields.includes(key)) {
           if (key === 'is_featured' || key === 'is_active') {
             params.push(value ? 1 : 0);
