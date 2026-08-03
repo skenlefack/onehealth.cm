@@ -1,9 +1,15 @@
 // ContentView.swift
-// COHRM Cameroun - Vue racine avec routage onboarding / main
+// One Health Cameroon Platform — Vue racine avec routage onboarding / plateforme
+//
+// Architecture :
+//   Onboarding → PlatformHomeView (accueil multi-modules)
+//                  └── NavigationLink → ModuleContainerView (espace dédié par module)
+//                                        └── TabView interne au module
+//                                        └── Bouton retour → PlatformHomeView
 
 import SwiftUI
 
-/// Vue racine qui gère la transition onboarding → app principale
+/// Vue racine qui gère la transition onboarding → plateforme
 struct ContentView: View {
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -11,7 +17,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                MainTabView()
+                PlatformRootView()
                     .transition(.opacity)
             } else {
                 OnboardingView {
@@ -26,7 +32,28 @@ struct ContentView: View {
     }
 }
 
-/// TabView principal avec 7 onglets (More tab pour Scanner, Notifications, Rapports)
+/// Vue racine de la plateforme avec NavigationStack global.
+/// L'écran d'accueil affiche les modules ; chaque module s'ouvre
+/// en push dans le NavigationStack, permettant un retour simple.
+struct PlatformRootView: View {
+
+    @State private var notificationsVM = NotificationsViewModel()
+
+    var body: some View {
+        NavigationStack {
+            PlatformHomeView()
+        }
+        .tint(AppColors.primary)
+        .task {
+            await notificationsVM.loadNotifications()
+        }
+    }
+}
+
+// MARK: - Legacy MainTabView (conservé pour compatibilité interne)
+
+/// TabView COHRM complet — utilisé à l'intérieur du ModuleContainerView
+/// quand l'utilisateur ouvre le module COHRM depuis l'accueil.
 struct MainTabView: View {
 
     @State private var selectedTab = 0
@@ -121,4 +148,7 @@ struct MainTabView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(NetworkMonitor.shared)
+        .environmentObject(SyncService.shared)
+        .modelContainer(for: [ReportModel.self, PhotoAttachment.self], inMemory: true)
 }

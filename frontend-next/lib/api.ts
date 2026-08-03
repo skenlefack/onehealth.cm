@@ -961,3 +961,67 @@ export async function submitExpertRegistration(token: string, data: {
 export async function getRegions(): Promise<ApiResponse<OHWRRegion[]>> {
   return fetchApi<OHWRRegion[]>('/mapping/regions');
 }
+
+// ============== DUSS-C (Défi Une Seule Santé) ==============
+
+export async function getDusscPublicModules(lang: string = 'fr') {
+  return fetchApi<any[]>(`/dussc/public/modules?lang=${lang}`, { cache: 'no-store' });
+}
+
+export async function getDusscPersonas(lang: string = 'fr') {
+  return fetchApi<any[]>(`/dussc/public/personas?lang=${lang}`, { cache: 'no-store' });
+}
+
+export async function getDusscConsent(lang: string = 'fr') {
+  return fetchApi<{ text: string }>(`/dussc/public/consent?lang=${lang}`, { cache: 'no-store' });
+}
+
+export async function getDusscQuiz(lang: string = 'fr', profil?: string) {
+  const params = new URLSearchParams({ lang });
+  if (profil) params.set('profil', profil);
+  return fetchApi<any>(`/dussc/public/quiz?${params}`, { cache: 'no-store' });
+}
+
+export async function createDusscSession(data: { uuid: string; langue: string; profil?: string; canal?: string; consent: string }) {
+  return fetchApi<{ session_id: number; uuid: string }>('/dussc/public/sessions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    cache: 'no-store',
+  });
+}
+
+export async function submitDusscResponse(uuid: string, data: { question_id: number; answer: string; bloc: string; question_order?: number; duration_ms?: number; lang?: string; options_order?: string[] }) {
+  return fetchApi<{ is_correct: boolean; correct_answer: string; explication?: string; action?: string; idee_fausse?: string }>(`/dussc/public/sessions/${uuid}/responses`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    cache: 'no-store',
+  });
+}
+
+export async function completeDusscSession(uuid: string, data: { region?: string; milieu?: string; tranche_age?: string; sexe?: string; duration_seconds?: number; id_equipe_facilitateur?: string }) {
+  return fetchApi<{ score_pre: number; score_post: number; gain: number; pct_pre: number; pct_post: number; total_questions: number; total_correct: number; pct_total: number }>(`/dussc/public/sessions/${uuid}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    cache: 'no-store',
+  });
+}
+
+export async function getDusscResult(uuid: string) {
+  return fetchApi<any>(`/dussc/public/sessions/${uuid}/result`, { cache: 'no-store' });
+}
+
+export async function sendDusscEvent(uuid: string, data: { event_type: string; screen_number?: number; screen_name?: string; duration_ms?: number; duration_seconds?: number; metadata?: any }) {
+  return fetchApi<any>(`/dussc/public/sessions/${uuid}/events`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    cache: 'no-store',
+  });
+}
+
+export async function syncDusscOffline(data: { session: any; responses: any[]; events: any[] }) {
+  return fetchApi<any>('/dussc/public/sessions/sync', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    cache: 'no-store',
+  });
+}

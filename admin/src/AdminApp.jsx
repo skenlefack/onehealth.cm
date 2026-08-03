@@ -1,6 +1,7 @@
 import PageBuilderPage from './PageBuilderPage';
 import COHRMSystemPage from './COHRMSystemPage';
 import CohrmModule from './modules/cohrm';
+import DusscModule from './modules/dussc';
 import NewsletterPage from './NewsletterPage';
 import AnalyticsModule from './modules/analytics';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -20,7 +21,8 @@ import {
   HelpCircle, FileQuestion, ListChecks, Timer, Target, CheckCircle2, CheckCircle, XCircle, File,
   Navigation, Map, Radio, AlertTriangle, Megaphone, Radar, Send, MessageCircle, Hash,
   Wifi, WifiOff, Signal, Smartphone as SmartphoneIcon, Database, Server, TrendingDown,
-  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode, ToggleLeft, TextCursorInput, Shuffle
+  ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode, ToggleLeft, TextCursorInput, Shuffle,
+  Brain
 } from 'lucide-react';
 
 // ============== COULEURS ONE HEALTH ==============
@@ -22164,6 +22166,7 @@ export default function AdminApp() {
       case 'ohwr-mapping': return <OHWRMappingPage isDark={isDark} token={token} />;
       case 'oh-elearning': return <OHELearningPage isDark={isDark} token={token} />;
       case 'cohrm-system': return <CohrmModule isDark={isDark} token={token} user={user} onBack={() => setActivePage('dashboard')} />;
+      case 'dussc-system': return <DusscModule isDark={isDark} token={token} user={user} onBack={() => setActivePage('dashboard')} />;
       case 'newsletter': return <NewsletterPage isDark={isDark} token={token} />;
       case 'analytics': return <AnalyticsModule isDark={isDark} token={token} user={user} onBack={() => setActivePage('dashboard')} />;
       default: return <Dashboard isDark={isDark} token={token} />;
@@ -22178,6 +22181,8 @@ export default function AdminApp() {
     ? { id: 'oh-elearning', label: 'OH E-Learning', icon: GraduationCap }
     : activePage === 'cohrm-system'
     ? { id: 'cohrm-system', label: 'COHRM-SYSTEM', icon: Radar }
+    : activePage === 'dussc-system'
+    ? { id: 'dussc-system', label: 'DUSS-C Défi', icon: Brain }
     : activePage === 'newsletter'
     ? { id: 'newsletter', label: 'Newsletter', icon: Mail }
     : activePage === 'analytics'
@@ -22201,7 +22206,7 @@ export default function AdminApp() {
       `}</style>
 
       {/* Sidebar - hidden for modules with own layout */}
-      <aside style={{ ...styles.sidebar(sidebarCollapsed), display: (activePage === 'cohrm-system' || activePage === 'analytics') ? 'none' : 'flex' }}>
+      <aside style={{ ...styles.sidebar(sidebarCollapsed), display: (activePage === 'cohrm-system' || activePage === 'dussc-system' || activePage === 'analytics') ? 'none' : 'flex' }}>
         <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '14px', borderBottom: `1px solid ${isDark ? '#334155' : 'rgba(255,255,255,0.2)'}` }}>
           <div style={{
             width: '48px', height: '48px', borderRadius: '12px',
@@ -22266,9 +22271,9 @@ export default function AdminApp() {
       </aside>
 
       {/* Main Content */}
-      <div style={(activePage === 'cohrm-system' || activePage === 'analytics') ? { flex: 1, minHeight: '100vh' } : styles.main(sidebarCollapsed)}>
+      <div style={(activePage === 'cohrm-system' || activePage === 'dussc-system' || activePage === 'analytics') ? { flex: 1, minHeight: '100vh' } : styles.main(sidebarCollapsed)}>
         {/* Header - hidden for modules with own layout */}
-        <header style={{ ...styles.header, display: (activePage === 'cohrm-system' || activePage === 'analytics') ? 'none' : 'flex' }}>
+        <header style={{ ...styles.header, display: (activePage === 'cohrm-system' || activePage === 'dussc-system' || activePage === 'analytics') ? 'none' : 'flex' }}>
           <div style={styles.flex}>
             <button
               style={{
@@ -22327,6 +22332,20 @@ export default function AdminApp() {
               title="COHRM-SYSTEM - Gestion des Rumeurs"
             >
               <Radar size={20} />
+            </button>
+            {/* DUSS-C Button */}
+            <button
+              style={{
+                ...styles.btnIcon,
+                background: activePage === 'dussc-system' ? '#2F5D3A' : (isDark ? 'rgba(47,93,58,0.2)' : 'rgba(47,93,58,0.15)'),
+                borderRadius: '12px',
+                color: activePage === 'dussc-system' ? 'white' : '#2F5D3A',
+                position: 'relative'
+              }}
+              onClick={() => setActivePage('dussc-system')}
+              title="DUSS-C - Défi Une Seule Santé"
+            >
+              <Brain size={20} />
             </button>
             {/* Newsletter Button */}
             <button
@@ -22643,7 +22662,7 @@ export default function AdminApp() {
         </header>
 
         {/* Page Content */}
-        <main style={(activePage === 'cohrm-system' || activePage === 'analytics') ? styles.contentFull : styles.content}>
+        <main style={(activePage === 'cohrm-system' || activePage === 'dussc-system' || activePage === 'analytics') ? styles.contentFull : styles.content}>
           {renderPage()}
         </main>
       </div>

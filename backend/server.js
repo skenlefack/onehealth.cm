@@ -125,6 +125,9 @@ app.use('/api/upload', require('./routes/upload'));
 // COHRM - Cameroon One Health Rumor Management
 app.use('/api/cohrm', require('./routes/cohrm'));
 
+// DUSS-C - Défi Une Seule Santé Cameroun
+app.use('/api/dussc', require('./routes/dussc'));
+
 // Newsletter
 app.use('/api/newsletter', require('./routes/newsletter'));
 

@@ -86,6 +86,20 @@ enum AppColors {
     /// Catastrophe
     static let disaster = Color(hex: 0x3498DB)
 
+    // MARK: - Couleurs de module plateforme
+
+    /// COHRM — Bleu profond (existant = primary)
+    static let moduleCOHRM = Color(hex: 0x1B4F72)
+
+    /// OHWR Mapping — Bleu clair
+    static let moduleOHWR = Color(hex: 0x3498DB)
+
+    /// DUSS-C — Vert forêt (identité visuelle du prototype)
+    static let moduleDUSSC = Color(hex: 0x2F5D3A)
+
+    /// E-Learning — Violet
+    static let moduleElearning = Color(hex: 0x9B59B6)
+
     // MARK: - Gradients
 
     /// Gradient principal
@@ -98,6 +112,13 @@ enum AppColors {
     /// Gradient accent
     static let accentGradient = LinearGradient(
         colors: [Color(hex: 0x27AE60), Color(hex: 0x2ECC71)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Gradient plateforme (vert forêt → bleu)
+    static let platformGradient = LinearGradient(
+        colors: [Color(hex: 0x0D3B2E), Color(hex: 0x1B6B4A), Color(hex: 0x2980B9)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )

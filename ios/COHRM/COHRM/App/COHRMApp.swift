@@ -1,12 +1,14 @@
 // COHRMApp.swift
-// COHRM Cameroun - Point d'entrée de l'application
-// Cameroon One Health Rumor Management
+// One Health Cameroon Platform — Point d'entrée de l'application
+// Plateforme nationale « Une Seule Santé » du Cameroun
+//
+// Modules : COHRM, OHWR Mapping, DUSS-C (Défi), E-Learning
 
 import SwiftUI
 import SwiftData
 import BackgroundTasks
 
-/// Point d'entrée principal de l'application COHRM
+/// Point d'entrée principal de la plateforme One Health Cameroon
 @main
 struct COHRMApp: App {
 
@@ -18,6 +20,9 @@ struct COHRMApp: App {
     /// Service de synchronisation arrière-plan
     @StateObject private var syncService = SyncService.shared
     @StateObject private var networkMonitor = NetworkMonitor.shared
+
+    /// Observateur de phase de scène pour la synchronisation
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Préférences utilisateur
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -32,6 +37,7 @@ struct COHRMApp: App {
                 ReportModel.self,
                 PhotoAttachment.self,
                 ReferenceData.self,
+                CachedRumor.self,
             ])
             let config = ModelConfiguration(
                 schema: schema,
@@ -42,6 +48,9 @@ struct COHRMApp: App {
         } catch {
             fatalError("Impossible d'initialiser SwiftData : \(error.localizedDescription)")
         }
+
+        // Fournir le container au service de sync pour les contextes arrière-plan
+        SyncService.modelContainer = modelContainer
 
         // Enregistrement des tâches d'arrière-plan
         registerBackgroundTasks()
@@ -60,6 +69,20 @@ struct COHRMApp: App {
                 .environmentObject(networkMonitor)
         }
         .modelContainer(modelContainer)
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .background:
+                // Planifier la synchronisation en arrière-plan
+                SyncService.shared.scheduleBackgroundSync()
+            case .active:
+                // Tenter de synchroniser les rapports en attente au retour
+                Task {
+                    await SyncService.shared.syncPendingReports()
+                }
+            default:
+                break
+            }
+        }
     }
 
     // MARK: - Configuration
