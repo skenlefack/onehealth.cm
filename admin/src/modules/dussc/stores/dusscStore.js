@@ -23,10 +23,16 @@ const useDusscStore = create((set, get) => ({
   // ─── Navigation ───
   activePage: 'dashboard',
   selectedQuestionId: null,
+  selectedTemplateId: null,
+  selectedAlertId: null,
   sidebarCollapsed: false,
 
   setActivePage: (page) => set({ activePage: page }),
   navigateToQuestion: (id) => set({ activePage: 'question-detail', selectedQuestionId: id }),
+  navigateToQuestionCreate: () => set({ activePage: 'question-create', selectedQuestionId: null }),
+  navigateToQuestionImport: () => set({ activePage: 'question-import' }),
+  navigateToTemplateCreate: () => set({ activePage: 'template-create', selectedTemplateId: null }),
+  navigateToAlertCreate: () => set({ activePage: 'alert-create', selectedAlertId: null }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   // ─── Modules & Personas ───

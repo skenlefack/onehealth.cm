@@ -533,7 +533,7 @@ const DusscQuestions = ({ isDark = false, user }) => {
         <div style={s.headerActions}>
           <button
             style={s.secondaryBtn}
-            onClick={() => setShowImportModal(true)}
+            onClick={() => setActivePage('question-import')}
           >
             <Upload size={15} />
             {t('questions.import')}
@@ -770,78 +770,7 @@ const DusscQuestions = ({ isDark = false, user }) => {
         )}
       </div>
 
-      {/* Import CSV Modal */}
-      {showImportModal && (
-        <div style={s.overlay} onClick={closeImportModal}>
-          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={s.modalHeader}>
-              <h3 style={s.modalTitle}>
-                <FileUp size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-                {t('questions.import')}
-              </h3>
-              <button style={s.modalClose} onClick={closeImportModal}>
-                <X size={18} />
-              </button>
-            </div>
-            <div style={s.modalBody}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                style={s.fileInput}
-                onChange={(e) => setImportFile(e.target.files[0] || null)}
-              />
-              {importFile && (
-                <div style={{ marginTop: 10, fontSize: 13, color: isDark ? '#94a3b8' : '#6B7280' }}>
-                  {importFile.name} ({(importFile.size / 1024).toFixed(1)} Ko)
-                </div>
-              )}
-              {importReport && (
-                <div style={s.report}>
-                  <div style={s.reportLine}>
-                    <span>Import{'\u00e9'}es</span>
-                    <strong style={{ color: DUSSC_COLORS.primaryLight }}>{importReport.imported || 0}</strong>
-                  </div>
-                  <div style={s.reportLine}>
-                    <span>Ignor{'\u00e9'}es</span>
-                    <strong style={{ color: '#F39C12' }}>{importReport.skipped || 0}</strong>
-                  </div>
-                  <div style={s.reportLine}>
-                    <span>Erreurs</span>
-                    <strong style={{ color: '#E74C3C' }}>{importReport.errors || 0}</strong>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div style={s.modalFooter}>
-              <button style={s.secondaryBtn} onClick={closeImportModal}>
-                {t('common.cancel')}
-              </button>
-              <button
-                style={{
-                  ...s.primaryBtn,
-                  opacity: (!importFile || importing) ? 0.6 : 1,
-                  pointerEvents: (!importFile || importing) ? 'none' : 'auto',
-                }}
-                onClick={handleImport}
-                disabled={!importFile || importing}
-              >
-                {importing ? (
-                  <>
-                    <RefreshCw size={15} style={{ animation: 'dussc-spin 0.8s linear infinite' }} />
-                    {t('common.loading')}
-                  </>
-                ) : (
-                  <>
-                    <Upload size={15} />
-                    {t('common.import')}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Import CSV → navigates to dedicated page */}
     </div>
   );
 };
