@@ -492,6 +492,9 @@ router.post('/questions/import', auth, csvUpload.single('file'), async (req, res
 
     const report = await importService.importCSV(req.file.path);
 
+    // Invalider le cache du quiz engine
+    quizEngine.invalidateCache();
+
     // Nettoyage du fichier temporaire
     const fs = require('fs');
     fs.unlinkSync(req.file.path);
