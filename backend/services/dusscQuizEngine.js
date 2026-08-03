@@ -114,7 +114,7 @@ async function buildFromAssignments(template, profil, isFr) {
   const blocs = { pre_test: [], tronc_commun: [], profil: [], post_test: [] };
   for (const r of rows) {
     if (r.bloc === 'profil' && profil && r.persona_filter) {
-      const filter = JSON.parse(r.persona_filter);
+      const filter = typeof r.persona_filter === 'string' ? JSON.parse(r.persona_filter) : (r.persona_filter || []);
       if (filter.length > 0 && !filter.includes(profil)) continue;
     }
     blocs[r.bloc].push(r);
@@ -134,8 +134,9 @@ async function buildAutoSelect(template, profil, isFr) {
   const matchesProfil = (q) => {
     if (!profil) return true;
     try {
-      const cibles = JSON.parse(q.public_cible || '[]');
-      return cibles.length === 0 || cibles.includes(profil);
+      const raw = q.public_cible;
+      const cibles = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+      return !Array.isArray(cibles) || cibles.length === 0 || cibles.includes(profil);
     } catch { return true; }
   };
 
@@ -171,16 +172,20 @@ function assembleQuiz(blocs, template, isFr) {
 
   const format = (q, bloc) => {
     order++;
+    // MySQL JSON columns are already parsed — handle both cases
+    const rawOpts = isFr ? q.options_fr : (q.options_en || q.options_fr);
     let optionsRaw;
-    try {
-      optionsRaw = JSON.parse(isFr ? q.options_fr : (q.options_en || q.options_fr));
-    } catch {
-      optionsRaw = [isFr ? q.options_fr : q.options_en];
+    if (Array.isArray(rawOpts)) {
+      optionsRaw = rawOpts;
+    } else if (typeof rawOpts === 'string') {
+      try { optionsRaw = JSON.parse(rawOpts); } catch { optionsRaw = [rawOpts]; }
+    } else {
+      optionsRaw = [];
     }
 
     let displayOptions = optionsRaw.map((text, idx) => ({
       letter: String.fromCharCode(65 + idx),
-      text,
+      text: String(text),
     }));
 
     if (template.randomize_options) {
