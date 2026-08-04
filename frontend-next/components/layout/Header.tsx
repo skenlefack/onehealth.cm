@@ -137,8 +137,7 @@ export function Header({ lang, t }: HeaderProps) {
             <a href={`mailto:${settings.contact_email || 'contact@onehealth.cm'}`}
               className="flex items-center gap-1.5 hover:text-white transition-colors">
               <Mail size={13} className="flex-shrink-0" />
-              <span className="hidden xs:inline sm:inline">{settings.contact_email || 'contact@onehealth.cm'}</span>
-              <span className="xs:hidden sm:hidden">Email</span>
+              <span>{settings.contact_email || 'contact@onehealth.cm'}</span>
             </a>
             {/* Phone: hidden on mobile */}
             <a href={`tel:${settings.site_phone || '+237242015961'}`}
