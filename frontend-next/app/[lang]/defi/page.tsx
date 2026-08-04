@@ -175,7 +175,7 @@ export default function DefiLandingPage() {
         {PILLARS.map(p => <div key={p.en} className="flex-1" style={{ background: p.color }} />)}
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Language toggle */}
         <div className="flex justify-end mb-6">
           <button onClick={toggleLang} className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium"
@@ -189,7 +189,7 @@ export default function DefiLandingPage() {
           <h1 className="text-3xl sm:text-4xl font-bold leading-tight mb-3" style={{ color: C.primary }}>
             {t.title}
           </h1>
-          <p className="text-base max-w-xl mx-auto mb-4" style={{ color: C.encre }}>
+          <p className="text-base max-w-2xl mx-auto mb-4" style={{ color: C.encre }}>
             {t.subtitle}
           </p>
           <p className="text-sm font-medium" style={{ color: C.accent }}>{t.duration}</p>
@@ -205,7 +205,7 @@ export default function DefiLandingPage() {
           </div>
 
           {/* Features */}
-          <div className="mt-6 grid grid-cols-2 gap-2 text-left max-w-md mx-auto">
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-left max-w-2xl mx-auto">
             {t.features.map((f, i) => (
               <div key={i} className="flex items-start gap-2 text-xs" style={{ color: C.encre }}>
                 <span style={{ color: C.primaryLight }}>✓</span>
@@ -264,7 +264,7 @@ export default function DefiLandingPage() {
                       <h3 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: C.accent }}>
                         {meta.icon} {lang === 'fr' ? meta.fr : meta.en}
                       </h3>
-                      <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {items.map(p => {
                           const isSel = selectedProfile === p.code;
                           return (
