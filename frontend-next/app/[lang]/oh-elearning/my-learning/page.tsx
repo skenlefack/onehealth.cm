@@ -451,8 +451,7 @@ export default function MyLearningPage() {
                               const url = enrollment.enrollable_type === 'course'
                                 ? `/${lang}/oh-elearning/learn/${enrollment.slug}`
                                 : `/${lang}/oh-elearning/paths/${enrollment.slug}`;
-                              console.log('Navigating to:', url);
-                              window.location.href = url;
+                              router.push(url);
                             }}
                           >
                             <Play size={16} className="mr-2" />

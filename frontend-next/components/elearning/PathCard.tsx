@@ -20,8 +20,8 @@ export function PathCard({ path, lang, showProgress = false }: PathCardProps) {
   const description = lang === 'en' && path.description_en
     ? path.description_en
     : path.description_fr;
-  const categoryName = lang === 'en' && path.category_name_fr
-    ? path.category_name_fr
+  const categoryName = lang === 'en' && path.category_name_en
+    ? path.category_name_en
     : path.category_name_fr;
 
   const isEnrolled = !!path.enrollment_id;

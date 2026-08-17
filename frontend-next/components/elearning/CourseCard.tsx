@@ -17,8 +17,8 @@ interface CourseCardProps {
 
 export function CourseCard({ course, lang, showProgress = false }: CourseCardProps) {
   const title = lang === 'en' && course.title_en ? course.title_en : course.title_fr;
-  const description = lang === 'en' && course.short_description_fr
-    ? course.short_description_fr
+  const description = lang === 'en' && course.short_description_en
+    ? course.short_description_en
     : course.short_description_fr;
   const categoryName = lang === 'en' && course.category_name_en
     ? course.category_name_en

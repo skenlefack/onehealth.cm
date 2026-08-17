@@ -13,10 +13,12 @@ import { isValidLanguage, getTranslation } from '@/lib/translations';
 import { getQuizAttemptResults, getQuiz } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function QuizResultsPage() {
   const params = useParams();
   const router = useRouter();
+  const { token: authToken } = useAuth();
   const lang = (params.lang as string) || 'fr';
   const quizId = parseInt(params.quizId as string);
   const attemptId = parseInt(params.attemptId as string);
@@ -35,8 +37,7 @@ export default function QuizResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
 
-  // Token
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+  const token = authToken || '';
 
   // Fetch results and quiz
   useEffect(() => {

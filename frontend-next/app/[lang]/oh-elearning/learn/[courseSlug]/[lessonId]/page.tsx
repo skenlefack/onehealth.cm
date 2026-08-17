@@ -304,7 +304,7 @@ export default function LessonViewerPage() {
               >
                 {language === 'fr' ? 'Plus tard' : 'Later'}
               </Button>
-              <Link href={`/${lang}/oh-elearning/login?redirect=${encodeURIComponent(window.location.pathname)}`} className="flex-1">
+              <Link href={`/${lang}/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`} className="flex-1">
                 <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700">
                   <LogIn size={18} className="mr-2" />
                   {language === 'fr' ? 'Se connecter' : 'Log in'}

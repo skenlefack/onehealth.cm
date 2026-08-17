@@ -9,8 +9,7 @@ import {
 import { Language } from '@/lib/types';
 import { isValidLanguage, getTranslation } from '@/lib/translations';
 import { getELearningPath, getImageUrl } from '@/lib/api';
-import { Button } from '@/components/ui';
-import { LevelBadge, CourseCard } from '@/components/elearning';
+import { LevelBadge, CourseCard, EnrollButton } from '@/components/elearning';
 
 interface PageProps {
   params: Promise<{ lang: string; slug: string }>;
@@ -58,8 +57,8 @@ export default async function PathDetailPage({ params }: PageProps) {
   const description = language === 'en' && path.description_en
     ? path.description_en
     : path.description_fr;
-  const categoryName = language === 'en' && path.category_name_fr
-    ? path.category_name_fr
+  const categoryName = language === 'en' && path.category_name_en
+    ? path.category_name_en
     : path.category_name_fr;
 
   const courses = path.courses || [];
@@ -176,13 +175,14 @@ export default async function PathDetailPage({ params }: PageProps) {
                 </div>
 
                 {/* Enroll button */}
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 mb-4"
-                >
-                  {t.elearning.enroll}
-                </Button>
+                <EnrollButton
+                  pathId={path.id}
+                  pathSlug={slug}
+                  isFree={true}
+                  lang={language}
+                  className="bg-indigo-600 hover:bg-indigo-700 mb-4"
+                  enrollableType="learning_path"
+                />
 
                 {/* Path includes */}
                 <div className="border-t border-slate-200 pt-4">

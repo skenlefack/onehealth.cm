@@ -11,7 +11,7 @@ import {
 // Use internal Docker URL for server-side, relative URL for client-side
 // Client-side uses /api which nginx (or Next.js rewrites) proxies to the backend
 const isServer = typeof window === 'undefined';
-const API_URL = isServer
+export const API_URL = isServer
   ? (process.env.BACKEND_INTERNAL_URL || 'http://localhost:5000') + '/api'
   : '/api';
 const API_BASE_URL = isServer
@@ -482,10 +482,6 @@ export async function getELearningCertificates(token: string): Promise<ApiRespon
   });
 }
 
-export async function verifyELearningCertificate(code: string): Promise<ApiResponse<ELearningCertificate>> {
-  return fetchApi<ELearningCertificate>(`/elearning/certificates/verify/${code}`);
-}
-
 // Stats
 export async function getELearningStats(): Promise<ApiResponse<ELearningStats>> {
   return fetchApi<ELearningStats>('/elearning/stats');
@@ -573,34 +569,6 @@ export async function abandonQuizAttempt(attemptId: number, token: string): Prom
 export async function getQuizHistory(quizId: number, token: string): Promise<ApiResponse<QuizAttempt[]>> {
   return fetchApi<QuizAttempt[]>(`/elearning/quizzes/${quizId}/attempts`, {
     headers: { Authorization: `Bearer ${token}` }
-  });
-}
-
-// ============== LEARNING PATHS ==============
-
-// Get all learning paths
-export async function getLearningPaths(params?: {
-  page?: number;
-  limit?: number;
-  level?: string;
-  category_id?: number;
-  search?: string;
-}): Promise<ApiResponse<ELearningLearningPath[]>> {
-  const queryParams = new URLSearchParams();
-  if (params?.page) queryParams.set('page', String(params.page));
-  if (params?.limit) queryParams.set('limit', String(params.limit));
-  if (params?.level) queryParams.set('level', params.level);
-  if (params?.category_id) queryParams.set('category_id', String(params.category_id));
-  if (params?.search) queryParams.set('search', params.search);
-
-  const query = queryParams.toString();
-  return fetchApi<ELearningLearningPath[]>(`/elearning/paths${query ? `?${query}` : ''}`);
-}
-
-// Get single learning path by slug
-export async function getLearningPath(slug: string, token?: string): Promise<ApiResponse<ELearningLearningPath & { courses: ELearningCourse[] }>> {
-  return fetchApi<ELearningLearningPath & { courses: ELearningCourse[] }>(`/elearning/paths/${slug}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined
   });
 }
 

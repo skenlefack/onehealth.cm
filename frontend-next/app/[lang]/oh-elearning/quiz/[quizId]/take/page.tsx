@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Language, QuizQuestionForStudent, ELearningQuiz } from '@/lib/types';
 import { isValidLanguage, getTranslation } from '@/lib/translations';
-import { getQuiz, startQuizAttempt, getQuizAttempt, submitQuizAttempt } from '@/lib/api';
+import { getQuiz, startQuizAttempt, submitQuizAttempt } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';

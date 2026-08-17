@@ -3965,7 +3965,7 @@ router.get('/courses/:id/calculate-grade/:userId', auth, async (req, res) => {
       SET weighted_score = ?,
           quiz_average = ?,
           certificate_eligible = ?
-      WHERE user_id = ? AND course_id = ?
+      WHERE user_id = ? AND enrollable_type = 'course' AND enrollable_id = ?
     `, [weightedScore, moduleQuizzesAverage, certificateEligible, userId, courseId]);
 
     res.json({
@@ -4025,7 +4025,7 @@ router.get('/paths/:id/calculate-grade/:userId', auth, async (req, res) => {
         e.certificate_eligible as course_passed
       FROM learning_path_courses lpc
       INNER JOIN courses c ON lpc.course_id = c.id
-      LEFT JOIN enrollments e ON (e.course_id = lpc.course_id AND e.user_id = ?)
+      LEFT JOIN enrollments e ON (e.enrollable_type = 'course' AND e.enrollable_id = lpc.course_id AND e.user_id = ?)
       WHERE lpc.learning_path_id = ?
       ORDER BY lpc.sort_order
     `, [userId, pathId]);
@@ -4098,7 +4098,7 @@ router.get('/paths/:id/calculate-grade/:userId', auth, async (req, res) => {
       SET weighted_score = ?,
           quiz_average = ?,
           certificate_eligible = ?
-      WHERE user_id = ? AND learning_path_id = ?
+      WHERE user_id = ? AND enrollable_type = 'learning_path' AND enrollable_id = ?
     `, [weightedScore, coursesAverage, certificateEligible, userId, pathId]);
 
     res.json({
@@ -4259,7 +4259,7 @@ async function recalculateCourseGrade(courseId, userId, db) {
   await db.query(`
     UPDATE enrollments
     SET weighted_score = ?, quiz_average = ?, certificate_eligible = ?
-    WHERE user_id = ? AND course_id = ?
+    WHERE user_id = ? AND enrollable_type = 'course' AND enrollable_id = ?
   `, [weightedScore, moduleQuizzesAverage, certificateEligible, userId, courseId]);
 }
 
@@ -4278,7 +4278,7 @@ async function recalculatePathGrade(pathId, userId, db) {
   const [pathCourses] = await db.query(`
     SELECT lpc.course_id, lpc.course_weight, e.weighted_score
     FROM learning_path_courses lpc
-    LEFT JOIN enrollments e ON (e.course_id = lpc.course_id AND e.user_id = ?)
+    LEFT JOIN enrollments e ON (e.enrollable_type = 'course' AND e.enrollable_id = lpc.course_id AND e.user_id = ?)
     WHERE lpc.learning_path_id = ?
   `, [userId, pathId]);
 
@@ -4328,7 +4328,7 @@ async function recalculatePathGrade(pathId, userId, db) {
   await db.query(`
     UPDATE enrollments
     SET weighted_score = ?, quiz_average = ?, certificate_eligible = ?
-    WHERE user_id = ? AND learning_path_id = ?
+    WHERE user_id = ? AND enrollable_type = 'learning_path' AND enrollable_id = ?
   `, [weightedScore, coursesAverage, certificateEligible, userId, pathId]);
 }
 

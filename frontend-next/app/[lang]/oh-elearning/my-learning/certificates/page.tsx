@@ -26,17 +26,20 @@ export default function MyCertificatesPage() {
   const [certificates, setCertificates] = useState<ELearningCertificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Handle PDF download
   const handleDownload = async (cert: ELearningCertificate) => {
     if (!token) return;
 
     setDownloadingId(cert.id);
+    setDownloadError(null);
     try {
       await downloadCertificatePDF(cert.id, token, language);
     } catch (error) {
       console.error('Download error:', error);
-      alert(language === 'fr' ? 'Erreur lors du telechargement' : 'Download error');
+      setDownloadError(language === 'fr' ? 'Erreur lors du téléchargement' : 'Download error');
+      setTimeout(() => setDownloadError(null), 5000);
     } finally {
       setDownloadingId(null);
     }
@@ -107,6 +110,13 @@ export default function MyCertificatesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Download error banner */}
+      {downloadError && (
+        <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
+          <XCircle size={18} />
+          {downloadError}
+        </div>
+      )}
       {/* Hero Banner */}
       <section className="relative overflow-hidden bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 pt-24 pb-16">
         {/* Background decorations */}

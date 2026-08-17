@@ -326,6 +326,7 @@ export interface ELearningCourse {
   description_fr?: string;
   description_en?: string;
   short_description_fr?: string;
+  short_description_en?: string;
   thumbnail?: string;
   intro_video_url?: string;
   level: 'beginner' | 'intermediate' | 'advanced';
@@ -432,6 +433,7 @@ export interface ELearningLearningPath {
   instructor_name?: string;
   category_id?: number;
   category_name_fr?: string;
+  category_name_en?: string;
   status: 'draft' | 'published' | 'archived';
   is_featured: boolean;
   created_at: string;

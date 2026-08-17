@@ -4,16 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Play, CheckCircle, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
-import { enrollInCourse, getELearningEnrollments } from '@/lib/api';
+import { enrollInCourse, enrollInPath, getELearningEnrollments } from '@/lib/api';
 import { Language } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface EnrollButtonProps {
-  courseId: number;
-  courseSlug: string;
-  isFree: boolean;
+  courseId?: number;
+  courseSlug?: string;
+  pathId?: number;
+  pathSlug?: string;
+  isFree?: boolean;
   lang: Language;
   className?: string;
+  enrollableType?: 'course' | 'learning_path';
 }
 
 const translations = {
@@ -39,7 +42,7 @@ const translations = {
   },
 };
 
-export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: EnrollButtonProps) {
+export function EnrollButton({ courseId, courseSlug, pathId, pathSlug, isFree = true, lang, className, enrollableType }: EnrollButtonProps) {
   const t = translations[lang];
   const router = useRouter();
   const { isAuthenticated, token } = useAuth();
@@ -48,6 +51,10 @@ export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: 
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState('');
+
+  const type = enrollableType || (pathId ? 'learning_path' : 'course');
+  const entityId = type === 'learning_path' ? pathId : courseId;
+  const entitySlug = type === 'learning_path' ? pathSlug : courseSlug;
 
   // Check enrollment status on mount
   useEffect(() => {
@@ -60,9 +67,8 @@ export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: 
       try {
         const result = await getELearningEnrollments(token);
         if (result.success && result.data) {
-          // Check if enrolled in this course
           const enrollment = result.data.find(
-            (e) => e.enrollable_type === 'course' && e.enrollable_id === courseId
+            (e) => e.enrollable_type === type && e.enrollable_id === entityId
           );
           if (enrollment) {
             setIsEnrolled(true);
@@ -76,33 +82,40 @@ export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: 
     };
 
     checkEnrollment();
-  }, [isAuthenticated, token, courseId]);
+  }, [isAuthenticated, token, entityId, type]);
 
   const handleEnroll = async () => {
-    // If not authenticated, redirect to login
     if (!isAuthenticated || !token) {
-      const currentUrl = `/${lang}/oh-elearning/courses/${courseSlug}`;
+      const currentUrl = type === 'learning_path'
+        ? `/${lang}/oh-elearning/paths/${entitySlug}`
+        : `/${lang}/oh-elearning/courses/${entitySlug}`;
       router.push(`/${lang}/auth/login?redirect=${encodeURIComponent(currentUrl)}`);
       return;
     }
+
+    if (!entityId) return;
 
     setIsEnrolling(true);
     setError('');
 
     try {
-      const result = await enrollInCourse(courseId, token);
+      const result = type === 'learning_path'
+        ? await enrollInPath(entityId, token)
+        : await enrollInCourse(entityId, token);
 
       if (result.success) {
         setIsEnrolled(true);
-        // Redirect to learn page after short delay
-        setTimeout(() => {
-          router.push(`/${lang}/oh-elearning/learn/${courseSlug}`);
-        }, 500);
+        if (type === 'course' && entitySlug) {
+          setTimeout(() => {
+            router.push(`/${lang}/oh-elearning/learn/${entitySlug}`);
+          }, 500);
+        }
       } else {
-        // Check if already enrolled
         if (result.message?.includes('already') || result.message?.includes('déjà')) {
           setIsEnrolled(true);
-          router.push(`/${lang}/oh-elearning/learn/${courseSlug}`);
+          if (type === 'course' && entitySlug) {
+            router.push(`/${lang}/oh-elearning/learn/${entitySlug}`);
+          }
         } else {
           setError(result.message || t.error);
         }
@@ -115,7 +128,11 @@ export function EnrollButton({ courseId, courseSlug, isFree, lang, className }: 
   };
 
   const handleContinue = () => {
-    router.push(`/${lang}/oh-elearning/learn/${courseSlug}`);
+    if (type === 'learning_path') {
+      router.push(`/${lang}/oh-elearning/paths/${entitySlug}`);
+    } else {
+      router.push(`/${lang}/oh-elearning/learn/${entitySlug}`);
+    }
   };
 
   // Loading state while checking enrollment
