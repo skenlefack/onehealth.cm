@@ -1,5 +1,5 @@
 // DashboardModels.swift
-// COHRM Cameroun - Extensions et helpers pour les modeles du tableau de bord
+// One Health Cameroon - Extensions et helpers pour les modeles du tableau de bord
 //
 // Les types principaux (DashboardData, ChartItem, TrendItem, RumorSummary)
 // sont definis dans RemoteModels.swift pour eviter la duplication.

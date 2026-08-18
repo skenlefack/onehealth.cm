@@ -1,5 +1,5 @@
 // AppDimensions.swift
-// COHRM Cameroun - Dimensions et espacements
+// One Health Cameroon - Dimensions et espacements
 
 import SwiftUI
 

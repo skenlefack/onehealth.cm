@@ -1,5 +1,5 @@
 // ScannerViewModel.swift
-// COHRM Cameroun - ViewModel du scanner de rumeurs
+// One Health Cameroon - ViewModel du scanner de rumeurs
 
 import Foundation
 

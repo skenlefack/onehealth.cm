@@ -1,5 +1,5 @@
 // RemoteModels.swift
-// COHRM Cameroun - Modèles de données distants (DTOs API)
+// One Health Cameroon - Modèles de données distants (DTOs API)
 
 import Foundation
 

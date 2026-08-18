@@ -1,5 +1,5 @@
 // ScanDetailView.swift
-// COHRM Cameroun - Vue de detail d'un scan
+// One Health Cameroon - Vue de detail d'un scan
 
 import SwiftUI
 

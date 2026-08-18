@@ -1,5 +1,5 @@
 // Step5ConfirmationView.swift
-// COHRM Cameroun - Étape 5 : Confirmation et envoi du signalement
+// One Health Cameroon - Étape 5 : Confirmation et envoi du signalement
 // Récapitulatif complet avec bouton d'envoi
 
 import SwiftUI

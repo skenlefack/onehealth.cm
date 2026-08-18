@@ -1,5 +1,5 @@
 // AppFonts.swift
-// COHRM Cameroun - Typographie
+// One Health Cameroon - Typographie
 
 import SwiftUI
 

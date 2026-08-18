@@ -1,8 +1,8 @@
 // swift-tools-version: 5.9
 // Package.swift
-// COHRM Cameroun - Swift Package Manager configuration
+// One Health Cameroon - Swift Package Manager configuration
 //
-// This file defines the build configuration for the COHRM iOS app.
+// This file defines the build configuration for the One Health Cameroon iOS app.
 // To create an Xcode project from this package:
 //   1. Open Xcode
 //   2. File > Open > select this Package.swift

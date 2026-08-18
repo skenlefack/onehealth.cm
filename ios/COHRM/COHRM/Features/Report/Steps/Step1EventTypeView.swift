@@ -1,5 +1,5 @@
 // Step1EventTypeView.swift
-// COHRM Cameroun - Étape 1 : Sélection du type d'événement
+// One Health Cameroon - Étape 1 : Sélection du type d'événement
 // Grille de catégories + sélection d'espèce
 
 import SwiftUI

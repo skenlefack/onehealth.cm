@@ -1,5 +1,5 @@
 // HistoryViewModel.swift
-// COHRM Cameroun - ViewModel de l'historique des signalements
+// One Health Cameroon - ViewModel de l'historique des signalements
 //
 // Gère la logique métier de l'écran d'historique :
 // suppression, resynchronisation, recherche et filtrage.

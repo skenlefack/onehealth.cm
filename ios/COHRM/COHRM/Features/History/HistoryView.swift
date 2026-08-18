@@ -1,5 +1,5 @@
 // HistoryView.swift
-// COHRM Cameroun - Vue de l'historique des signalements
+// One Health Cameroon - Vue de l'historique des signalements
 //
 // Affiche la liste complète des signalements locaux, groupés par mois,
 // avec recherche, filtrage par statut, et actions par glissement.

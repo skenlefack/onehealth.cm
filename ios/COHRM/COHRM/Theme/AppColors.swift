@@ -1,5 +1,5 @@
 // AppColors.swift
-// COHRM Cameroun - Palette de couleurs
+// One Health Cameroon - Palette de couleurs
 
 import SwiftUI
 

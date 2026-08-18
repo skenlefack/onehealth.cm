@@ -1,5 +1,5 @@
 // PhotoPickerView.swift
-// COHRM Cameroun - Sélection de photos avec PHPicker
+// One Health Cameroon - Sélection de photos avec PHPicker
 
 import SwiftUI
 import PhotosUI

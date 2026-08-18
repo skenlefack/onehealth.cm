@@ -1,5 +1,5 @@
 // Endpoints.swift
-// COHRM Cameroun - Définition des endpoints API
+// One Health Cameroon - Définition des endpoints API
 
 import Foundation
 

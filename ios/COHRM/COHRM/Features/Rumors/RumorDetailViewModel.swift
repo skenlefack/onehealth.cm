@@ -1,5 +1,5 @@
 // RumorDetailViewModel.swift
-// COHRM Cameroun - ViewModel du detail d'une rumeur
+// One Health Cameroon - ViewModel du detail d'une rumeur
 
 import Foundation
 

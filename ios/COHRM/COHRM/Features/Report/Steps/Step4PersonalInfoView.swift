@@ -1,5 +1,5 @@
 // Step4PersonalInfoView.swift
-// COHRM Cameroun - Étape 4 : Informations personnelles du déclarant
+// One Health Cameroon - Étape 4 : Informations personnelles du déclarant
 // Toggle anonyme, champs nom/téléphone/email
 
 import SwiftUI

@@ -100,7 +100,7 @@ struct COHRMApp: App {
     /// Enregistre les tâches d'arrière-plan pour la synchronisation
     private func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: "cm.onehealth.cohrm.sync",
+            forTaskWithIdentifier: "cm.onehealth.app.sync",
             using: nil
         ) { task in
             guard let bgTask = task as? BGAppRefreshTask else { return }

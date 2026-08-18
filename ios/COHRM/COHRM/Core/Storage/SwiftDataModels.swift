@@ -1,5 +1,5 @@
 // SwiftDataModels.swift
-// COHRM Cameroun - Modèles SwiftData pour la persistance locale
+// One Health Cameroon - Modèles SwiftData pour la persistance locale
 
 import Foundation
 import SwiftData

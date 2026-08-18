@@ -1,5 +1,5 @@
 // LoginView.swift
-// COHRM Cameroun - Écran de connexion
+// One Health Cameroon - Écran de connexion
 
 import SwiftUI
 

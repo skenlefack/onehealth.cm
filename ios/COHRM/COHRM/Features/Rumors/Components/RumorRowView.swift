@@ -1,5 +1,5 @@
 // RumorRowView.swift
-// COHRM Cameroun - Ligne de rumeur reutilisable
+// One Health Cameroon - Ligne de rumeur reutilisable
 
 import SwiftUI
 

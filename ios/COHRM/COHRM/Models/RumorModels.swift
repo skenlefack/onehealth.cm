@@ -1,5 +1,5 @@
 // RumorModels.swift
-// COHRM Cameroun - Extensions et helpers pour les modeles de rumeurs
+// One Health Cameroon - Extensions et helpers pour les modeles de rumeurs
 //
 // Les types principaux (RumorSummary, RumorDetail, ValidationItem, NoteItem,
 // PhotoItem, ScanRunDTO, ScanItemDTO, ScanDetailDTO, ScanResultDTO,

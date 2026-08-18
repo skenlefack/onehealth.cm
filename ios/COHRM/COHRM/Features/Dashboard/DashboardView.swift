@@ -1,5 +1,5 @@
 // DashboardView.swift
-// COHRM Cameroun - Tableau de bord analytique
+// One Health Cameroon - Tableau de bord analytique
 
 import SwiftUI
 import Charts

@@ -1,5 +1,5 @@
 // KeychainService.swift
-// COHRM Cameroun - Stockage sécurisé via Keychain natif
+// One Health Cameroon - Stockage sécurisé via Keychain natif
 
 import Foundation
 import Security
@@ -14,7 +14,7 @@ actor KeychainService {
 
     // MARK: - Constantes
 
-    private let serviceName = "cm.onehealth.cohrm"
+    private let serviceName = "cm.onehealth.app"
     private let tokenKey = "authToken"
     private let userKey = "userData"
     private let actorKey = "actorData"

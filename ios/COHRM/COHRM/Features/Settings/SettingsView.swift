@@ -1,5 +1,5 @@
 // SettingsView.swift
-// COHRM Cameroun - Vue des paramètres de l'application
+// One Health Cameroon - Vue des paramètres de l'application
 //
 // Formulaire Apple-style avec sections pour la langue, le serveur,
 // les notifications, le stockage, les informations et les données.

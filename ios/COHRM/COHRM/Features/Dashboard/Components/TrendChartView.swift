@@ -1,5 +1,5 @@
 // TrendChartView.swift
-// COHRM Cameroun - Graphique de tendance temporelle
+// One Health Cameroon - Graphique de tendance temporelle
 
 import SwiftUI
 import Charts

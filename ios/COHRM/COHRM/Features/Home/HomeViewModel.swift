@@ -1,5 +1,5 @@
 // HomeViewModel.swift
-// COHRM Cameroun - ViewModel de la page d'accueil
+// One Health Cameroon - ViewModel de la page d'accueil
 //
 // Gère les statistiques du tableau de bord et déclenche
 // la synchronisation des signalements en attente.

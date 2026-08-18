@@ -1,5 +1,5 @@
 // ScannerView.swift
-// COHRM Cameroun - Vue principale du scanner de rumeurs
+// One Health Cameroon - Vue principale du scanner de rumeurs
 
 import SwiftUI
 

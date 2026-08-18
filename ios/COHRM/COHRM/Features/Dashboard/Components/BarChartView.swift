@@ -1,5 +1,5 @@
 // BarChartView.swift
-// COHRM Cameroun - Graphique en barres horizontales
+// One Health Cameroon - Graphique en barres horizontales
 
 import SwiftUI
 

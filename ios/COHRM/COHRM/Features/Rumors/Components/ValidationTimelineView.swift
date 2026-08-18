@@ -1,5 +1,5 @@
 // ValidationTimelineView.swift
-// COHRM Cameroun - Timeline de validation des rumeurs
+// One Health Cameroon - Timeline de validation des rumeurs
 
 import SwiftUI
 

@@ -1,5 +1,5 @@
 // SyncService.swift
-// COHRM Cameroun - Service de synchronisation hors-ligne
+// One Health Cameroon - Service de synchronisation hors-ligne
 
 import Foundation
 import SwiftData
@@ -210,7 +210,7 @@ final class SyncService: ObservableObject {
 
     /// Planifie une tâche de synchronisation en arrière-plan
     func scheduleBackgroundSync() {
-        let request = BGAppRefreshTaskRequest(identifier: "cm.onehealth.cohrm.sync")
+        let request = BGAppRefreshTaskRequest(identifier: "cm.onehealth.app.sync")
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
         do {
             try BGTaskScheduler.shared.submit(request)

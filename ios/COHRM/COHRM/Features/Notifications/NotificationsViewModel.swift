@@ -1,5 +1,5 @@
 // NotificationsViewModel.swift
-// COHRM Cameroun - ViewModel des notifications
+// One Health Cameroon - ViewModel des notifications
 
 import Foundation
 

@@ -1,5 +1,5 @@
 // PhotoService.swift
-// COHRM Cameroun - Service de gestion des photos
+// One Health Cameroon - Service de gestion des photos
 
 import Foundation
 import UIKit

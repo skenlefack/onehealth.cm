@@ -1,5 +1,5 @@
 // ReportViewModel.swift
-// COHRM Cameroun - ViewModel pour l'assistant de signalement
+// One Health Cameroon - ViewModel pour l'assistant de signalement
 // Gère la navigation, la validation et la soumission du rapport
 
 import SwiftUI

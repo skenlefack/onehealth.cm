@@ -1,5 +1,5 @@
 // Step3DetailsView.swift
-// COHRM Cameroun - Étape 3 : Détails de l'événement
+// One Health Cameroon - Étape 3 : Détails de l'événement
 // Titre, description, symptômes, nombre d'affectés, date, photos
 
 import SwiftUI

@@ -1,5 +1,5 @@
 /* Localizable.strings (Français)
-   COHRM Cameroun - Application de signalement sanitaire */
+   One Health Cameroon - Application de signalement sanitaire */
 
 // ========================================
 // ONGLETS
@@ -24,7 +24,7 @@
 // ========================================
 // ACCUEIL
 // ========================================
-"home.title" = "COHRM Cameroun";
+"home.title" = "One Health Cameroon";
 "home.subtitle" = "Surveillance sanitaire One Health";
 "home.report_button" = "Signaler un événement";
 "home.sms_button" = "Signalement SMS";
@@ -196,7 +196,7 @@
 "settings.language.en" = "English";
 "settings.server" = "Serveur";
 "settings.server.url" = "URL du serveur";
-"settings.server.hint" = "Adresse du serveur COHRM";
+"settings.server.hint" = "Adresse du serveur One Health";
 "settings.notifications" = "Notifications";
 "settings.notifications.push" = "Notifications push";
 "settings.storage" = "Stockage";
@@ -206,7 +206,7 @@
 "settings.about" = "À propos";
 "settings.about.version" = "Version";
 "settings.about.build" = "Build";
-"settings.about.description" = "COHRM Cameroun est une application de surveillance sanitaire One Health développée pour le Cameroun. Elle permet le signalement rapide d'événements de santé publique, animale et environnementale.";
+"settings.about.description" = "One Health Cameroon est une application de surveillance sanitaire One Health développée pour le Cameroun. Elle permet le signalement rapide d'événements de santé publique, animale et environnementale.";
 "settings.data" = "Données";
 "settings.data.export" = "Exporter les données";
 "settings.data.reset" = "Réinitialiser les données";
@@ -258,7 +258,7 @@
 // TABLEAU DE BORD
 // ========================================
 "dashboard.title" = "Tableau de bord";
-"dashboard.subtitle" = "Vue d'ensemble du système COHRM";
+"dashboard.subtitle" = "Vue d'ensemble du système One Health";
 "dashboard.total" = "Total";
 "dashboard.pending" = "En attente";
 "dashboard.investigating" = "Investigation";
@@ -385,7 +385,7 @@
 "settings.profile.subtitle" = "Modifier vos informations personnelles";
 "profile.title" = "Mon profil";
 "profile.info.header" = "Informations personnelles";
-"profile.info.footer" = "Ces informations sont associées à votre compte COHRM.";
+"profile.info.footer" = "Ces informations sont associées à votre compte One Health.";
 "profile.first_name" = "Prénom";
 "profile.first_name.placeholder" = "Votre prénom";
 "profile.last_name" = "Nom";

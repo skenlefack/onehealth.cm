@@ -1,5 +1,5 @@
 // OnboardingView.swift
-// COHRM Cameroun - Écran d'accueil (première ouverture)
+// One Health Cameroon - Écran d'accueil (première ouverture)
 //
 // Présente les fonctionnalités principales de l'application
 // en 3 pages avec animations fluides et bouton d'action.

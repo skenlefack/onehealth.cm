@@ -1,5 +1,5 @@
 // ReportsViewModel.swift
-// COHRM Cameroun - ViewModel pour les rapports statistiques
+// One Health Cameroon - ViewModel pour les rapports statistiques
 
 import Foundation
 

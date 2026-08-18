@@ -1,5 +1,5 @@
 // NotificationsView.swift
-// COHRM Cameroun - Vue de la liste des notifications
+// One Health Cameroon - Vue de la liste des notifications
 
 import SwiftUI
 

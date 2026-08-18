@@ -1,5 +1,5 @@
 // APIClient.swift
-// COHRM Cameroun - Client HTTP natif avec URLSession
+// One Health Cameroon - Client HTTP natif avec URLSession
 
 import Foundation
 

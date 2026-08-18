@@ -1,5 +1,5 @@
 // PublicReportViewModel.swift
-// COHRM Cameroun - ViewModel pour le signalement public
+// One Health Cameroon - ViewModel pour le signalement public
 
 import Foundation
 

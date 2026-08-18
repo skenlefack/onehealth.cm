@@ -1,5 +1,5 @@
 // DashboardViewModel.swift
-// COHRM Cameroun - ViewModel du tableau de bord analytique
+// One Health Cameroon - ViewModel du tableau de bord analytique
 
 import Foundation
 import SwiftUI

@@ -1,5 +1,5 @@
 // RumorsViewModel.swift
-// COHRM Cameroun - ViewModel de la liste des rumeurs
+// One Health Cameroon - ViewModel de la liste des rumeurs
 
 import Foundation
 import SwiftData

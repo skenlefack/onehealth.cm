@@ -1,5 +1,5 @@
 // PhotoGalleryView.swift
-// COHRM Cameroun - Galerie photo pour les rumeurs
+// One Health Cameroon - Galerie photo pour les rumeurs
 
 import SwiftUI
 

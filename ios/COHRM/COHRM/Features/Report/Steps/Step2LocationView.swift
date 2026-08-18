@@ -1,5 +1,5 @@
 // Step2LocationView.swift
-// COHRM Cameroun - Étape 2 : Localisation de l'événement
+// One Health Cameroon - Étape 2 : Localisation de l'événement
 // Carte interactive, sélection de région/département, champs de localité
 
 import SwiftUI

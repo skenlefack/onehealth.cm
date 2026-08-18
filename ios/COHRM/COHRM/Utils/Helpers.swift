@@ -1,5 +1,5 @@
 // Helpers.swift
-// COHRM Cameroun - Fonctions utilitaires
+// One Health Cameroon - Fonctions utilitaires
 
 import SwiftUI
 import UIKit

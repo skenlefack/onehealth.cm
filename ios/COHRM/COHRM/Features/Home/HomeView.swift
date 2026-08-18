@@ -1,5 +1,5 @@
 // HomeView.swift
-// COHRM Cameroun - Écran d'accueil principal (premier onglet)
+// One Health Cameroon - Écran d'accueil principal (premier onglet)
 //
 // Affiche le tableau de bord avec statistiques rapides,
 // bouton de signalement, indicateur réseau et derniers rapports.

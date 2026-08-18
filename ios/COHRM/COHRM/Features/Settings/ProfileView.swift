@@ -1,5 +1,5 @@
 // ProfileView.swift
-// COHRM Cameroun - Vue de gestion du profil et mot de passe
+// One Health Cameroon - Vue de gestion du profil et mot de passe
 
 import SwiftUI
 

@@ -1,5 +1,5 @@
 // APIService.swift
-// COHRM Cameroun - Service API haut niveau
+// One Health Cameroon - Service API haut niveau
 
 import Foundation
 import UIKit

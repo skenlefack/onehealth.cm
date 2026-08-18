@@ -1,5 +1,5 @@
 // PublicReportView.swift
-// COHRM Cameroun - Vue de signalement public (sans authentification)
+// One Health Cameroon - Vue de signalement public (sans authentification)
 //
 // Permet a tout citoyen de soumettre un signalement
 // et de suivre un signalement existant par son code.

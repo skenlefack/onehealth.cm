@@ -1,5 +1,5 @@
 // KPICardView.swift
-// COHRM Cameroun - Carte KPI réutilisable
+// One Health Cameroon - Carte KPI réutilisable
 
 import SwiftUI
 

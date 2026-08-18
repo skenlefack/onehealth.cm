@@ -1,5 +1,5 @@
 // FilterChipsView.swift
-// COHRM Cameroun - Chips de filtrage horizontal pour les statuts
+// One Health Cameroon - Chips de filtrage horizontal pour les statuts
 
 import SwiftUI
 

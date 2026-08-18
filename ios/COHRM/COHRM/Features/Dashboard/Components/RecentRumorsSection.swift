@@ -1,5 +1,5 @@
 // RecentRumorsSection.swift
-// COHRM Cameroun - Section des rumeurs récentes
+// One Health Cameroon - Section des rumeurs récentes
 
 import SwiftUI
 

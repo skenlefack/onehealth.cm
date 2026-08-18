@@ -4,14 +4,14 @@
 <dict>
 	<!-- Identifiant du bundle -->
 	<key>CFBundleIdentifier</key>
-	<string>cm.onehealth.cohrm</string>
+	<string>cm.onehealth.app</string>
 
 	<!-- Nom de l'application -->
 	<key>CFBundleDisplayName</key>
-	<string>COHRM Cameroun</string>
+	<string>One Health Cameroon</string>
 
 	<key>CFBundleName</key>
-	<string>COHRM</string>
+	<string>OneHealth</string>
 
 	<!-- Version -->
 	<key>CFBundleShortVersionString</key>
@@ -36,19 +36,19 @@
 
 	<!-- Localisation - Utilisation en cours -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>COHRM utilise votre position pour localiser automatiquement le lieu du signalement sanitaire. Cela permet aux autorités de santé d'intervenir rapidement dans la zone concernée.</string>
+	<string>One Health utilise votre position pour localiser automatiquement le lieu du signalement sanitaire. Cela permet aux autorités de santé d'intervenir rapidement dans la zone concernée.</string>
 
 	<!-- Caméra -->
 	<key>NSCameraUsageDescription</key>
-	<string>COHRM peut utiliser l'appareil photo pour prendre des photos illustrant un événement sanitaire signalé. Ces photos sont envoyées de manière sécurisée aux autorités de santé.</string>
+	<string>One Health peut utiliser l'appareil photo pour prendre des photos illustrant un événement sanitaire signalé. Ces photos sont envoyées de manière sécurisée aux autorités de santé.</string>
 
 	<!-- Bibliothèque de photos -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>COHRM peut accéder à vos photos pour joindre des images pertinentes à un signalement sanitaire. Seules les photos que vous sélectionnez sont utilisées.</string>
+	<string>One Health peut accéder à vos photos pour joindre des images pertinentes à un signalement sanitaire. Seules les photos que vous sélectionnez sont utilisées.</string>
 
 	<!-- Ajout à la bibliothèque photos -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>COHRM peut sauvegarder des photos dans votre bibliothèque.</string>
+	<string>One Health peut sauvegarder des photos dans votre bibliothèque.</string>
 
 	<!-- ================================ -->
 	<!-- TÂCHES D'ARRIÈRE-PLAN -->
@@ -56,7 +56,7 @@
 
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>cm.onehealth.cohrm.sync</string>
+		<string>cm.onehealth.app.sync</string>
 	</array>
 
 	<key>UIBackgroundModes</key>

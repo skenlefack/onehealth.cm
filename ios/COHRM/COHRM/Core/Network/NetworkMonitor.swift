@@ -1,5 +1,5 @@
 // NetworkMonitor.swift
-// COHRM Cameroun - Surveillance de la connectivité réseau
+// One Health Cameroon - Surveillance de la connectivité réseau
 
 import Foundation
 import Network
@@ -28,7 +28,7 @@ final class NetworkMonitor: ObservableObject {
     // MARK: - Privé
 
     private let monitor = NWPathMonitor()
-    private let queue = DispatchQueue(label: "cm.onehealth.cohrm.networkmonitor")
+    private let queue = DispatchQueue(label: "cm.onehealth.app.networkmonitor")
 
     // MARK: - Types
 

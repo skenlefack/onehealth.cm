@@ -1,5 +1,5 @@
 // RumorDetailView.swift
-// COHRM Cameroun - Vue de detail d'une rumeur
+// One Health Cameroon - Vue de detail d'une rumeur
 
 import SwiftUI
 import MapKit

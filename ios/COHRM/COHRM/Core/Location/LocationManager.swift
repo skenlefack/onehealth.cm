@@ -1,5 +1,5 @@
 // LocationManager.swift
-// COHRM Cameroun - Gestionnaire de localisation
+// One Health Cameroon - Gestionnaire de localisation
 
 import Foundation
 import CoreLocation

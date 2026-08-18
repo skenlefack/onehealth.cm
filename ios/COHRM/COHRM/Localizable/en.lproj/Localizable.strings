@@ -1,5 +1,5 @@
 /* Localizable.strings (English)
-   COHRM Cameroon - Health reporting application */
+   One Health Cameroon - Health reporting application */
 
 // ========================================
 // TABS
@@ -24,7 +24,7 @@
 // ========================================
 // HOME
 // ========================================
-"home.title" = "COHRM Cameroon";
+"home.title" = "One Health Cameroon";
 "home.subtitle" = "One Health surveillance";
 "home.report_button" = "Report an event";
 "home.sms_button" = "SMS Report";
@@ -196,7 +196,7 @@
 "settings.language.en" = "English";
 "settings.server" = "Server";
 "settings.server.url" = "Server URL";
-"settings.server.hint" = "COHRM server address";
+"settings.server.hint" = "One Health server address";
 "settings.notifications" = "Notifications";
 "settings.notifications.push" = "Push notifications";
 "settings.storage" = "Storage";
@@ -206,7 +206,7 @@
 "settings.about" = "About";
 "settings.about.version" = "Version";
 "settings.about.build" = "Build";
-"settings.about.description" = "COHRM Cameroon is a One Health surveillance application developed for Cameroon. It enables rapid reporting of public health, animal, and environmental events.";
+"settings.about.description" = "One Health Cameroon is a One Health surveillance application developed for Cameroon. It enables rapid reporting of public health, animal, and environmental events.";
 "settings.data" = "Data";
 "settings.data.export" = "Export data";
 "settings.data.reset" = "Reset data";
@@ -258,7 +258,7 @@
 // DASHBOARD
 // ========================================
 "dashboard.title" = "Dashboard";
-"dashboard.subtitle" = "COHRM system overview";
+"dashboard.subtitle" = "One Health system overview";
 "dashboard.total" = "Total";
 "dashboard.pending" = "Pending";
 "dashboard.investigating" = "Investigating";
@@ -385,7 +385,7 @@
 "settings.profile.subtitle" = "Edit your personal information";
 "profile.title" = "My profile";
 "profile.info.header" = "Personal information";
-"profile.info.footer" = "This information is linked to your COHRM account.";
+"profile.info.footer" = "This information is linked to your One Health account.";
 "profile.first_name" = "First name";
 "profile.first_name.placeholder" = "Your first name";
 "profile.last_name" = "Last name";

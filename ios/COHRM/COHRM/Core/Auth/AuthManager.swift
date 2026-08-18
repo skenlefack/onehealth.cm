@@ -1,5 +1,5 @@
 // AuthManager.swift
-// COHRM Cameroun - Gestion de l'état d'authentification
+// One Health Cameroon - Gestion de l'état d'authentification
 
 import Foundation
 import SwiftUI

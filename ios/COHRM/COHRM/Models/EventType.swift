@@ -1,5 +1,5 @@
 // EventType.swift
-// COHRM Cameroun - Types d'événements sanitaires
+// One Health Cameroon - Types d'événements sanitaires
 
 import SwiftUI
 

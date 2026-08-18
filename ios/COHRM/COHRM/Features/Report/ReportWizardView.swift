@@ -1,5 +1,5 @@
 // ReportWizardView.swift
-// COHRM Cameroun - Vue principale de l'assistant de signalement
+// One Health Cameroon - Vue principale de l'assistant de signalement
 // Conteneur avec barre de progression et navigation entre étapes
 
 import SwiftUI

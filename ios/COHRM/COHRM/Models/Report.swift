@@ -1,5 +1,5 @@
 // Report.swift
-// COHRM Cameroun - Modèle de signalement (DTO)
+// One Health Cameroon - Modèle de signalement (DTO)
 
 import Foundation
 import CoreLocation

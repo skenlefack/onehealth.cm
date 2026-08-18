@@ -1,5 +1,5 @@
 // RumorsListView.swift
-// COHRM Cameroun - Liste des rumeurs avec filtres et recherche
+// One Health Cameroon - Liste des rumeurs avec filtres et recherche
 
 import SwiftUI
 import SwiftData

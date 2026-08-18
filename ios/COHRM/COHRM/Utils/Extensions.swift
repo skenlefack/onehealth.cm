@@ -1,5 +1,5 @@
 // Extensions.swift
-// COHRM Cameroun - Extensions utilitaires
+// One Health Cameroon - Extensions utilitaires
 
 import SwiftUI
 import UIKit

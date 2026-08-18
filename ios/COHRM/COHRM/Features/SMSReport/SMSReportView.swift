@@ -1,5 +1,5 @@
 // SMSReportView.swift
-// COHRM Cameroun - Signalement par SMS structuré
+// One Health Cameroon - Signalement par SMS structuré
 //
 // Permet de créer un message SMS au format COHRM et de l'envoyer
 // via le composeur SMS natif (MFMessageComposeViewController).
