@@ -2,7 +2,6 @@
 // One Health Cameroon - ViewModel du tableau de bord analytique
 
 import Foundation
-import SwiftUI
 
 /// ViewModel pour le tableau de bord analytique COHRM.
 /// Gère le chargement des données depuis l'API et expose

@@ -97,65 +97,6 @@ struct ModuleContainerView: View {
         .tint(module.color)
     }
 
-    // MARK: - Module à venir
-
-    /// Vue placeholder pour les modules pas encore implémentés
-    private var comingSoonView: some View {
-        VStack(spacing: AppDimensions.spacingXL) {
-            Spacer()
-
-            // Icône du module
-            ZStack {
-                Circle()
-                    .fill(module.gradient.opacity(0.15))
-                    .frame(width: 120, height: 120)
-
-                Circle()
-                    .fill(module.gradient.opacity(0.1))
-                    .frame(width: 90, height: 90)
-
-                Image(systemName: module.icon)
-                    .font(.system(size: 40, weight: .medium))
-                    .foregroundStyle(module.color)
-            }
-
-            // Titre
-            VStack(spacing: AppDimensions.spacingS) {
-                Text(module.title(lang: appLanguage))
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(AppColors.textPrimary)
-
-                Text(module.subtitle(lang: appLanguage))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(module.color)
-            }
-
-            // Description
-            Text(module.description(lang: appLanguage))
-                .font(.system(size: 15))
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, AppDimensions.spacingXL)
-
-            // Badge
-            HStack(spacing: AppDimensions.spacingS) {
-                Image(systemName: "hammer.fill")
-                    .font(.system(size: 14))
-                Text(appLanguage == "fr" ? "En cours de développement" : "Under Development")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .foregroundStyle(module.color)
-            .padding(.horizontal, AppDimensions.spacingL)
-            .padding(.vertical, AppDimensions.spacingM)
-            .background(module.color.opacity(0.1))
-            .clipShape(Capsule())
-
-            Spacer()
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .background(AppColors.groupedBackground)
-    }
 }
 
 // MARK: - Preview
@@ -169,14 +110,20 @@ struct ModuleContainerView: View {
     .modelContainer(for: [ReportModel.self, PhotoAttachment.self], inMemory: true)
 }
 
-#Preview("DUSS-C Coming Soon") {
+#Preview("E-Learning Module") {
+    NavigationStack {
+        ModuleContainerView(module: .elearning)
+    }
+}
+
+#Preview("DUSS-C Module") {
     NavigationStack {
         ModuleContainerView(module: .dussc)
     }
 }
 
-#Preview("E-Learning Coming Soon") {
+#Preview("OHWR Module") {
     NavigationStack {
-        ModuleContainerView(module: .elearning)
+        ModuleContainerView(module: .ohwr)
     }
 }
