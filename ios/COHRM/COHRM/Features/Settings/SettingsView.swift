@@ -499,16 +499,12 @@ struct SettingsView: View {
     /// Gere le toggle des notifications push
     private func handleNotificationToggle(enabled: Bool) {
         if enabled {
-            // Demander l'autorisation de notifications
-            UNUserNotificationCenter.current().requestAuthorization(
-                options: [.alert, .badge, .sound]
-            ) { granted, error in
-                if !granted {
-                    Task { @MainActor in
-                        pushNotificationsEnabled = false
-                        alertMessage = String(localized: "settings.notifications.denied")
-                        showAlert = true
-                    }
+            Task {
+                await PushNotificationService.shared.requestAuthorization()
+                if !PushNotificationService.shared.isAuthorized {
+                    pushNotificationsEnabled = false
+                    alertMessage = String(localized: "settings.notifications.denied")
+                    showAlert = true
                 }
             }
         }

@@ -93,6 +93,9 @@ final class AuthManager {
             currentActor = data.actor
             isAuthenticated = true
 
+            // Enregistrer le device token push si disponible
+            PushNotificationService.shared.reregisterAfterLogin()
+
         } catch let error as APIError {
             switch error {
             case .unauthorized:
@@ -111,8 +114,9 @@ final class AuthManager {
 
     /// Déconnecte l'utilisateur
     func logout() {
-        // Nettoyer le Keychain
+        // Désenregistrer les push notifications
         Task {
+            await PushNotificationService.shared.unregisterFromBackend()
             await KeychainService.shared.clearAll()
             await APIClient.shared.setAuthToken(nil)
         }

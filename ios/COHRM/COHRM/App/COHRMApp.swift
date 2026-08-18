@@ -8,11 +8,38 @@ import SwiftUI
 import SwiftData
 import BackgroundTasks
 
+// MARK: - App Delegate (Push Notifications)
+
+/// AppDelegate pour recevoir les tokens APNs et gérer les push
+class AppDelegate: NSObject, UIApplicationDelegate {
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in
+            PushNotificationService.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Task { @MainActor in
+            PushNotificationService.shared.didFailToRegisterForRemoteNotifications(error: error)
+        }
+    }
+}
+
 /// Point d'entrée principal de la plateforme One Health Cameroon
 @main
 struct COHRMApp: App {
 
     // MARK: - Propriétés
+
+    /// Delegate pour les push notifications APNs
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     /// Container SwiftData pour la persistance locale
     let modelContainer: ModelContainer
@@ -57,6 +84,9 @@ struct COHRMApp: App {
 
         // Configuration de l'apparence globale
         configureAppearance()
+
+        // Configurer le service de push notifications
+        PushNotificationService.shared.configure()
     }
 
     // MARK: - Scene

@@ -173,4 +173,14 @@ enum Endpoints {
     /// Configuration du scanner
     /// GET /cohrm/scanner/config
     static let scannerConfig = "/cohrm/scanner/config"
+
+    // MARK: - Push Notifications (Device Token)
+
+    /// Enregistrer un device token pour les push notifications
+    /// POST /cohrm/notifications/register-device
+    static let registerDevice = "/cohrm/notifications/register-device"
+
+    /// Supprimer un device token
+    /// DELETE /cohrm/notifications/unregister-device
+    static let unregisterDevice = "/cohrm/notifications/unregister-device"
 }

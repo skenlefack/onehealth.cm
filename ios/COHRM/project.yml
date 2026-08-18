@@ -59,6 +59,7 @@ targets:
       properties:
         com.apple.developer.associated-domains: []
         com.apple.backgroundtaskscheduler: true
+        aps-environment: development
     scheme:
       testTargets:
         - COHRMTests
