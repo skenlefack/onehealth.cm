@@ -29,7 +29,7 @@ struct ModuleContainerView: View {
             case .dussc:
                 comingSoonView
             case .elearning:
-                comingSoonView
+                ELearningHomeView()
             }
         }
         .navigationTitle(module.title(lang: appLanguage))

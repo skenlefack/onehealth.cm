@@ -429,3 +429,89 @@
 // ========================================
 "home.reports.title" = "Statistical reports";
 "home.reports.subtitle" = "View statistics and trends";
+
+// ========================================
+// AUTHENTICATION
+// ========================================
+"login.title" = "Sign In";
+"login.subtitle" = "Health surveillance platform";
+"login.email" = "Email address";
+"login.email.placeholder" = "your@email.cm";
+"login.password" = "Password";
+"login.password.placeholder" = "Your password";
+"login.button" = "Sign In";
+"login.loading" = "Signing in...";
+"login.error.invalid_credentials" = "Invalid email or password";
+"login.error.server" = "Server error. Please try again.";
+"login.error.network" = "Network error. Check your connection.";
+"app.loading" = "Loading...";
+
+// ========================================
+// LOGOUT
+// ========================================
+"settings.logout" = "Sign Out";
+"settings.logout.confirm.title" = "Sign Out";
+"settings.logout.confirm.message" = "Are you sure you want to sign out?";
+"settings.logout.confirm.action" = "Sign Out";
+"settings.logout.confirm.cancel" = "Cancel";
+
+// ========================================
+// SETTINGS - SMS
+// ========================================
+"settings.sms.number.label" = "COHRM SMS Number";
+
+// ========================================
+// E-LEARNING
+// ========================================
+"elearning.title" = "E-Learning";
+"elearning.subtitle" = "One Health online training";
+"elearning.enrolled" = "Enrolled";
+"elearning.completed" = "Completed";
+"elearning.certificates" = "Certificates";
+"elearning.categories" = "Categories";
+"elearning.featured" = "Featured Courses";
+"elearning.continue" = "Continue";
+"elearning.explore" = "Explore";
+"elearning.all_courses" = "All Courses";
+"elearning.my_learning" = "My Learning";
+"elearning.my_certificates" = "My Certificates";
+"elearning.paths" = "Paths";
+"elearning.see_all" = "See all";
+"elearning.courses" = "Courses";
+"elearning.search" = "Search for a course...";
+"elearning.no_courses" = "No courses found";
+"elearning.no_courses.desc" = "Try adjusting your filters";
+"elearning.level.beginner" = "Beginner";
+"elearning.level.intermediate" = "Intermediate";
+"elearning.level.advanced" = "Advanced";
+"elearning.free" = "Free";
+"elearning.description" = "Description";
+"elearning.objectives" = "Learning Objectives";
+"elearning.curriculum" = "Curriculum";
+"elearning.duration" = "Duration";
+"elearning.modules" = "Modules";
+"elearning.lessons" = "Lessons";
+"elearning.students" = "Students";
+"elearning.progress" = "completed";
+"elearning.continue_learning" = "Continue Course";
+"elearning.enroll_free" = "Enroll for Free";
+"elearning.enroll" = "Enroll";
+"elearning.course_not_found" = "Course not found";
+"elearning.filter.all" = "All";
+"elearning.filter.in_progress" = "In Progress";
+"elearning.filter.completed" = "Completed";
+"elearning.no_enrollments" = "No enrollments";
+"elearning.no_enrollments.desc" = "Explore our courses and enroll";
+"elearning.in_progress" = "In Progress";
+"elearning.status.completed" = "Completed";
+"elearning.status.in_progress" = "In Progress";
+"elearning.status.enrolled" = "Enrolled";
+"elearning.no_certificates" = "No certificates";
+"elearning.no_certificates.desc" = "Complete a course to earn a certificate";
+"elearning.cert.active" = "Active";
+"elearning.cert.expired" = "Expired";
+"elearning.cert.revoked" = "Revoked";
+"elearning.no_paths" = "No paths available";
+"elearning.no_paths.desc" = "Learning paths will be available soon";
+"elearning.courses_count" = "courses";
+"elearning.path_courses" = "Path Courses";
