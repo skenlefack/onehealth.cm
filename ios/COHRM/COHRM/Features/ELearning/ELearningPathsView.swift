@@ -13,7 +13,7 @@ struct ELearningPathsView: View {
     var body: some View {
         Group {
             if isLoading {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if paths.isEmpty {
                 ContentUnavailableView(
                     String(localized: "elearning.no_paths"),
@@ -94,7 +94,7 @@ struct ELearningPathsView: View {
         do {
             let response = try await ELearningService.shared.getPaths(search: searchText.isEmpty ? nil : searchText)
             paths = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }
@@ -110,7 +110,7 @@ struct ELearningPathDetailView: View {
     var body: some View {
         ScrollView {
             if isLoading {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if let path {
                 VStack(spacing: 20) {
                     // Header
@@ -189,7 +189,7 @@ struct ELearningPathDetailView: View {
         do {
             let response = try await ELearningService.shared.getPathDetail(slug: slug)
             path = response.data
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }

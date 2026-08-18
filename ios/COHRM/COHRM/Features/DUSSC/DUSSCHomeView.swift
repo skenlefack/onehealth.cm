@@ -256,14 +256,14 @@ struct DUSSCHomeView: View {
         do {
             let response = try await DUSSCService.shared.getModules()
             modules = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
     }
 
     private func loadPersonas() async {
         do {
             let response = try await DUSSCService.shared.getPersonas()
             personas = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
     }
 
     private func moduleIcon(_ icon: String?) -> String {

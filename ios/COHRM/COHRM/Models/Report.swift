@@ -2,7 +2,6 @@
 // One Health Cameroon - Modèle de signalement (DTO)
 
 import Foundation
-import CoreLocation
 
 /// Données d'un signalement avant envoi au serveur
 /// Utilisé comme DTO entre les vues et le service API

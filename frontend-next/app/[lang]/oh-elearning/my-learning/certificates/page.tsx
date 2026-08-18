@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Language, ELearningCertificate } from '@/lib/types';
 import { isValidLanguage, getTranslation } from '@/lib/translations';
-import { getMyCertificates, downloadCertificatePDF } from '@/lib/api';
+import { getELearningCertificates, downloadCertificatePDF } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -50,7 +50,7 @@ export default function MyCertificatesPage() {
 
     setLoading(true);
     try {
-      const res = await getMyCertificates(token);
+      const res = await getELearningCertificates(token);
       if (res.success) {
         setCertificates(res.data);
       }

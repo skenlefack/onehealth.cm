@@ -12,7 +12,7 @@ struct ELearningCertificatesView: View {
     var body: some View {
         Group {
             if isLoading {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if certificates.isEmpty {
                 ContentUnavailableView(
                     String(localized: "elearning.no_certificates"),
@@ -111,7 +111,7 @@ struct ELearningCertificatesView: View {
         do {
             let response = try await ELearningService.shared.getMyCertificates()
             certificates = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }

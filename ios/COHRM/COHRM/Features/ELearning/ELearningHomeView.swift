@@ -160,7 +160,7 @@ struct ELearningHomeView: View {
                 NavigationLink(destination: ELearningCourseDetailView(slug: enrollment.slug ?? "")) {
                     HStack(spacing: 12) {
                         // Thumbnail
-                        AsyncImage(url: imageURL(enrollment.thumbnail)) { image in
+                        AsyncImage(url: serverImageURL(enrollment.thumbnail)) { image in
                             image.resizable().scaledToFill()
                         } placeholder: {
                             RoundedRectangle(cornerRadius: 8).fill(Color(hex: 0x9B59B6).opacity(0.2))
@@ -267,10 +267,4 @@ struct ELearningHomeView: View {
         }
     }
 
-    private func imageURL(_ path: String?) -> URL? {
-        guard let path else { return nil }
-        let base = UserDefaults.standard.string(forKey: "serverURL") ?? "https://onehealth.cm/api"
-        let serverBase = base.replacingOccurrences(of: "/api", with: "")
-        return URL(string: "\(serverBase)\(path)")
-    }
 }

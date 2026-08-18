@@ -88,7 +88,7 @@ struct ELearningMyLearningView: View {
 
     private func enrollmentRow(_ enrollment: ELEnrollment) -> some View {
         HStack(spacing: 12) {
-            AsyncImage(url: imageURL(enrollment.thumbnail)) { image in
+            AsyncImage(url: serverImageURL(enrollment.thumbnail)) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x9B59B6).opacity(0.15))
@@ -155,19 +155,14 @@ struct ELearningMyLearningView: View {
         do {
             let response = try await ELearningService.shared.getMyEnrollments()
             enrollments = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
     }
 
     private func loadStats() async {
         do {
             let response = try await ELearningService.shared.getUserStats()
             stats = response.data
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
     }
 
-    private func imageURL(_ path: String?) -> URL? {
-        guard let path else { return nil }
-        let base = UserDefaults.standard.string(forKey: "serverURL") ?? "https://onehealth.cm/api"
-        return URL(string: base.replacingOccurrences(of: "/api", with: "") + path)
-    }
 }

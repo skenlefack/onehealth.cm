@@ -149,3 +149,43 @@ extension Bundle {
         infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 }
+
+// MARK: - Server URL Helpers
+
+/// Construit une URL complète à partir d'un chemin relatif (ex: /uploads/photo.jpg)
+func serverImageURL(_ path: String?) -> URL? {
+    guard let path, !path.isEmpty else { return nil }
+    if path.hasPrefix("http") { return URL(string: path) }
+    let base = UserDefaults.standard.string(forKey: "serverURL") ?? "https://onehealth.cm/api"
+    let serverBase = base.replacingOccurrences(of: "/api", with: "")
+    return URL(string: "\(serverBase)\(path)")
+}
+
+// MARK: - Bilingual Helper
+
+/// Retourne la version localisée (FR ou EN) d'une paire de textes
+func localized(fr: String?, en: String?) -> String {
+    let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? "fr"
+    return (lang == "en" ? en : nil) ?? fr ?? ""
+}
+
+// MARK: - Shared UI Components
+
+/// Vue de chargement standard réutilisable
+struct LoadingView: View {
+    var message: String? = nil
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(AppColors.primary)
+            if let message {
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
+    }
+}

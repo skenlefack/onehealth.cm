@@ -135,7 +135,7 @@ struct OHWRMapFullView: View {
         do {
             let response = try await OHWRService.shared.getMarkers()
             markers = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }

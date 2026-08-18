@@ -574,13 +574,6 @@ export async function getQuizHistory(quizId: number, token: string): Promise<Api
 
 // ============== CERTIFICATES ==============
 
-// Get user's certificates
-export async function getMyCertificates(token: string): Promise<ApiResponse<ELearningCertificate[]>> {
-  return fetchApi<ELearningCertificate[]>('/elearning/certificates', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-}
-
 // Verify certificate (public)
 export async function verifyCertificate(code: string): Promise<ApiResponse<{
   valid: boolean;

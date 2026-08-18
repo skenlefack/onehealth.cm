@@ -142,7 +142,7 @@ struct ELearningCourseListView: View {
         do {
             let response = try await ELearningService.shared.getCategories()
             categories = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
     }
 
     // MARK: - UI Helpers

@@ -2,7 +2,6 @@
 // One Health Cameroon - Tableau de bord analytique
 
 import SwiftUI
-import Charts
 
 /// Vue principale du tableau de bord analytique COHRM.
 /// Affiche les KPIs, tendances, graphiques de distribution

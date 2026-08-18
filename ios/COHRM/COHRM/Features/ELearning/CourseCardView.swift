@@ -12,7 +12,7 @@ struct CourseCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Thumbnail
             ZStack(alignment: .topTrailing) {
-                AsyncImage(url: imageURL(course.thumbnail)) { image in
+                AsyncImage(url: serverImageURL(course.thumbnail)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     LinearGradient(colors: [Color(hex: 0x9B59B6).opacity(0.3), Color(hex: 0x7C3AED).opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -91,10 +91,4 @@ struct CourseCardView: View {
         }
     }
 
-    private func imageURL(_ path: String?) -> URL? {
-        guard let path else { return nil }
-        let base = UserDefaults.standard.string(forKey: "serverURL") ?? "https://onehealth.cm/api"
-        let serverBase = base.replacingOccurrences(of: "/api", with: "")
-        return URL(string: "\(serverBase)\(path)")
-    }
 }

@@ -17,7 +17,7 @@ struct OHWRExpertsListView: View {
     var body: some View {
         Group {
             if isLoading && experts.isEmpty {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if experts.isEmpty {
                 ContentUnavailableView(
                     appLanguage == "fr" ? "Aucun expert trouvé" : "No experts found",
@@ -88,7 +88,7 @@ struct OHWRExpertsListView: View {
             let response = try await OHWRService.shared.getExperts(search: searchText.isEmpty ? nil : searchText)
             experts = response.data ?? []
             hasMore = (response.pagination?.page ?? 1) < (response.pagination?.pages ?? 1)
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 
@@ -116,7 +116,7 @@ struct OHWRExpertDetailView: View {
     var body: some View {
         ScrollView {
             if isLoading {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if let expert {
                 VStack(spacing: 16) {
                     // Header card
@@ -187,7 +187,7 @@ struct OHWRExpertDetailView: View {
             do {
                 let response = try await OHWRService.shared.getExpertDetail(id: expertId)
                 expert = response.data
-            } catch {}
+            } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
             isLoading = false
         }
     }
@@ -215,7 +215,7 @@ struct OHWROrganizationsListView: View {
     var body: some View {
         Group {
             if isLoading && items.isEmpty {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if items.isEmpty {
                 ContentUnavailableView(appLanguage == "fr" ? "Aucune organisation" : "No organizations", systemImage: "building.2")
             } else {
@@ -250,7 +250,7 @@ struct OHWROrganizationsListView: View {
         do {
             let response = try await OHWRService.shared.getOrganizations(search: searchText.isEmpty ? nil : searchText)
             items = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }
@@ -267,7 +267,7 @@ struct OHWRMaterialsListView: View {
     var body: some View {
         Group {
             if isLoading && items.isEmpty {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if items.isEmpty {
                 ContentUnavailableView(appLanguage == "fr" ? "Aucun équipement" : "No equipment", systemImage: "wrench.and.screwdriver")
             } else {
@@ -307,7 +307,7 @@ struct OHWRMaterialsListView: View {
         do {
             let response = try await OHWRService.shared.getMaterials(search: searchText.isEmpty ? nil : searchText)
             items = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }
@@ -324,7 +324,7 @@ struct OHWRDocumentsListView: View {
     var body: some View {
         Group {
             if isLoading && items.isEmpty {
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                LoadingView()
             } else if items.isEmpty {
                 ContentUnavailableView(appLanguage == "fr" ? "Aucun document" : "No documents", systemImage: "doc.text")
             } else {
@@ -364,7 +364,7 @@ struct OHWRDocumentsListView: View {
         do {
             let response = try await OHWRService.shared.getDocuments(search: searchText.isEmpty ? nil : searchText)
             items = response.data ?? []
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 }

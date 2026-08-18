@@ -453,7 +453,7 @@ struct DUSSCQuizView: View {
                 durationSeconds: duration
             )
             scores = response.data
-        } catch {}
+        } catch { print("[OneHealth] Error: \(error.localizedDescription)") }
         isLoading = false
     }
 

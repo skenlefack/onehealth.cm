@@ -44,7 +44,7 @@ struct ELearningCourseDetailView: View {
         ZStack(alignment: .bottomLeading) {
             // Background image or gradient
             if let thumb = course.thumbnail {
-                AsyncImage(url: imageURL(thumb)) { image in
+                AsyncImage(url: serverImageURL(thumb)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     LinearGradient(colors: [Color(hex: 0x7C3AED), Color(hex: 0x9B59B6)], startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -348,11 +348,6 @@ struct ELearningCourseDetailView: View {
         }
     }
 
-    private func imageURL(_ path: String?) -> URL? {
-        guard let path else { return nil }
-        let base = UserDefaults.standard.string(forKey: "serverURL") ?? "https://onehealth.cm/api"
-        return URL(string: base.replacingOccurrences(of: "/api", with: "") + path)
-    }
 
     // MARK: - Actions
 

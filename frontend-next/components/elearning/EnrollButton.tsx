@@ -121,6 +121,7 @@ export function EnrollButton({ courseId, courseSlug, pathId, pathSlug, isFree = 
         }
       }
     } catch (err) {
+      console.error('Enrollment error:', err);
       setError(t.error);
     } finally {
       setIsEnrolling(false);
