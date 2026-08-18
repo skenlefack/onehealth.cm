@@ -124,7 +124,7 @@ enum PlatformModule: String, CaseIterable, Identifiable {
     var isAvailable: Bool {
         switch self {
         case .cohrm:     true      // Déjà implémenté
-        case .ohwr:      false     // À venir
+        case .ohwr:      true      // Implémenté
         case .dussc:     true      // Implémenté
         case .elearning: true      // Implémenté
         }

@@ -25,7 +25,7 @@ struct ModuleContainerView: View {
             case .cohrm:
                 cohrmModule
             case .ohwr:
-                comingSoonView
+                OHWRHomeView()
             case .dussc:
                 DUSSCHomeView()
             case .elearning:
