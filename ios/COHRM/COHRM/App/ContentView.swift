@@ -9,26 +9,49 @@
 
 import SwiftUI
 
-/// Vue racine qui gère la transition onboarding → plateforme
+/// Vue racine qui gère la transition onboarding → login → plateforme
 struct ContentView: View {
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
+    private let authManager = AuthManager.shared
+
     var body: some View {
         Group {
-            if hasCompletedOnboarding {
-                PlatformRootView()
-                    .transition(.opacity)
-            } else {
+            if !hasCompletedOnboarding {
+                // Étape 1 : Onboarding (premier lancement)
                 OnboardingView {
                     withAnimation(.easeInOut(duration: 0.5)) {
                         hasCompletedOnboarding = true
                     }
                 }
                 .transition(.opacity)
+            } else if authManager.isLoading {
+                // Chargement de la session
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(AppColors.primary)
+                    Text(String(localized: "app.loading"))
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppColors.background)
+            } else if !authManager.isAuthenticated {
+                // Étape 2 : Login
+                LoginView()
+                    .transition(.opacity)
+            } else {
+                // Étape 3 : Plateforme
+                PlatformRootView()
+                    .transition(.opacity)
             }
         }
         .animation(.easeInOut, value: hasCompletedOnboarding)
+        .animation(.easeInOut, value: authManager.isAuthenticated)
+        .task {
+            await authManager.restoreSession()
+        }
     }
 }
 

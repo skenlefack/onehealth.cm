@@ -19,6 +19,14 @@ actor APIClient {
             ?? "https://onehealth.cm/api"
     }
 
+    /// Token d'authentification JWT
+    private var authToken: String?
+
+    /// Définit le token d'authentification
+    func setAuthToken(_ token: String?) {
+        self.authToken = token
+    }
+
     /// Timeout des requêtes
     private let timeoutInterval: TimeInterval = 30
 
@@ -51,6 +59,7 @@ actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.addValue("application/json", forHTTPHeaderField: "Accept")
+        addAuthHeader(to: &request)
 
         let (data, response) = try await session.data(for: request)
         try validateResponse(response)
@@ -74,6 +83,7 @@ actor APIClient {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue("application/json", forHTTPHeaderField: "Accept")
+        addAuthHeader(to: &request)
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await session.data(for: request)
@@ -98,6 +108,7 @@ actor APIClient {
         request.httpMethod = "PUT"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue("application/json", forHTTPHeaderField: "Accept")
+        addAuthHeader(to: &request)
         if !body.isEmpty {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
@@ -124,6 +135,7 @@ actor APIClient {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue("application/json", forHTTPHeaderField: "Accept")
+        addAuthHeader(to: &request)
 
         let encoder = JSONEncoder()
         request.httpBody = try encoder.encode(body)
@@ -150,6 +162,7 @@ actor APIClient {
         request.httpMethod = "PUT"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue("application/json", forHTTPHeaderField: "Accept")
+        addAuthHeader(to: &request)
 
         let encoder = JSONEncoder()
         request.httpBody = try encoder.encode(body)
@@ -178,6 +191,7 @@ actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
 
         var body = Data()
 
@@ -208,6 +222,15 @@ actor APIClient {
         return try decoder.decode(T.self, from: responseData)
     }
 
+    // MARK: - Auth Header
+
+    /// Ajoute le header Authorization si un token est disponible
+    private func addAuthHeader(to request: inout URLRequest) {
+        if let token = authToken {
+            request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+    }
+
     // MARK: - Validation
 
     private func validateResponse(_ response: URLResponse) throws {
@@ -219,6 +242,9 @@ actor APIClient {
         case 200...299:
             return // OK
         case 401:
+            Task { @MainActor in
+                NotificationCenter.default.post(name: .authSessionExpired, object: nil)
+            }
             throw APIError.unauthorized
         case 403:
             throw APIError.forbidden
@@ -283,3 +309,10 @@ struct APIResponse<T: Decodable>: Decodable {
 }
 
 struct EmptyResponse: Decodable {}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Postée quand le serveur retourne 401 (session expirée)
+    static let authSessionExpired = Notification.Name("authSessionExpired")
+}

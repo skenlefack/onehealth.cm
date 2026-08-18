@@ -99,6 +99,9 @@ struct SettingsView: View {
 
             // Section 6 : Donnees
             dataSection
+
+            // Section 7 : Déconnexion
+            logoutSection
         }
         .navigationTitle(String(localized: "settings.title"))
         .navigationBarTitleDisplayMode(.large)
@@ -218,6 +221,23 @@ struct SettingsView: View {
                 .keyboardType(.URL)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+            }
+
+            // Numéro SMS
+            VStack(alignment: .leading, spacing: AppDimensions.spacingXS) {
+                Text(String(localized: "settings.sms.number.label"))
+                    .font(AppFonts.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                TextField(
+                    "+237...",
+                    text: Binding(
+                        get: { UserDefaults.standard.string(forKey: "smsRecipient") ?? "+237670000000" },
+                        set: { UserDefaults.standard.set($0, forKey: "smsRecipient") }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .keyboardType(.phonePad)
             }
 
             // Indicateur de connexion
@@ -406,6 +426,35 @@ struct SettingsView: View {
         } footer: {
             Text(String(localized: "settings.data.footer"))
                 .font(AppFonts.caption)
+        }
+    }
+
+    // MARK: - Section Déconnexion
+
+    @State private var showLogoutConfirmation = false
+
+    private var logoutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                showLogoutConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                    Text(String(localized: "settings.logout"))
+                }
+            }
+            .confirmationDialog(
+                String(localized: "settings.logout.confirm.title"),
+                isPresented: $showLogoutConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "settings.logout.confirm.action"), role: .destructive) {
+                    AuthManager.shared.logout()
+                }
+                Button(String(localized: "settings.logout.confirm.cancel"), role: .cancel) {}
+            } message: {
+                Text(String(localized: "settings.logout.confirm.message"))
+            }
         }
     }
 

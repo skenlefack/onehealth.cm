@@ -66,13 +66,15 @@ final class PlatformHomeViewModel {
 
     private func loadCohrmStats() async {
         do {
-            let data: CohrmDashboardResponse = try await APIClient.shared.get(
-                endpoint: "/cohrm/mobile/dashboard"
+            let response = try await APIClient.shared.get(
+                "/cohrm/mobile/dashboard",
+                responseType: APIResponse<CohrmDashboardResponse>.self
             )
-            totalRumors = data.stats?.total ?? 0
-            pendingRumors = data.stats?.pending ?? 0
-            criticalRumors = data.stats?.critical ?? 0
-            investigatingRumors = data.stats?.investigating ?? 0
+            let data = response.data
+            totalRumors = data?.stats?.total ?? 0
+            pendingRumors = data?.stats?.pending ?? 0
+            criticalRumors = data?.stats?.critical ?? 0
+            investigatingRumors = data?.stats?.investigating ?? 0
         } catch {
             // Fail silently — module may not be available
             print("[Platform] COHRM stats error: \(error.localizedDescription)")
@@ -83,12 +85,14 @@ final class PlatformHomeViewModel {
 
     private func loadOhwrStats() async {
         do {
-            let data: OhwrStatsResponse = try await APIClient.shared.get(
-                endpoint: "/mapping/stats"
+            let response = try await APIClient.shared.get(
+                "/mapping/stats",
+                responseType: APIResponse<OhwrStatsResponse>.self
             )
-            totalResources = data.totalResources ?? 0
-            totalExperts = data.totalExperts ?? 0
-            coveredRegions = data.coveredRegions ?? 0
+            let data = response.data
+            totalResources = data?.totalResources ?? 0
+            totalExperts = data?.totalExperts ?? 0
+            coveredRegions = data?.coveredRegions ?? 0
         } catch {
             print("[Platform] OHWR stats error: \(error.localizedDescription)")
         }
@@ -98,13 +102,15 @@ final class PlatformHomeViewModel {
 
     private func loadDusscStats() async {
         do {
-            let data: DusscStatsResponse = try await APIClient.shared.get(
-                endpoint: "/dussc/analytics/advocacy"
+            let response = try await APIClient.shared.get(
+                "/dussc/analytics/advocacy",
+                responseType: APIResponse<DusscStatsResponse>.self
             )
-            totalQuizSessions = data.totalSessions ?? 0
-            totalQuestions = data.totalQuestions ?? 0
-            avgGain = data.avgGain ?? 0
-            completionRate = data.completionRate ?? 0
+            let data = response.data
+            totalQuizSessions = data?.totalSessions ?? 0
+            totalQuestions = data?.totalQuestions ?? 0
+            avgGain = data?.avgGain ?? 0
+            completionRate = data?.completionRate ?? 0
         } catch {
             print("[Platform] DUSS-C stats error: \(error.localizedDescription)")
         }
@@ -114,12 +120,14 @@ final class PlatformHomeViewModel {
 
     private func loadElearningStats() async {
         do {
-            let data: ElearningStatsResponse = try await APIClient.shared.get(
-                endpoint: "/elearning/stats"
+            let response = try await APIClient.shared.get(
+                "/elearning/stats",
+                responseType: APIResponse<ElearningStatsResponse>.self
             )
-            totalCourses = data.totalCourses ?? 0
-            totalEnrollments = data.totalEnrollments ?? 0
-            totalCertified = data.totalCertified ?? 0
+            let data = response.data
+            totalCourses = data?.totalCourses ?? 0
+            totalEnrollments = data?.totalEnrollments ?? 0
+            totalCertified = data?.totalCertified ?? 0
         } catch {
             print("[Platform] E-Learning stats error: \(error.localizedDescription)")
         }

@@ -2,6 +2,7 @@
 // COHRM Cameroun - ViewModel de la liste des rumeurs
 
 import Foundation
+import SwiftData
 
 /// ViewModel principal pour la gestion et le filtrage des rumeurs
 @MainActor
@@ -21,6 +22,9 @@ final class RumorsViewModel {
 
     /// Message d'erreur eventuel
     var errorMessage: String?
+
+    /// Indique si les données affichées proviennent du cache hors-ligne
+    var isOfflineData = false
 
     /// Page courante
     private(set) var currentPage = 1
@@ -93,16 +97,17 @@ final class RumorsViewModel {
     // MARK: - Chargement
 
     /// Charge une page de rumeurs avec les filtres courants
-    func loadRumors(page: Int = 1) async {
+    func loadRumors(page: Int = 1, modelContext: ModelContext? = nil) async {
         if page == 1 {
             isLoading = true
         } else {
             isLoadingMore = true
         }
         errorMessage = nil
+        if page == 1 { isOfflineData = false }
 
         do {
-            let response = try await CohrmAPIService.shared.getRumors(
+            let response = try await APIService.shared.getRumors(
                 page: page,
                 limit: 20,
                 status: selectedStatus,
@@ -113,6 +118,10 @@ final class RumorsViewModel {
             if let data = response.data {
                 if page == 1 {
                     rumors = data
+                    // Mettre en cache les résultats pour consultation hors-ligne
+                    if let modelContext = modelContext {
+                        cacheRumors(data, modelContext: modelContext)
+                    }
                 } else {
                     rumors.append(contentsOf: data)
                 }
@@ -128,7 +137,12 @@ final class RumorsViewModel {
                 totalPages = page
             }
         } catch {
-            errorMessage = error.localizedDescription
+            // Fallback hors-ligne : charger depuis le cache si la liste est vide
+            if page == 1 && rumors.isEmpty, let modelContext = modelContext {
+                loadCachedRumors(modelContext: modelContext)
+            } else {
+                errorMessage = error.localizedDescription
+            }
         }
 
         isLoading = false
@@ -136,15 +150,57 @@ final class RumorsViewModel {
     }
 
     /// Charge la page suivante si disponible
-    func loadMore() async {
+    func loadMore(modelContext: ModelContext? = nil) async {
         guard hasMorePages, !isLoadingMore, !isLoading else { return }
-        await loadRumors(page: currentPage + 1)
+        await loadRumors(page: currentPage + 1, modelContext: modelContext)
     }
 
     /// Rafraichit depuis la premiere page
-    func refresh() async {
+    func refresh(modelContext: ModelContext? = nil) async {
         currentPage = 1
         totalPages = 1
-        await loadRumors(page: 1)
+        await loadRumors(page: 1, modelContext: modelContext)
+    }
+
+    // MARK: - Cache hors-ligne
+
+    /// Met en cache les rumeurs récupérées depuis l'API
+    private func cacheRumors(_ rumors: [RumorSummary], modelContext: ModelContext) {
+        do {
+            // Supprimer les anciennes entrées du cache
+            try modelContext.delete(model: CachedRumor.self)
+
+            // Insérer les nouvelles
+            for rumor in rumors {
+                let cached = CachedRumor(from: rumor)
+                modelContext.insert(cached)
+            }
+
+            try modelContext.save()
+        } catch {
+            print("Erreur mise en cache des rumeurs : \(error)")
+        }
+    }
+
+    /// Charge les rumeurs depuis le cache SwiftData en cas d'erreur réseau
+    private func loadCachedRumors(modelContext: ModelContext) {
+        do {
+            let descriptor = FetchDescriptor<CachedRumor>(
+                sortBy: [SortDescriptor(\.cachedAt, order: .reverse)]
+            )
+            let cachedRumors = try modelContext.fetch(descriptor)
+
+            if !cachedRumors.isEmpty {
+                rumors = cachedRumors.map { $0.toRumorSummary() }
+                isOfflineData = true
+                totalPages = 1
+                currentPage = 1
+                errorMessage = nil
+            } else {
+                errorMessage = String(localized: "rumors.error.no_cache")
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

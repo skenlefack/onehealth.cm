@@ -372,29 +372,44 @@ struct PaginationInfo: Codable {
 
 // MARK: - Authentification
 
+/// Réponse complète du login (data du APIResponse)
+struct LoginResponseData: Codable {
+    let user: LoginUser
+    let actor: LoginActor?
+    let token: String
+}
+
 /// Utilisateur connecté
 struct LoginUser: Codable {
     let id: Int
-    let username: String?
+    let name: String?
     let email: String?
-    let firstName: String?
-    let lastName: String?
+    let username: String?
     let role: String?
-    let actorLevel: Int?
-    let actorRegion: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, username, email
-        case firstName = "first_name"
-        case lastName = "last_name"
-        case role
-        case actorLevel = "actor_level"
-        case actorRegion = "actor_region"
-    }
+    let avatar: String?
+    let permissions: [String]?
 
     /// Nom complet de l'utilisateur
     var fullName: String {
-        [firstName, lastName].compactMap { $0 }.joined(separator: " ")
+        name ?? username ?? email ?? ""
+    }
+}
+
+/// Acteur COHRM associé à l'utilisateur
+struct LoginActor: Codable {
+    let id: Int?
+    let level: Int?
+    let levelLabel: String?
+    let type: String?
+    let region: String?
+    let department: String?
+    let district: String?
+    let organization: String?
+    let phone: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, level, type, region, department, district, organization, phone
+        case levelLabel = "level_label"
     }
 }
 

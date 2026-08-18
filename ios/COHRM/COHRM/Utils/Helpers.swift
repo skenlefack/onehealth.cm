@@ -40,8 +40,10 @@ enum SMSHelper {
         return parts.joined(separator: "#")
     }
 
-    /// Numéro de réception SMS COHRM
-    static let smsRecipient = "+237600000000" // À configurer
+    /// Numéro de réception SMS COHRM (configurable dans les paramètres)
+    static var smsRecipient: String {
+        UserDefaults.standard.string(forKey: "smsRecipient") ?? "+237670000000"
+    }
 }
 
 /// Retour haptique

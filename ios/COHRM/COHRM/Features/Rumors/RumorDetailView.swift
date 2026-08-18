@@ -2,6 +2,7 @@
 // COHRM Cameroun - Vue de detail d'une rumeur
 
 import SwiftUI
+import MapKit
 
 /// Vue detaillee d'une rumeur avec toutes les sections
 struct RumorDetailView: View {
@@ -237,6 +238,19 @@ struct RumorDetailView: View {
                                 value: String(format: "%.6f, %.6f", lat, lng),
                                 icon: "location.fill"
                             )
+
+                            // Carte interactive
+                            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                            Map(initialPosition: .region(MKCoordinateRegion(
+                                center: coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                            ))) {
+                                Marker(rumor.title ?? "Location", coordinate: coordinate)
+                                    .tint(AppColors.danger)
+                            }
+                            .frame(height: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .allowsHitTesting(false)
                         }
                     }
                 }

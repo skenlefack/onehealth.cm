@@ -186,3 +186,72 @@ final class ReferenceData {
         self.lastSyncedAt = Date()
     }
 }
+
+/// Rumeur mise en cache pour la consultation hors-ligne
+@Model
+final class CachedRumor {
+
+    /// Identifiant serveur de la rumeur
+    var rumorId: Int
+
+    /// Code unique de la rumeur
+    var code: String?
+
+    /// Titre de la rumeur
+    var title: String?
+
+    /// Statut (pending, investigating, confirmed, closed, false_alarm)
+    var status: String?
+
+    /// Priorité (low, medium, high, critical)
+    var priority: String?
+
+    /// Niveau de risque
+    var riskLevel: String?
+
+    /// Région d'origine
+    var region: String?
+
+    /// Catégorie (animal, human, environmental, zoonotic)
+    var category: String?
+
+    /// Source du signalement
+    var source: String?
+
+    /// Date de création sur le serveur (chaîne ISO)
+    var createdAt: String?
+
+    /// Date de mise en cache locale
+    var cachedAt: Date
+
+    init(from summary: RumorSummary) {
+        self.rumorId = summary.id
+        self.code = summary.code
+        self.title = summary.title
+        self.status = summary.status
+        self.priority = summary.priority
+        self.riskLevel = summary.riskLevel
+        self.region = summary.region
+        self.category = summary.category
+        self.source = summary.source
+        self.createdAt = summary.createdAt
+        self.cachedAt = Date()
+    }
+
+    /// Convertit en RumorSummary pour l'affichage dans les vues existantes
+    func toRumorSummary() -> RumorSummary {
+        return RumorSummary(
+            id: rumorId,
+            code: code,
+            title: title,
+            category: category,
+            status: status,
+            priority: priority,
+            region: region,
+            riskLevel: riskLevel,
+            source: source,
+            reporterName: nil,
+            createdAt: createdAt
+        )
+    }
+}

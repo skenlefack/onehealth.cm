@@ -101,10 +101,12 @@ actor APIService {
     // MARK: - Rumeurs
 
     /// Liste les rumeurs avec filtres
-    func getRumors(page: Int = 1, limit: Int = 20, status: String? = nil, search: String? = nil) async throws -> APIResponse<[RumorSummary]> {
+    func getRumors(page: Int = 1, limit: Int = 20, status: String? = nil, priority: String? = nil, search: String? = nil, region: String? = nil) async throws -> APIResponse<[RumorSummary]> {
         var params: [String: String] = ["page": "\(page)", "limit": "\(limit)"]
         if let status = status { params["status"] = status }
+        if let priority = priority { params["priority"] = priority }
         if let search = search { params["search"] = search }
+        if let region = region { params["region"] = region }
         return try await client.get(
             Endpoints.rumors,
             queryParams: params,
@@ -233,11 +235,11 @@ actor APIService {
     // MARK: - Authentification
 
     /// Connexion mobile
-    func login(email: String, password: String) async throws -> APIResponse<LoginUser> {
+    func login(email: String, password: String) async throws -> APIResponse<LoginResponseData> {
         return try await client.post(
             Endpoints.mobileLogin,
             body: ["email": email, "password": password],
-            responseType: APIResponse<LoginUser>.self
+            responseType: APIResponse<LoginResponseData>.self
         )
     }
 

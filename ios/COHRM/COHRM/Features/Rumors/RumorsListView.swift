@@ -2,11 +2,13 @@
 // COHRM Cameroun - Liste des rumeurs avec filtres et recherche
 
 import SwiftUI
+import SwiftData
 
 /// Vue principale de la liste des rumeurs
 struct RumorsListView: View {
 
     @State private var viewModel = RumorsViewModel()
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         ZStack {
@@ -14,6 +16,11 @@ struct RumorsListView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                // Bannière hors-ligne
+                if viewModel.isOfflineData {
+                    offlineBanner
+                }
+
                 // Chips de filtrage par statut
                 FilterChipsView(
                     selectedStatus: $viewModel.selectedStatus,
@@ -47,11 +54,11 @@ struct RumorsListView: View {
             prompt: String(localized: "rumors.search.placeholder")
         )
         .refreshable {
-            await viewModel.refresh()
+            await viewModel.refresh(modelContext: modelContext)
         }
         .task {
             if viewModel.rumors.isEmpty {
-                await viewModel.loadRumors()
+                await viewModel.loadRumors(modelContext: modelContext)
             }
         }
     }
@@ -69,7 +76,7 @@ struct RumorsListView: View {
                     .onAppear {
                         // Infinite scroll : charger plus quand le dernier element apparait
                         if rumor.id == viewModel.rumors.last?.id {
-                            Task { await viewModel.loadMore() }
+                            Task { await viewModel.loadMore(modelContext: modelContext) }
                         }
                     }
                 }
@@ -128,12 +135,25 @@ struct RumorsListView: View {
                 String(localized: "rumors.error.retry"),
                 icon: "arrow.clockwise"
             ) {
-                Task { await viewModel.refresh() }
+                Task { await viewModel.refresh(modelContext: modelContext) }
             }
             .padding(.horizontal, AppDimensions.spacingXL)
 
             Spacer()
         }
+    }
+
+    private var offlineBanner: some View {
+        HStack(spacing: AppDimensions.spacingXS) {
+            Image(systemName: "wifi.slash")
+                .font(.caption)
+            Text(String(localized: "rumors.offline_banner"))
+                .font(AppFonts.caption)
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, AppDimensions.spacingXS)
+        .background(AppColors.warning)
     }
 
     private var emptyView: some View {
