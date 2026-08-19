@@ -15360,9 +15360,9 @@ const OHELearningPage = ({ isDark, token }) => {
           <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>Actions Rapides</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             {[
-              { icon: Plus, label: 'Nouveau Cours', action: () => { setEditingCourse(null); setShowCourseForm(true); }, color: colors.primary },
-              { icon: Award, label: 'Nouveau Parcours', action: () => { setEditingPath(null); setShowPathForm(true); }, color: colors.purple },
-              { icon: Tag, label: 'Catégorie', action: () => { setEditingCategory(null); setShowCategoryModal(true); }, color: colors.teal },
+              { icon: Plus, label: 'Nouveau Cours', action: () => { setActiveTab('courses'); setEditingCourse(null); setShowCourseForm(true); }, color: colors.primary },
+              { icon: Award, label: 'Nouveau Parcours', action: () => { setActiveTab('paths'); setEditingPath(null); setShowPathForm(true); }, color: colors.purple },
+              { icon: Tag, label: 'Catégorie', action: () => { setActiveTab('categories'); setEditingCategory(null); setShowCategoryModal(true); }, color: colors.teal },
               { icon: RefreshCw, label: 'Actualiser', action: () => { fetchStats(); fetchCourses(); }, color: colors.success }
             ].map((item, i) => (
               <button key={i} onClick={item.action} style={{
