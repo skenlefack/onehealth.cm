@@ -15254,7 +15254,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'courses', label: 'Cours', icon: BookOpen },
-    { id: 'curriculum', label: 'Modules & Leçons', icon: FolderTree, hidden: !selectedCourse },
+    { id: 'curriculum', label: 'Modules & Leçons', icon: FolderTree },
     { id: 'paths', label: 'Parcours', icon: Award },
     { id: 'questions', label: 'Banque Questions', icon: HelpCircle },
     { id: 'quizzes', label: 'Quiz', icon: FileQuestion },
@@ -15548,27 +15548,76 @@ const OHELearningPage = ({ isDark, token }) => {
 
   // ============ RENDER CURRICULUM TAB ============
   const renderCurriculum = () => {
-    // Show inline form when editing/creating module
-    if (showModuleForm) {
-      return <ModuleFormInline />;
-    }
-
-    // Show inline form when editing/creating lesson
-    if (showLessonForm) {
-      return <LessonFormInline />;
-    }
-
-    if (!selectedCourse) {
+    // Drawer overlay for module/lesson forms
+    const renderFormDrawer = () => {
+      if (!showModuleForm && !showLessonForm) return null;
       return (
+        <div style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1000,
+          display: 'flex', justifyContent: 'flex-end'
+        }}>
+          {/* Backdrop */}
+          <div
+            onClick={() => { setShowModuleForm(false); setShowLessonForm(false); }}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}
+          />
+          {/* Drawer panel */}
+          <div style={{
+            position: 'relative', width: '680px', maxWidth: '90vw', height: '100vh',
+            background: isDark ? '#0f172a' : '#ffffff', boxShadow: '-4px 0 24px rgba(0,0,0,0.2)',
+            overflowY: 'auto', padding: '24px', zIndex: 1
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}` }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+                {showModuleForm ? (editingModule ? 'Modifier le Module' : 'Nouveau Module') : (editingLesson ? 'Modifier la Leçon' : 'Nouvelle Leçon')}
+              </h3>
+              <button onClick={() => { setShowModuleForm(false); setShowLessonForm(false); }}
+                style={{ ...styles.btnIcon, width: '36px', height: '36px', background: isDark ? '#1e293b' : '#f1f5f9' }}>
+                <X size={18} />
+              </button>
+            </div>
+            {showModuleForm && <ModuleFormInline />}
+            {showLessonForm && <LessonFormInline />}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div>
+        {renderFormDrawer()}
+
+        {/* Course Selector */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px' }}>
+          <select
+            value={selectedCourse?.id || ''}
+            onChange={async (e) => {
+              const courseId = parseInt(e.target.value);
+              if (!courseId) { setSelectedCourse(null); return; }
+              const course = courses.find(c => c.id === courseId);
+              if (course) await viewCourseCurriculum(course);
+            }}
+            style={{ ...styles.select, flex: 1, fontSize: '15px', padding: '12px 16px', fontWeight: '600' }}
+          >
+            <option value="">-- Sélectionnez un cours à éditer --</option>
+            {courses.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.title_fr} {c.status === 'draft' ? '(brouillon)' : c.status === 'archived' ? '(archivé)' : ''}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => { setEditingCourse(null); setShowCourseForm(true); setActiveTab('courses'); }} style={styles.btnPrimary}>
+            <Plus size={18} /> Nouveau Cours
+          </button>
+        </div>
+
+    {!selectedCourse ? (
         <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
           <FolderTree size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
           <h3 style={{ margin: '0 0 8px' }}>Sélectionnez un cours</h3>
-          <p style={styles.textMuted}>Choisissez un cours dans l'onglet "Cours" pour gérer ses modules et leçons</p>
+          <p style={styles.textMuted}>Choisissez un cours dans la liste ci-dessus pour gérer ses modules et leçons</p>
         </div>
-      );
-    }
-
-    return (
+    ) : (
       <div>
         {/* Course Header */}
         <div style={{
@@ -15598,8 +15647,8 @@ const OHELearningPage = ({ isDark, token }) => {
                 </p>
               </div>
             </div>
-            <button onClick={() => { setSelectedCourse(null); setActiveTab('courses'); }} style={styles.btnSecondary}>
-              <ArrowLeft size={16} /> Retour aux cours
+            <button onClick={() => { setEditingCourse(selectedCourse); setShowCourseForm(true); setActiveTab('courses'); }} style={styles.btnSecondary}>
+              <Edit3 size={16} /> Modifier le cours
             </button>
           </div>
         </div>
@@ -15705,6 +15754,8 @@ const OHELearningPage = ({ isDark, token }) => {
             ))}
           </div>
         )}
+      </div>
+    )}
       </div>
     );
   };
