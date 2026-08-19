@@ -14673,6 +14673,14 @@ const OHELearningPage = ({ isDark, token }) => {
   const [selectedPath, setSelectedPath] = useState(null);
   const [showPathCoursesModal, setShowPathCoursesModal] = useState(false);
 
+  // Admin Enrollments
+  const [adminEnrollments, setAdminEnrollments] = useState([]);
+  const [enrollmentStats, setEnrollmentStats] = useState({ total: 0, active: 0, completed: 0, cancelled: 0 });
+  const [enrollmentPagination, setEnrollmentPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [enrollmentSearch, setEnrollmentSearch] = useState('');
+  const [enrollmentStatusFilter, setEnrollmentStatusFilter] = useState('');
+  const [enrollmentTypeFilter, setEnrollmentTypeFilter] = useState('');
+
   // Fetch functions
   const fetchStats = async () => {
     try {
@@ -14748,6 +14756,40 @@ const OHELearningPage = ({ isDark, token }) => {
     }
   };
 
+  const fetchAdminEnrollments = async (page = 1) => {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(enrollmentSearch && { search: enrollmentSearch }),
+        ...(enrollmentStatusFilter && { status: enrollmentStatusFilter }),
+        ...(enrollmentTypeFilter && { type: enrollmentTypeFilter })
+      });
+      const res = await api.get(`/elearning/admin/enrollments?${params}`, token);
+      if (res.success) {
+        setAdminEnrollments(res.data.enrollments);
+        setEnrollmentStats(res.data.stats);
+        setEnrollmentPagination(res.data.pagination);
+      }
+    } catch (err) {
+      console.error('Error fetching enrollments:', err);
+    }
+  };
+
+  const handleUpdateEnrollmentStatus = async (enrollmentId, newStatus) => {
+    try {
+      const res = await api.put(`/elearning/admin/enrollments/${enrollmentId}/status`, { status: newStatus }, token);
+      if (res.success) {
+        setToast({ message: 'Statut mis à jour', type: 'success' });
+        fetchAdminEnrollments(enrollmentPagination.page);
+      } else {
+        setToast({ message: res.message || 'Erreur', type: 'error' });
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur de connexion', type: 'error' });
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchCourses();
@@ -14758,6 +14800,12 @@ const OHELearningPage = ({ isDark, token }) => {
     fetchCertificates();
     fetchCertificateTemplates();
   }, [token]);
+
+  useEffect(() => {
+    if (activeTab === 'enrollments') {
+      fetchAdminEnrollments(1);
+    }
+  }, [activeTab]);
 
   // Course CRUD
   const handleSaveCourse = async (courseData) => {
@@ -16918,22 +16966,286 @@ const OHELearningPage = ({ isDark, token }) => {
     );
   };
 
-  const renderEnrollments = () => (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Inscriptions</h2>
-          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>Gérez les inscriptions aux cours et parcours</p>
-        </div>
-      </div>
+  const renderEnrollments = () => {
+    const getEnrollStatusBadge = (status) => {
+      const config = {
+        enrolled: { label: 'Inscrit', color: colors.primary, icon: CheckCircle },
+        in_progress: { label: 'En cours', color: colors.warning, icon: Clock },
+        completed: { label: 'Terminé', color: colors.success, icon: CheckCircle },
+        cancelled: { label: 'Annulé', color: colors.error, icon: XCircle },
+        suspended: { label: 'Suspendu', color: isDark ? '#64748b' : '#94a3b8', icon: Pause },
+        expired: { label: 'Expiré', color: '#f97316', icon: AlertCircle }
+      };
+      const c = config[status] || config.enrolled;
+      const Icon = c.icon;
+      return (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: '4px',
+          padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+          background: `${c.color}15`, color: c.color
+        }}>
+          <Icon size={12} />
+          {c.label}
+        </span>
+      );
+    };
 
-      <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
-        <Users size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: '16px' }} />
-        <h3 style={{ margin: '0 0 8px' }}>Gestion des inscriptions</h3>
-        <p style={styles.textMuted}>Les inscriptions des apprenants apparaîtront ici une fois que des utilisateurs seront inscrits à vos cours.</p>
+    const thStyle = { padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' };
+
+    return (
+      <div>
+        {/* Stats Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+          {[
+            { icon: Users, label: 'Total Inscriptions', value: enrollmentStats.total || 0, color: colors.primary },
+            { icon: Activity, label: 'Actives', value: enrollmentStats.active || 0, color: colors.success },
+            { icon: CheckCircle, label: 'Terminées', value: enrollmentStats.completed || 0, color: colors.teal },
+            { icon: XCircle, label: 'Annulées / Suspendues', value: enrollmentStats.cancelled || 0, color: colors.error }
+          ].map((stat, i) => (
+            <div key={i} style={{
+              ...styles.card,
+              background: `linear-gradient(135deg, ${stat.color}15 0%, ${stat.color}05 100%)`,
+              borderLeft: `4px solid ${stat.color}`
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>{stat.label}</p>
+                  <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: '700', color: stat.color }}>{stat.value}</p>
+                </div>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: `${stat.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <stat.icon size={24} color={stat.color} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Inscriptions</h2>
+            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>Gérez les inscriptions aux cours et parcours</p>
+          </div>
+          <button onClick={() => fetchAdminEnrollments(1)} style={{ ...styles.btnPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={16} /> Actualiser
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+            <input
+              type="text"
+              placeholder="Rechercher par nom, email..."
+              value={enrollmentSearch}
+              onChange={e => setEnrollmentSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') fetchAdminEnrollments(1); }}
+              style={{ ...styles.input, paddingLeft: '42px', width: '100%' }}
+            />
+          </div>
+          <select value={enrollmentStatusFilter} onChange={e => { setEnrollmentStatusFilter(e.target.value); }} style={{ ...styles.select, width: '160px', flexShrink: 0 }}>
+            <option value="">Tous les statuts</option>
+            <option value="enrolled">Inscrit</option>
+            <option value="in_progress">En cours</option>
+            <option value="completed">Terminé</option>
+            <option value="cancelled">Annulé</option>
+            <option value="suspended">Suspendu</option>
+            <option value="expired">Expiré</option>
+          </select>
+          <select value={enrollmentTypeFilter} onChange={e => { setEnrollmentTypeFilter(e.target.value); }} style={{ ...styles.select, width: '150px', flexShrink: 0 }}>
+            <option value="">Tous les types</option>
+            <option value="course">Cours</option>
+            <option value="learning_path">Parcours</option>
+          </select>
+          <button onClick={() => fetchAdminEnrollments(1)} style={{ ...styles.btnPrimary, flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Search size={16} /> Filtrer
+          </button>
+        </div>
+
+        {/* Table */}
+        {adminEnrollments.length === 0 ? (
+          <div style={{ ...styles.card, textAlign: 'center', padding: '60px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: `${colors.primary}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Users size={40} color={colors.primary} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: '600' }}>Aucune inscription trouvée</h3>
+            <p style={{ margin: '0 0 20px', ...styles.textMuted }}>
+              Les inscriptions des apprenants apparaitront ici une fois que des utilisateurs seront inscrits a vos cours.
+            </p>
+          </div>
+        ) : (
+          <div style={{ ...styles.card, padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: isDark ? '#1e293b' : '#f8fafc' }}>
+                    <th style={thStyle}>Utilisateur</th>
+                    <th style={thStyle}>Cours / Parcours</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>Type</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>Statut</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>Progression</th>
+                    <th style={thStyle}>Inscrit le</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminEnrollments.map((enr, idx) => (
+                    <tr key={enr.id} style={{
+                      borderBottom: idx < adminEnrollments.length - 1 ? `1px solid ${isDark ? '#334155' : '#e2e8f0'}` : 'none',
+                      background: isDark ? 'transparent' : 'white',
+                      transition: 'background 0.15s'
+                    }}>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '40px', height: '40px', borderRadius: '50%',
+                            background: `${colors.primary}20`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: '700', fontSize: '14px', color: colors.primary
+                          }}>
+                            {(enr.first_name || enr.username || '?')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: '500', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                              {enr.first_name && enr.last_name ? `${enr.first_name} ${enr.last_name}` : enr.username}
+                            </div>
+                            <div style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '2px' }}>
+                              {enr.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '8px',
+                            background: enr.enrollable_type === 'learning_path' ? `${colors.purple}15` : `${colors.primary}15`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            {enr.enrollable_type === 'learning_path' ? (
+                              <GraduationCap size={16} color={colors.purple} />
+                            ) : (
+                              <BookOpen size={16} color={colors.primary} />
+                            )}
+                          </div>
+                          <span style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                            {enr.item_title || 'N/A'}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+                          background: enr.enrollable_type === 'learning_path' ? `${colors.purple}15` : `${colors.primary}15`,
+                          color: enr.enrollable_type === 'learning_path' ? colors.purple : colors.primary
+                        }}>
+                          {enr.enrollable_type === 'learning_path' ? 'Parcours' : 'Cours'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        {getEnrollStatusBadge(enr.status)}
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                          <div style={{
+                            width: '80px', height: '6px', borderRadius: '3px',
+                            background: isDark ? '#334155' : '#e2e8f0', overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: `${enr.progress_percentage || 0}%`, height: '100%', borderRadius: '3px',
+                              background: (enr.progress_percentage || 0) >= 100 ? colors.success : (enr.progress_percentage || 0) >= 50 ? colors.warning : colors.primary,
+                              transition: 'width 0.3s'
+                            }} />
+                          </div>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', minWidth: '35px' }}>
+                            {Math.round(enr.progress_percentage || 0)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ fontSize: '13px', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                          {enr.enrolled_at ? new Date(enr.enrolled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                        </div>
+                        {enr.last_accessed_at && (
+                          <div style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={10} />
+                            {new Date(enr.last_accessed_at).toLocaleDateString('fr-FR')}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <select
+                          value={enr.status}
+                          onChange={e => handleUpdateEnrollmentStatus(enr.id, e.target.value)}
+                          style={{
+                            ...styles.select,
+                            width: 'auto',
+                            fontSize: '12px',
+                            padding: '6px 10px',
+                            minWidth: '120px'
+                          }}
+                        >
+                          <option value="enrolled">Inscrit</option>
+                          <option value="in_progress">En cours</option>
+                          <option value="completed">Termine</option>
+                          <option value="cancelled">Annule</option>
+                          <option value="suspended">Suspendu</option>
+                          <option value="expired">Expire</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {enrollmentPagination.totalPages > 1 && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '16px 20px',
+                borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+              }}>
+                <span style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                  Page {enrollmentPagination.page} sur {enrollmentPagination.totalPages} ({enrollmentPagination.total} inscriptions)
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => fetchAdminEnrollments(enrollmentPagination.page - 1)}
+                    disabled={enrollmentPagination.page <= 1}
+                    style={{
+                      ...styles.btnIcon,
+                      opacity: enrollmentPagination.page <= 1 ? 0.4 : 1,
+                      cursor: enrollmentPagination.page <= 1 ? 'not-allowed' : 'pointer',
+                      background: isDark ? '#1e293b' : '#f1f5f9',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    onClick={() => fetchAdminEnrollments(enrollmentPagination.page + 1)}
+                    disabled={enrollmentPagination.page >= enrollmentPagination.totalPages}
+                    style={{
+                      ...styles.btnIcon,
+                      opacity: enrollmentPagination.page >= enrollmentPagination.totalPages ? 0.4 : 1,
+                      cursor: enrollmentPagination.page >= enrollmentPagination.totalPages ? 'not-allowed' : 'pointer',
+                      background: isDark ? '#1e293b' : '#f1f5f9',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // ============ COURSE MODAL ============
   // ============ COURSE FORM INLINE ============
@@ -17413,6 +17725,9 @@ const OHELearningPage = ({ isDark, token }) => {
       video_source_type: editingLesson?.video_url && !editingLesson?.video_url.startsWith('/uploads') ? 'url' : 'upload',
       pdf_url: editingLesson?.pdf_url || '',
       pptx_url: editingLesson?.pptx_url || '',
+      pptx_source_type: editingLesson?.pptx_url && editingLesson?.pptx_url.startsWith('http') ? 'url' : 'upload',
+      docx_url: editingLesson?.docx_url || '',
+      xlsx_url: editingLesson?.xlsx_url || '',
       duration_minutes: editingLesson?.duration_minutes || 0,
       is_preview: editingLesson?.is_preview || false,
       status: editingLesson?.status || 'draft',
@@ -17421,7 +17736,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [uploadingType, setUploadingType] = useState(''); // 'video', 'pdf', 'powerpoint'
+    const [uploadingType, setUploadingType] = useState(''); // 'video', 'pdf', 'powerpoint', 'word', 'excel'
     const [uploadFileName, setUploadFileName] = useState('');
 
     // Helper function for upload with progress
@@ -17509,6 +17824,28 @@ const OHELearningPage = ({ isDark, token }) => {
       );
     };
 
+    const handleWordUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await uploadWithProgress(
+        '/api/upload/elearning/word',
+        file,
+        (url) => setForm(prev => ({ ...prev, docx_url: url })),
+        'word'
+      );
+    };
+
+    const handleExcelUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await uploadWithProgress(
+        '/api/upload/elearning/excel',
+        file,
+        (url) => setForm(prev => ({ ...prev, xlsx_url: url })),
+        'excel'
+      );
+    };
+
     const handleVideoUrlChange = (url) => {
       const provider = detectVideoProvider(url);
       setForm(prev => ({ ...prev, video_url: url, video_provider: provider }));
@@ -17572,7 +17909,10 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="video">Vidéo</option>
                 <option value="pdf">PDF</option>
                 <option value="powerpoint">PowerPoint</option>
+                <option value="word">Word</option>
+                <option value="excel">Excel</option>
                 <option value="mixed">Mixte</option>
+                <option value="interactive">Contenu Interactif</option>
               </select>
             </div>
             <div>
@@ -17778,25 +18118,129 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           )}
 
-          {/* PowerPoint Upload */}
+          {/* PowerPoint Upload/URL */}
           {form.content_type === 'powerpoint' && (
             <div>
               <label style={styles.label}>Présentation PowerPoint</label>
-              {form.pptx_url ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fff7ed', borderRadius: '10px' }}>
-                  <FileText size={20} color="#ea580c" />
-                  <span style={{ flex: 1, fontSize: '13px' }}>{form.pptx_url}</span>
-                  <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+
+              {/* Toggle between upload and URL */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, pptx_source_type: 'upload', pptx_url: '' })}
+                  style={{
+                    ...styles.btnSecondary,
+                    flex: 1,
+                    background: form.pptx_source_type === 'upload' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                    color: form.pptx_source_type === 'upload' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                    border: 'none'
+                  }}
+                >
+                  <Upload size={16} style={{ marginRight: '8px' }} />
+                  Uploader un fichier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, pptx_source_type: 'url', pptx_url: '' })}
+                  style={{
+                    ...styles.btnSecondary,
+                    flex: 1,
+                    background: form.pptx_source_type === 'url' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                    color: form.pptx_source_type === 'url' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                    border: 'none'
+                  }}
+                >
+                  <Link size={16} style={{ marginRight: '8px' }} />
+                  URL externe
+                </button>
+              </div>
+
+              {/* Upload mode */}
+              {form.pptx_source_type === 'upload' ? (
+                <>
+                  {form.pptx_url ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fff7ed', borderRadius: '10px' }}>
+                      <FileText size={20} color="#ea580c" />
+                      <span style={{ flex: 1, fontSize: '13px' }}>{form.pptx_url}</span>
+                      <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : uploading && uploadingType === 'powerpoint' ? (
+                    <div style={{
+                      padding: '24px', borderRadius: '10px', border: `2px solid #ea580c`,
+                      background: isDark ? '#1e293b' : '#fff7ed'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <Loader size={24} color="#ea580c" style={{ animation: 'spin 1s linear infinite' }} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                            Upload en cours...
+                          </p>
+                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                            {uploadFileName}
+                          </p>
+                        </div>
+                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#ea580c' }}>{uploadProgress}%</span>
+                      </div>
+                      <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${uploadProgress}%`,
+                          background: 'linear-gradient(90deg, #ea580c, #f97316)',
+                          borderRadius: '4px',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                      textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                      opacity: uploading ? 0.5 : 1
+                    }} onClick={() => !uploading && document.getElementById('lesson-pptx-input').click()}>
+                      <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                      <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                        Cliquer pour uploader un PowerPoint (max 100MB)
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
+                        Formats acceptés : .ppt, .pptx
+                      </p>
+                    </div>
+                  )}
+                  <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} disabled={uploading} />
+                </>
+              ) : (
+                <input
+                  type="url"
+                  value={form.pptx_url}
+                  onChange={e => setForm({ ...form, pptx_url: e.target.value })}
+                  placeholder="https://example.com/presentation.pptx"
+                  style={styles.input}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Word Upload */}
+          {(form.content_type === 'word' || form.content_type === 'mixed') && (
+            <div>
+              <label style={styles.label}>Document Word (.docx)</label>
+              {form.docx_url ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#eff6ff', borderRadius: '10px' }}>
+                  <FileText size={20} color="#2563eb" />
+                  <span style={{ flex: 1, fontSize: '13px' }}>{form.docx_url}</span>
+                  <button onClick={() => setForm({ ...form, docx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
                     <X size={14} />
                   </button>
                 </div>
-              ) : uploading && uploadingType === 'powerpoint' ? (
+              ) : uploading && uploadingType === 'word' ? (
                 <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px solid #ea580c`,
-                  background: isDark ? '#1e293b' : '#fff7ed'
+                  padding: '24px', borderRadius: '10px', border: `2px solid #2563eb`,
+                  background: isDark ? '#1e293b' : '#eff6ff'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <Loader size={24} color="#ea580c" style={{ animation: 'spin 1s linear infinite' }} />
+                    <Loader size={24} color="#2563eb" style={{ animation: 'spin 1s linear infinite' }} />
                     <div style={{ flex: 1 }}>
                       <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
                         Upload en cours...
@@ -17805,13 +18249,13 @@ const OHELearningPage = ({ isDark, token }) => {
                         {uploadFileName}
                       </p>
                     </div>
-                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#ea580c' }}>{uploadProgress}%</span>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#2563eb' }}>{uploadProgress}%</span>
                   </div>
                   <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%',
                       width: `${uploadProgress}%`,
-                      background: 'linear-gradient(90deg, #ea580c, #f97316)',
+                      background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
                       borderRadius: '4px',
                       transition: 'width 0.3s ease'
                     }} />
@@ -17822,17 +18266,75 @@ const OHELearningPage = ({ isDark, token }) => {
                   padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
                   textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
                   opacity: uploading ? 0.5 : 1
-                }} onClick={() => !uploading && document.getElementById('lesson-pptx-input').click()}>
+                }} onClick={() => !uploading && document.getElementById('lesson-word-input').click()}>
                   <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
                   <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Cliquer pour uploader un PowerPoint (max 100MB)
+                    Cliquer pour uploader un document Word (max 50MB)
                   </p>
                   <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
-                    Formats acceptés : .ppt, .pptx
+                    Formats acceptés : .doc, .docx
                   </p>
                 </div>
               )}
-              <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} disabled={uploading} />
+              <input type="file" id="lesson-word-input" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleWordUpload} style={{ display: 'none' }} disabled={uploading} />
+            </div>
+          )}
+
+          {/* Excel Upload */}
+          {(form.content_type === 'excel' || form.content_type === 'mixed') && (
+            <div>
+              <label style={styles.label}>Fichier Excel (.xlsx)</label>
+              {form.xlsx_url ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
+                  <FileText size={20} color="#16a34a" />
+                  <span style={{ flex: 1, fontSize: '13px' }}>{form.xlsx_url}</span>
+                  <button onClick={() => setForm({ ...form, xlsx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : uploading && uploadingType === 'excel' ? (
+                <div style={{
+                  padding: '24px', borderRadius: '10px', border: `2px solid #16a34a`,
+                  background: isDark ? '#1e293b' : '#f0fdf4'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <Loader size={24} color="#16a34a" style={{ animation: 'spin 1s linear infinite' }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                        Upload en cours...
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                        {uploadFileName}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#16a34a' }}>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${uploadProgress}%`,
+                      background: 'linear-gradient(90deg, #16a34a, #22c55e)',
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                  textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                  opacity: uploading ? 0.5 : 1
+                }} onClick={() => !uploading && document.getElementById('lesson-excel-input').click()}>
+                  <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Cliquer pour uploader un fichier Excel (max 50MB)
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
+                    Formats acceptés : .xls, .xlsx
+                  </p>
+                </div>
+              )}
+              <input type="file" id="lesson-excel-input" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleExcelUpload} style={{ display: 'none' }} disabled={uploading} />
             </div>
           )}
 
