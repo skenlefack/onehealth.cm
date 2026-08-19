@@ -604,8 +604,51 @@ export default function LessonViewerPage() {
               </div>
             )}
 
+            {/* Next Lesson CTA */}
+            {nextLesson && (
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-8 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm font-medium mb-1">
+                      {language === 'fr' ? 'Leçon suivante' : 'Next lesson'}
+                    </p>
+                    <h4 className="text-white text-lg font-bold">
+                      {language === 'en' && nextLesson.title_en ? nextLesson.title_en : nextLesson.title_fr}
+                    </h4>
+                  </div>
+                  <Link href={`/${lang}/oh-elearning/learn/${courseSlug}/${nextLesson.id}`}>
+                    <Button variant="primary" size="lg" className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md px-6">
+                      {language === 'fr' ? 'Continuer' : 'Continue'}
+                      <ChevronRight size={22} className="ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {!nextLesson && (
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 mb-8 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-emerald-100 text-sm font-medium mb-1">
+                      {language === 'fr' ? 'Félicitations !' : 'Congratulations!'}
+                    </p>
+                    <h4 className="text-white text-lg font-bold">
+                      {language === 'fr' ? 'Vous avez terminé toutes les leçons' : 'You completed all lessons'}
+                    </h4>
+                  </div>
+                  <Link href={`/${lang}/oh-elearning/courses/${courseSlug}`}>
+                    <Button variant="primary" size="lg" className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold shadow-md px-6">
+                      {language === 'fr' ? 'Terminer le cours' : 'Finish course'}
+                      <CheckCircle size={22} className="ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {/* Navigation */}
-            <div className="flex items-center justify-between py-6 border-t border-slate-700">
+            <div className="flex items-center justify-between py-4 border-t border-slate-700">
               {prevLesson ? (
                 <Link href={`/${lang}/oh-elearning/learn/${courseSlug}/${prevLesson.id}`}>
                   <Button variant="ghost" className="text-slate-300 hover:text-white">
@@ -619,18 +662,13 @@ export default function LessonViewerPage() {
 
               {nextLesson ? (
                 <Link href={`/${lang}/oh-elearning/learn/${courseSlug}/${nextLesson.id}`}>
-                  <Button variant="primary" className="bg-blue-600 hover:bg-blue-700">
+                  <Button variant="ghost" className="text-slate-300 hover:text-white">
                     {t.elearning.nextLesson}
                     <ChevronRight size={20} className="ml-2" />
                   </Button>
                 </Link>
               ) : (
-                <Link href={`/${lang}/oh-elearning/courses/${courseSlug}`}>
-                  <Button variant="primary" className="bg-emerald-600 hover:bg-emerald-700">
-                    {language === 'fr' ? 'Terminer le cours' : 'Finish course'}
-                    <CheckCircle size={20} className="ml-2" />
-                  </Button>
-                </Link>
+                <div />
               )}
             </div>
           </div>
