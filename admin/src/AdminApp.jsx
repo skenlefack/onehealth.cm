@@ -15314,6 +15314,7 @@ const OHELearningPage = ({ isDark, token }) => {
       case 'pdf': return <FileText size={16} />;
       case 'quiz': return <Check size={16} />;
       case 'text': return <FileText size={16} />;
+      case 'interactive': return <Layers size={16} />;
       default: return <File size={16} />;
     }
   };
@@ -15680,7 +15681,7 @@ const OHELearningPage = ({ isDark, token }) => {
                           <div>
                             <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>{lesson.title_fr}</p>
                             <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                              {lesson.content_type === 'video' ? 'Vidéo' : lesson.content_type === 'pdf' ? 'PDF' : lesson.content_type === 'quiz' ? 'Quiz' : 'Texte'}
+                              {lesson.content_type === 'video' ? 'Vidéo' : lesson.content_type === 'pdf' ? 'PDF' : lesson.content_type === 'quiz' ? 'Quiz' : lesson.content_type === 'interactive' ? 'Interactif' : 'Texte'}
                               {lesson.duration_minutes > 0 && ` • ${lesson.duration_minutes} min`}
                               {lesson.is_preview && ' • Aperçu gratuit'}
                             </p>
@@ -18346,6 +18347,221 @@ const OHELearningPage = ({ isDark, token }) => {
                 style={{ ...styles.input, minHeight: '150px' }} placeholder="Contenu de la leçon..." />
             </div>
           )}
+
+          {/* Interactive Content Builder */}
+          {form.content_type === 'interactive' && (() => {
+            const BLOCK_TYPES = [
+              { type: 'flashcards', icon: '\u{1F0CF}', label: 'Cartes M\u00e9moire' },
+              { type: 'matching', icon: '\u{1F517}', label: 'Associations' },
+              { type: 'mcq_cards', icon: '\u2753', label: 'QCM Interactif' },
+              { type: 'ordering', icon: '\u{1F4CA}', label: 'Classement' },
+              { type: 'fill_gaps', icon: '\u{1F4DD}', label: 'Texte \u00e0 Trous' }
+            ];
+            const getDefaultConfig = (type) => {
+              switch (type) {
+                case 'flashcards': return { cards: [{ front: '', back: '' }] };
+                case 'matching': return { pairs: [{ left: '', right: '' }] };
+                case 'mcq_cards': return { question: '', options: [{ text: '', is_correct: false, explanation: '' }] };
+                case 'ordering': return { items: [{ text: '' }], correct_order: [0] };
+                case 'fill_gaps': return { text: '', blanks: [] };
+                default: return {};
+              }
+            };
+
+            let blocks = [];
+            try {
+              const parsed = JSON.parse(form.content_fr);
+              if (parsed && Array.isArray(parsed.blocks)) blocks = parsed.blocks;
+            } catch (e) { /* not valid JSON yet */ }
+
+            const updateBlocks = (newBlocks) => {
+              setForm(prev => ({ ...prev, content_fr: JSON.stringify({ blocks: newBlocks }) }));
+            };
+            const addBlock = (type) => {
+              const newBlock = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type, title: '', config: getDefaultConfig(type) };
+              updateBlocks([...blocks, newBlock]);
+            };
+            const removeBlock = (idx) => { const nb = [...blocks]; nb.splice(idx, 1); updateBlocks(nb); };
+            const moveBlock = (idx, dir) => {
+              const nb = [...blocks]; const ti = idx + dir;
+              if (ti < 0 || ti >= nb.length) return;
+              [nb[idx], nb[ti]] = [nb[ti], nb[idx]]; updateBlocks(nb);
+            };
+            const updateBlock = (idx, updates) => {
+              const nb = [...blocks]; nb[idx] = { ...nb[idx], ...updates }; updateBlocks(nb);
+            };
+            const updateConfig = (idx, configUpdates) => {
+              const nb = [...blocks]; nb[idx] = { ...nb[idx], config: { ...nb[idx].config, ...configUpdates } }; updateBlocks(nb);
+            };
+
+            const blockTypeInfo = (type) => BLOCK_TYPES.find(b => b.type === type) || { icon: '?', label: type };
+
+            const ibStyles = {
+              blockCard: { background: isDark ? '#0f172a' : '#f8fafc', border: `2px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '16px', marginBottom: '12px' },
+              blockHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingBottom: '10px', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` },
+              miniBtn: { background: isDark ? '#334155' : '#e2e8f0', color: isDark ? '#e2e8f0' : '#475569', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' },
+              dangerBtn: { background: colors.error + '20', color: colors.error, border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' },
+              addItemBtn: { background: 'transparent', color: colors.primary, border: `1px dashed ${colors.primary}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '8px' },
+              pairRow: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' },
+              smallInput: { ...styles.input, padding: '8px 12px', fontSize: '13px' },
+              smallTextarea: { ...styles.input, padding: '8px 12px', fontSize: '13px', minHeight: '60px', resize: 'vertical' },
+              typeTag: (color) => ({ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: color + '20', color })
+            };
+
+            const renderBlockEditor = (block, idx) => {
+              const cfg = block.config;
+              switch (block.type) {
+                case 'flashcards':
+                  return (
+                    <div>
+                      {cfg.cards.map((card, ci) => (
+                        <div key={ci} style={ibStyles.pairRow}>
+                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Recto (question)" value={card.front}
+                            onChange={e => { const nc = [...cfg.cards]; nc[ci] = { ...nc[ci], front: e.target.value }; updateConfig(idx, { cards: nc }); }} />
+                          <span style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '18px' }}>\u2192</span>
+                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Verso (r\u00e9ponse)" value={card.back}
+                            onChange={e => { const nc = [...cfg.cards]; nc[ci] = { ...nc[ci], back: e.target.value }; updateConfig(idx, { cards: nc }); }} />
+                          {cfg.cards.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const nc = cfg.cards.filter((_, i) => i !== ci); updateConfig(idx, { cards: nc }); }}>\u2715</button>}
+                        </div>
+                      ))}
+                      <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { cards: [...cfg.cards, { front: '', back: '' }] })}>+ Ajouter une carte</button>
+                    </div>
+                  );
+                case 'matching':
+                  return (
+                    <div>
+                      {cfg.pairs.map((pair, pi) => (
+                        <div key={pi} style={ibStyles.pairRow}>
+                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Terme" value={pair.left}
+                            onChange={e => { const np = [...cfg.pairs]; np[pi] = { ...np[pi], left: e.target.value }; updateConfig(idx, { pairs: np }); }} />
+                          <span style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '18px' }}>\u2194</span>
+                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="D\u00e9finition" value={pair.right}
+                            onChange={e => { const np = [...cfg.pairs]; np[pi] = { ...np[pi], right: e.target.value }; updateConfig(idx, { pairs: np }); }} />
+                          {cfg.pairs.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const np = cfg.pairs.filter((_, i) => i !== pi); updateConfig(idx, { pairs: np }); }}>\u2715</button>}
+                        </div>
+                      ))}
+                      <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { pairs: [...cfg.pairs, { left: '', right: '' }] })}>+ Ajouter une paire</button>
+                    </div>
+                  );
+                case 'mcq_cards':
+                  return (
+                    <div>
+                      <textarea style={{ ...ibStyles.smallTextarea, marginBottom: '10px' }} placeholder="Question..." value={cfg.question}
+                        onChange={e => updateConfig(idx, { question: e.target.value })} />
+                      <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>Options :</label>
+                      {cfg.options.map((opt, oi) => (
+                        <div key={oi} style={{ ...ibStyles.pairRow, flexWrap: 'wrap' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', minWidth: '24px' }}>
+                            <input type="checkbox" checked={opt.is_correct}
+                              onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], is_correct: e.target.checked }; updateConfig(idx, { options: no }); }} />
+                          </label>
+                          <input style={{ ...ibStyles.smallInput, flex: 2 }} placeholder="Texte de l'option" value={opt.text}
+                            onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], text: e.target.value }; updateConfig(idx, { options: no }); }} />
+                          <input style={{ ...ibStyles.smallInput, flex: 2 }} placeholder="Explication (optionnel)" value={opt.explanation}
+                            onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], explanation: e.target.value }; updateConfig(idx, { options: no }); }} />
+                          {cfg.options.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const no = cfg.options.filter((_, i) => i !== oi); updateConfig(idx, { options: no }); }}>\u2715</button>}
+                        </div>
+                      ))}
+                      <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { options: [...cfg.options, { text: '', is_correct: false, explanation: '' }] })}>+ Ajouter une option</button>
+                    </div>
+                  );
+                case 'ordering':
+                  return (
+                    <div>
+                      <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 0 8px' }}>Ajoutez les \u00e9l\u00e9ments dans l'ordre correct. L'apprenant devra les remettre en ordre.</p>
+                      {cfg.items.map((item, ii) => (
+                        <div key={ii} style={ibStyles.pairRow}>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: isDark ? '#64748b' : '#94a3b8', minWidth: '20px' }}>{ii + 1}.</span>
+                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder={`\u00c9l\u00e9ment ${ii + 1}`} value={item.text}
+                            onChange={e => { const ni = [...cfg.items]; ni[ii] = { text: e.target.value }; const co = ni.map((_, i) => i); updateConfig(idx, { items: ni, correct_order: co }); }} />
+                          {cfg.items.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const ni = cfg.items.filter((_, i) => i !== ii); const co = ni.map((_, i) => i); updateConfig(idx, { items: ni, correct_order: co }); }}>\u2715</button>}
+                        </div>
+                      ))}
+                      <button style={ibStyles.addItemBtn} onClick={() => { const ni = [...cfg.items, { text: '' }]; updateConfig(idx, { items: ni, correct_order: ni.map((_, i) => i) }); }}>+ Ajouter un \u00e9l\u00e9ment</button>
+                    </div>
+                  );
+                case 'fill_gaps': {
+                  const detectedBlanks = (cfg.text || '').match(/\{blank\}/g) || [];
+                  const blanksArr = cfg.blanks || [];
+                  const syncedBlanks = detectedBlanks.map((_, bi) => blanksArr[bi] || { answer: '', hint: '' });
+                  return (
+                    <div>
+                      <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 0 6px' }}>Utilisez <code style={{ background: isDark ? '#334155' : '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>{'{blank}'}</code> pour marquer les trous.</p>
+                      <textarea style={{ ...ibStyles.smallTextarea, marginBottom: '10px' }} placeholder="Le {blank} est un animal {blank}." value={cfg.text}
+                        onChange={e => {
+                          const newText = e.target.value;
+                          const newDetected = (newText.match(/\{blank\}/g) || []);
+                          const newBlanks = newDetected.map((_, bi) => (cfg.blanks || [])[bi] || { answer: '', hint: '' });
+                          updateConfig(idx, { text: newText, blanks: newBlanks });
+                        }} />
+                      {syncedBlanks.length > 0 && (
+                        <div>
+                          <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>R\u00e9ponses des trous :</label>
+                          {syncedBlanks.map((blank, bi) => (
+                            <div key={bi} style={ibStyles.pairRow}>
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: colors.primary, minWidth: '60px' }}>Trou {bi + 1}</span>
+                              <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="R\u00e9ponse" value={blank.answer}
+                                onChange={e => { const nb = [...syncedBlanks]; nb[bi] = { ...nb[bi], answer: e.target.value }; updateConfig(idx, { blanks: nb }); }} />
+                              <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Indice (optionnel)" value={blank.hint}
+                                onChange={e => { const nb = [...syncedBlanks]; nb[bi] = { ...nb[bi], hint: e.target.value }; updateConfig(idx, { blanks: nb }); }} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                default: return null;
+              }
+            };
+
+            return (
+              <div>
+                <label style={styles.label}>Contenu Interactif</label>
+
+                {/* Block list */}
+                {blocks.map((block, idx) => {
+                  const info = blockTypeInfo(block.type);
+                  return (
+                    <div key={block.id} style={ibStyles.blockCard}>
+                      <div style={ibStyles.blockHeader}>
+                        <span style={{ fontSize: '20px' }}>{info.icon}</span>
+                        <span style={ibStyles.typeTag(colors.primary)}>{info.label}</span>
+                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Titre du bloc" value={block.title}
+                          onChange={e => updateBlock(idx, { title: e.target.value })} />
+                        <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+                          <button style={ibStyles.miniBtn} onClick={() => moveBlock(idx, -1)} disabled={idx === 0} title="Monter">\u2191</button>
+                          <button style={ibStyles.miniBtn} onClick={() => moveBlock(idx, 1)} disabled={idx === blocks.length - 1} title="Descendre">\u2193</button>
+                          <button style={ibStyles.dangerBtn} onClick={() => removeBlock(idx)} title="Supprimer">\u2715</button>
+                        </div>
+                      </div>
+                      {renderBlockEditor(block, idx)}
+                    </div>
+                  );
+                })}
+
+                {/* Add block selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <select id="ib-add-block-select" style={{ ...styles.select, width: 'auto', padding: '10px 14px', fontSize: '13px' }} defaultValue="">
+                    <option value="" disabled>+ Ajouter un bloc interactif...</option>
+                    {BLOCK_TYPES.map(bt => (
+                      <option key={bt.type} value={bt.type}>{bt.icon} {bt.label}</option>
+                    ))}
+                  </select>
+                  <button style={{ ...styles.btnPrimary, fontSize: '13px', padding: '10px 18px' }} onClick={() => {
+                    const sel = document.getElementById('ib-add-block-select');
+                    if (sel && sel.value) { addBlock(sel.value); sel.value = ''; }
+                  }}>Ajouter</button>
+                </div>
+
+                {blocks.length === 0 && (
+                  <p style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px', marginTop: '8px' }}>
+                    Aucun bloc interactif. Cliquez sur le bouton ci-dessus pour commencer.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>

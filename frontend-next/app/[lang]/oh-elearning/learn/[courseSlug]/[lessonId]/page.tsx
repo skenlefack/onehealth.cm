@@ -15,6 +15,7 @@ import {
 } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { ProgressBar, VideoPlayer, VideoProgressData, PowerPointViewer, DocumentViewer } from '@/components/elearning';
+import { InteractiveContentRenderer } from '@/components/elearning/InteractiveContent';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -546,6 +547,20 @@ export default function LessonViewerPage() {
                 />
               </div>
             )}
+
+            {/* Interactive content */}
+            {currentLesson.content_type === 'interactive' && lessonContent && (() => {
+              try {
+                const interactiveConfig = JSON.parse(lessonContent);
+                return (
+                  <div className="mb-8">
+                    <InteractiveContentRenderer config={interactiveConfig} lang={language} />
+                  </div>
+                );
+              } catch {
+                return null;
+              }
+            })()}
 
             {/* Attachments */}
             {currentLesson.attachments && currentLesson.attachments.length > 0 && (
