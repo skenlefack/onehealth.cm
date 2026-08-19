@@ -24,9 +24,12 @@ export function DocumentViewer({ url, type, title, lang = 'fr', className = '' }
     if (url.startsWith('http')) {
       setFullUrl(url);
     } else {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.onehealth.cm';
+      // Use the public domain (not API domain) since files are served by nginx
+      const publicDomain = typeof window !== 'undefined'
+        ? window.location.origin.replace('admin.', '').replace('www.', '')
+        : 'https://onehealth.cm';
       const cleanPath = url.startsWith('/') ? url : `/${url}`;
-      setFullUrl(`${backendUrl}${cleanPath}`);
+      setFullUrl(`${publicDomain}${cleanPath}`);
     }
 
     // PDF uses native browser viewer by default, office docs use Microsoft viewer

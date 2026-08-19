@@ -469,7 +469,7 @@ export default function LessonViewerPage() {
             <div className="bg-slate-800 p-4">
               <div className="max-w-5xl mx-auto">
                 <DocumentViewer
-                  url={currentLesson.pptx_url}
+                  url={getImageUrl(currentLesson.pptx_url)}
                   type="powerpoint"
                   title={lessonTitle}
                   lang={language}
@@ -483,7 +483,7 @@ export default function LessonViewerPage() {
             <div className="bg-slate-800 p-4">
               <div className="max-w-5xl mx-auto">
                 <DocumentViewer
-                  url={currentLesson.docx_url}
+                  url={getImageUrl(currentLesson.docx_url)}
                   type="word"
                   title={lessonTitle}
                   lang={language}
@@ -497,7 +497,7 @@ export default function LessonViewerPage() {
             <div className="bg-slate-800 p-4">
               <div className="max-w-5xl mx-auto">
                 <DocumentViewer
-                  url={currentLesson.xlsx_url}
+                  url={getImageUrl(currentLesson.xlsx_url)}
                   type="excel"
                   title={lessonTitle}
                   lang={language}
