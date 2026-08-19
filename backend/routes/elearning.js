@@ -929,7 +929,7 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
       module_id, title_fr, title_en,
       content_fr, content_en, summary_fr, summary_en,
       content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
-      pdf_url, pptx_url, attachments, resources,
+      pdf_url, pptx_url, docx_url, xlsx_url, attachments, resources,
       duration_minutes, sort_order, is_preview, is_required, is_downloadable,
       has_quiz, quiz_id, quiz_position, quiz_weight,
       completion_type, min_video_watch_percent, min_time_spent_seconds,
@@ -961,17 +961,17 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
         module_id, title_fr, title_en,
         content_fr, content_en, summary_fr, summary_en,
         content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
-        pdf_url, pptx_url, attachments, resources,
+        pdf_url, pptx_url, docx_url, xlsx_url, attachments, resources,
         duration_minutes, sort_order, is_preview, is_required, is_downloadable,
         has_quiz, quiz_id, quiz_position, quiz_weight,
         completion_type, min_video_watch_percent, min_time_spent_seconds,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       module_id, title_fr, title_en,
       content_fr, content_en, summary_fr, summary_en,
       content_type || 'text', video_url, video_duration_seconds || 0, video_provider || 'upload', video_thumbnail,
-      pdf_url, pptx_url, JSON.stringify(attachments || []), JSON.stringify(resources || []),
+      pdf_url, pptx_url, docx_url, xlsx_url, JSON.stringify(attachments || []), JSON.stringify(resources || []),
       duration_minutes || 0, order, is_preview || false, is_required !== false, is_downloadable || false,
       has_quiz || false, quiz_id, quiz_position || 'end', quiz_weight || 1.00,
       completion_type || 'view', min_video_watch_percent || 80, min_time_spent_seconds || 0,
@@ -1008,7 +1008,7 @@ router.put('/lessons/:id', auth, authorize('admin', 'editor'), async (req, res) 
     const allowedFields = [
       'title_fr', 'title_en', 'content_fr', 'content_en', 'summary_fr', 'summary_en',
       'content_type', 'video_url', 'video_duration_seconds', 'video_provider', 'video_thumbnail',
-      'pdf_url', 'pptx_url', 'duration_minutes', 'sort_order', 'is_preview', 'is_required', 'is_downloadable',
+      'pdf_url', 'pptx_url', 'docx_url', 'xlsx_url', 'duration_minutes', 'sort_order', 'is_preview', 'is_required', 'is_downloadable',
       'has_quiz', 'quiz_id', 'quiz_position', 'quiz_weight',
       'completion_type', 'min_video_watch_percent', 'min_time_spent_seconds',
       'status', 'is_active'
@@ -1549,6 +1549,126 @@ router.get('/stats/user', auth, async (req, res) => {
   } catch (error) {
     console.error('Get user stats error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ============================================
+// ADMIN ENROLLMENTS
+// ============================================
+
+// @route   GET /api/elearning/admin/enrollments
+// @desc    Get all enrollments for admin management
+// @access  Admin
+router.get('/admin/enrollments', auth, authorize('admin', 'editor'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search = '', status = '', type = '', course_id = '' } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    let whereConditions = ['1=1'];
+    let params = [];
+
+    if (search) {
+      whereConditions.push('(u.username LIKE ? OR u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    if (status) {
+      whereConditions.push('e.status = ?');
+      params.push(status);
+    }
+
+    if (type) {
+      whereConditions.push('e.enrollable_type = ?');
+      params.push(type);
+    }
+
+    if (course_id) {
+      whereConditions.push('e.enrollable_id = ?');
+      params.push(course_id);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Get total count
+    const [countResult] = await db.query(
+      `SELECT COUNT(*) as total FROM enrollments e JOIN users u ON e.user_id = u.id WHERE ${whereClause}`,
+      params
+    );
+
+    // Get enrollments with user and course/path info
+    const [enrollments] = await db.query(`
+      SELECT e.*,
+        u.username, u.email, u.first_name, u.last_name,
+        CASE
+          WHEN e.enrollable_type = 'course' THEN c.title_fr
+          WHEN e.enrollable_type = 'learning_path' THEN lp.title_fr
+        END as item_title,
+        CASE
+          WHEN e.enrollable_type = 'course' THEN c.title_en
+          WHEN e.enrollable_type = 'learning_path' THEN lp.title_en
+        END as item_title_en
+      FROM enrollments e
+      JOIN users u ON e.user_id = u.id
+      LEFT JOIN courses c ON e.enrollable_type = 'course' AND e.enrollable_id = c.id
+      LEFT JOIN learning_paths lp ON e.enrollable_type = 'learning_path' AND e.enrollable_id = lp.id
+      WHERE ${whereClause}
+      ORDER BY e.enrolled_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, parseInt(limit), offset]);
+
+    // Get stats
+    const [stats] = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'enrolled' OR status = 'in_progress' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'cancelled' OR status = 'suspended' THEN 1 ELSE 0 END) as cancelled
+      FROM enrollments
+    `);
+
+    res.json({
+      success: true,
+      data: {
+        enrollments,
+        stats: stats[0],
+        pagination: {
+          total: countResult[0].total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(countResult[0].total / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Admin enrollments error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/elearning/admin/enrollments/:id/status
+// @desc    Update enrollment status (admin)
+// @access  Admin
+router.put('/admin/enrollments/:id/status', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = ['enrolled', 'in_progress', 'completed', 'expired', 'cancelled', 'suspended'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const [result] = await db.query(
+      'UPDATE enrollments SET status = ?, updated_at = NOW() WHERE id = ?',
+      [status, req.params.id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Enrollment not found' });
+    }
+
+    res.json({ success: true, message: 'Enrollment status updated' });
+  } catch (error) {
+    console.error('Update enrollment status error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

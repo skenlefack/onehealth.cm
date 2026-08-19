@@ -411,6 +411,82 @@ router.post('/elearning/powerpoint', auth, uploadElearningPpt.single('file'), as
   }
 });
 
+// Word Document Upload
+const wordFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only Word documents (.doc, .docx) are allowed'), false);
+  }
+};
+
+const wordStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../uploads/elearning/documents');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${uuidv4()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    cb(null, uniqueName);
+  }
+});
+
+const uploadWord = multer({ storage: wordStorage, fileFilter: wordFilter, limits: { fileSize: 50 * 1024 * 1024 } });
+
+router.post('/elearning/word', auth, uploadWord.single('file'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const url = `/uploads/elearning/documents/${req.file.filename}`;
+    res.json({ success: true, data: { url, filename: req.file.originalname, size: req.file.size } });
+  } catch (error) {
+    console.error('Word upload error:', error);
+    res.status(500).json({ success: false, message: 'Upload failed' });
+  }
+});
+
+// Excel Upload
+const excelFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only Excel files (.xls, .xlsx) are allowed'), false);
+  }
+};
+
+const excelStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../uploads/elearning/documents');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${uuidv4()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    cb(null, uniqueName);
+  }
+});
+
+const uploadExcel = multer({ storage: excelStorage, fileFilter: excelFilter, limits: { fileSize: 50 * 1024 * 1024 } });
+
+router.post('/elearning/excel', auth, uploadExcel.single('file'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const url = `/uploads/elearning/documents/${req.file.filename}`;
+    res.json({ success: true, data: { url, filename: req.file.originalname, size: req.file.size } });
+  } catch (error) {
+    console.error('Excel upload error:', error);
+    res.status(500).json({ success: false, message: 'Upload failed' });
+  }
+});
+
 // Upload e-learning course thumbnail
 router.post('/elearning/thumbnail', auth, uploadImage.single('file'), async (req, res) => {
   try {

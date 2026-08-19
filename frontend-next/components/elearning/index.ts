@@ -8,3 +8,4 @@ export type { VideoProgressData } from './VideoPlayer';
 export { EnrollButton } from './EnrollButton';
 export { ELearningSearchBar } from './ELearningSearchBar';
 export { PowerPointViewer } from './PowerPointViewer';
+export { DocumentViewer } from './DocumentViewer';

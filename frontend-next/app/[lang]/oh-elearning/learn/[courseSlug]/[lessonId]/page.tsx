@@ -14,7 +14,7 @@ import {
   getImageUrl, completeLesson, updateLessonProgress
 } from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
-import { ProgressBar, VideoPlayer, VideoProgressData, PowerPointViewer } from '@/components/elearning';
+import { ProgressBar, VideoPlayer, VideoProgressData, PowerPointViewer, DocumentViewer } from '@/components/elearning';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -452,24 +452,13 @@ export default function LessonViewerPage() {
           {/* PDF content */}
           {currentLesson.content_type === 'pdf' && currentLesson.pdf_url && (
             <div className="bg-slate-800 p-4">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-lg p-8 text-center">
-                  <File size={48} className="mx-auto text-red-500 mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                    {language === 'fr' ? 'Document PDF' : 'PDF Document'}
-                  </h3>
-                  <p className="text-slate-600 mb-4">{lessonTitle}</p>
-                  <a
-                    href={getImageUrl(currentLesson.pdf_url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="primary" className="bg-red-500 hover:bg-red-600">
-                      <Download size={18} className="mr-2" />
-                      {language === 'fr' ? 'Télécharger le PDF' : 'Download PDF'}
-                    </Button>
-                  </a>
-                </div>
+              <div className="max-w-5xl mx-auto">
+                <DocumentViewer
+                  url={getImageUrl(currentLesson.pdf_url)}
+                  type="pdf"
+                  title={lessonTitle}
+                  lang={language}
+                />
               </div>
             </div>
           )}
@@ -478,8 +467,37 @@ export default function LessonViewerPage() {
           {currentLesson.content_type === 'powerpoint' && currentLesson.pptx_url && (
             <div className="bg-slate-800 p-4">
               <div className="max-w-5xl mx-auto">
-                <PowerPointViewer
-                  pptxUrl={currentLesson.pptx_url}
+                <DocumentViewer
+                  url={currentLesson.pptx_url}
+                  type="powerpoint"
+                  title={lessonTitle}
+                  lang={language}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Word content */}
+          {currentLesson.content_type === 'word' && currentLesson.docx_url && (
+            <div className="bg-slate-800 p-4">
+              <div className="max-w-5xl mx-auto">
+                <DocumentViewer
+                  url={currentLesson.docx_url}
+                  type="word"
+                  title={lessonTitle}
+                  lang={language}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Excel content */}
+          {currentLesson.content_type === 'excel' && currentLesson.xlsx_url && (
+            <div className="bg-slate-800 p-4">
+              <div className="max-w-5xl mx-auto">
+                <DocumentViewer
+                  url={currentLesson.xlsx_url}
+                  type="excel"
                   title={lessonTitle}
                   lang={language}
                 />

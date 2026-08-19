@@ -392,12 +392,14 @@ export interface ELearningLesson {
   title_en?: string;
   content_fr?: string;
   content_en?: string;
-  content_type: 'video' | 'text' | 'pdf' | 'mixed' | 'quiz' | 'powerpoint';
+  content_type: 'video' | 'text' | 'pdf' | 'mixed' | 'quiz' | 'powerpoint' | 'word' | 'excel' | 'interactive';
   video_url?: string;
   video_duration_seconds: number;
   video_provider: 'youtube' | 'vimeo' | 'upload' | 'other';
   pdf_url?: string;
   pptx_url?: string;
+  docx_url?: string;
+  xlsx_url?: string;
   attachments?: { name: string; url: string; type: string }[];
   duration_minutes: number;
   sort_order: number;
