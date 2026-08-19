@@ -519,7 +519,7 @@ export interface UserLearningStats {
 
 // ============== QUIZ TYPES ==============
 
-export type QuestionType = 'mcq' | 'multiple_select' | 'true_false' | 'short_answer' | 'matching' | 'fill_blank';
+export type QuestionType = 'mcq' | 'multiple_select' | 'true_false' | 'short_answer' | 'matching' | 'fill_blank' | 'ordering';
 export type QuizType = 'practice' | 'graded' | 'final_exam';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type AttemptStatus = 'in_progress' | 'completed' | 'abandoned' | 'timed_out';

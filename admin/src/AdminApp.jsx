@@ -15767,7 +15767,8 @@ const OHELearningPage = ({ isDark, token }) => {
       true_false: { label: 'Vrai/Faux', color: colors.teal },
       short_answer: { label: 'Réponse Courte', color: colors.warning },
       matching: { label: 'Association', color: colors.success },
-      fill_blank: { label: 'Texte à Trous', color: colors.error }
+      fill_blank: { label: 'Texte à Trous', color: colors.error },
+      ordering: { label: 'Classement', color: colors.info || '#3b82f6' }
     };
     const config = typeConfig[type] || { label: type, color: '#94a3b8' };
     return (
@@ -15855,6 +15856,7 @@ const OHELearningPage = ({ isDark, token }) => {
             <option value="short_answer">Réponse Courte</option>
             <option value="matching">Association</option>
             <option value="fill_blank">Texte à Trous</option>
+            <option value="ordering">Classement</option>
           </select>
           <select value={questionDifficultyFilter} onChange={e => setQuestionDifficultyFilter(e.target.value)} style={{ ...styles.select, width: '150px', flexShrink: 0 }}>
             <option value="all">Toutes difficultés</option>
@@ -18136,6 +18138,7 @@ const OHELearningPage = ({ isDark, token }) => {
     const parseOptions = (opts, type) => {
       if (!opts) {
         if (type === 'matching') return [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
+        if (type === 'ordering') return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
         return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
       }
       if (Array.isArray(opts)) return opts;
@@ -18145,6 +18148,7 @@ const OHELearningPage = ({ isDark, token }) => {
       if (ans === null || ans === undefined) {
         if (type === 'multiple_select' || type === 'fill_blank') return [];
         if (type === 'true_false') return true;
+        if (type === 'ordering') return [];
         return 0;
       }
       if (typeof ans === 'number' || typeof ans === 'boolean' || Array.isArray(ans)) return ans;
@@ -18278,6 +18282,9 @@ const OHELearningPage = ({ isDark, token }) => {
                   if (type === 'matching') {
                     newOptions = [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
                     newAnswer = null; // Matching uses options order as answer
+                  } else if (type === 'ordering') {
+                    newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+                    newAnswer = [0, 1, 2];
                   } else if (type === 'fill_blank') {
                     newOptions = [];
                     newAnswer = [''];
@@ -18305,6 +18312,7 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="short_answer">Réponse courte</option>
                 <option value="matching">Association (paires)</option>
                 <option value="fill_blank">Texte à trous</option>
+                <option value="ordering">Ordre / Classement</option>
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -18559,6 +18567,102 @@ const OHELearningPage = ({ isDark, token }) => {
                   <Plus size={14} /> Ajouter une paire
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Ordering - Classement */}
+          {form.question_type === 'ordering' && (
+            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ListChecks size={16} color={colors.info || '#3b82f6'} />
+                  Éléments à ordonner (dans l'ordre correct)
+                </span>
+              </label>
+              <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Ajoutez les éléments dans l'ordre correct. L'apprenant devra les remettre dans cet ordre.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(form.options || []).map((opt, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{
+                      background: colors.info || '#3b82f6', color: '#fff', borderRadius: '50%',
+                      width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 'bold', flexShrink: 0
+                    }}>{idx + 1}</span>
+                    <input
+                      value={opt.text_fr || ''}
+                      onChange={e => {
+                        const newOpts = [...form.options];
+                        newOpts[idx] = { ...newOpts[idx], text_fr: e.target.value };
+                        setForm({ ...form, options: newOpts });
+                      }}
+                      placeholder={`Élément ${idx + 1} (FR)`}
+                      style={{ ...styles.input, flex: 1 }}
+                    />
+                    <input
+                      value={opt.text_en || ''}
+                      onChange={e => {
+                        const newOpts = [...form.options];
+                        newOpts[idx] = { ...newOpts[idx], text_en: e.target.value };
+                        setForm({ ...form, options: newOpts });
+                      }}
+                      placeholder="(EN)"
+                      style={{ ...styles.input, flex: 1, fontSize: '12px' }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (idx > 0) {
+                          const newOpts = [...form.options];
+                          [newOpts[idx-1], newOpts[idx]] = [newOpts[idx], newOpts[idx-1]];
+                          setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                        }
+                      }}
+                      disabled={idx === 0}
+                      style={{ ...styles.btnIcon, opacity: idx === 0 ? 0.3 : 1 }}
+                      title="Monter"
+                    >&#8593;</button>
+                    <button
+                      onClick={() => {
+                        if (idx < form.options.length - 1) {
+                          const newOpts = [...form.options];
+                          [newOpts[idx], newOpts[idx+1]] = [newOpts[idx+1], newOpts[idx]];
+                          setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                        }
+                      }}
+                      disabled={idx === form.options.length - 1}
+                      style={{ ...styles.btnIcon, opacity: idx === form.options.length - 1 ? 0.3 : 1 }}
+                      title="Descendre"
+                    >&#8595;</button>
+                    {form.options.length > 2 && (
+                      <button
+                        onClick={() => {
+                          const newOpts = form.options.filter((_, i) => i !== idx);
+                          setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                        }}
+                        style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
+                        title="Supprimer"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {form.options.length < 10 && (
+                <button
+                  onClick={() => {
+                    const newOpts = [...(form.options || []), { text_fr: '', text_en: '' }];
+                    setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                  }}
+                  style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}
+                >
+                  <Plus size={14} /> Ajouter un élément
+                </button>
+              )}
+              <p style={{ margin: '8px 0 0', fontSize: '11px', color: isDark ? '#6b7280' : '#9ca3af' }}>
+                L'ordre actuel sera considéré comme l'ordre correct.
+              </p>
             </div>
           )}
 

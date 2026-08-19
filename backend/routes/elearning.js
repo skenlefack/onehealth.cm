@@ -2872,6 +2872,15 @@ router.post('/attempts/:id/submit', auth, async (req, res) => {
           // userAnswer et correctAnswer sont des objets {left_id: right_id}
           isCorrect = JSON.stringify(correctAnswer) === JSON.stringify(userAnswer);
           break;
+        case 'ordering':
+          // userAnswer and correctAnswer are arrays of indices representing order
+          if (Array.isArray(correctAnswer) && Array.isArray(userAnswer)) {
+            isCorrect = correctAnswer.length === userAnswer.length &&
+              correctAnswer.every((val, idx) => val === userAnswer[idx]);
+          } else {
+            isCorrect = JSON.stringify(correctAnswer) === JSON.stringify(userAnswer);
+          }
+          break;
       }
 
       if (isCorrect) {

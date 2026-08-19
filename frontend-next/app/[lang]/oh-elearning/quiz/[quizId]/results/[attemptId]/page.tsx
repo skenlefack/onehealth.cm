@@ -125,6 +125,14 @@ export default function QuizResultsPage() {
       }).join(', ');
     }
 
+    if (questionType === 'ordering' && Array.isArray(answer) && options) {
+      return answer.map((optionIdx: number, position: number) => {
+        const option = options[optionIdx];
+        const text = option ? (language === 'en' && option.text_en ? option.text_en : option.text_fr) : `Option ${optionIdx + 1}`;
+        return `${position + 1}. ${text}`;
+      }).join(' → ');
+    }
+
     if (typeof answer === 'string') {
       return answer;
     }

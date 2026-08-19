@@ -527,6 +527,72 @@ export default function QuizTakePage() {
                         })}
                       </div>
                     )}
+
+                    {/* Ordering */}
+                    {currentQuestion.question_type === 'ordering' && currentQuestion.options && (() => {
+                      // Initialize order if not set
+                      const currentOrder: number[] = responses[currentQuestion.id] || currentQuestion.options.map((_: any, i: number) => i);
+
+                      const moveItem = (fromIdx: number, toIdx: number) => {
+                        if (toIdx < 0 || toIdx >= currentOrder.length) return;
+                        const newOrder = [...currentOrder];
+                        const [moved] = newOrder.splice(fromIdx, 1);
+                        newOrder.splice(toIdx, 0, moved);
+                        handleAnswerChange(currentQuestion.id, newOrder);
+                      };
+
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-sm text-slate-400 mb-4">
+                            {language === 'fr' ? 'Utilisez les flèches pour réorganiser les éléments dans le bon ordre' : 'Use the arrows to reorder items in the correct order'}
+                          </p>
+                          {currentOrder.map((optionIdx: number, position: number) => {
+                            const option = currentQuestion.options[optionIdx];
+                            if (!option) return null;
+                            const optionText = language === 'en' && option.text_en ? option.text_en : option.text_fr;
+                            return (
+                              <div
+                                key={optionIdx}
+                                className="flex items-center gap-3 p-4 bg-slate-800 border border-slate-600 rounded-xl hover:border-blue-500 transition-all"
+                              >
+                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex-shrink-0">
+                                  {position + 1}
+                                </span>
+                                <span className="flex-1 text-white">{optionText}</span>
+                                <div className="flex flex-col gap-1">
+                                  <button
+                                    onClick={() => moveItem(position, position - 1)}
+                                    disabled={position === 0}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      position === 0
+                                        ? 'text-slate-600 cursor-not-allowed'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="18 15 12 9 6 15" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => moveItem(position, position + 1)}
+                                    disabled={position === currentOrder.length - 1}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      position === currentOrder.length - 1
+                                        ? 'text-slate-600 cursor-not-allowed'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
