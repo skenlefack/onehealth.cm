@@ -2,7 +2,7 @@
 set -e
 
 # Create upload directories in the mounted volume (may run as root or expressjs)
-dirs="experts organizations materials documents documents/files thumbnails elearning elearning/videos elearning/thumbnails elearning/pdfs elearning/attachments elearning/presentations"
+dirs="experts organizations materials documents documents/files thumbnails elearning elearning/videos elearning/thumbnails elearning/pdfs elearning/attachments elearning/presentations elearning/documents certificates"
 
 for dir in $dirs; do
   mkdir -p "/app/uploads/$dir"
