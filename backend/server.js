@@ -8,6 +8,9 @@ require('dotenv').config();
 
 const app = express();
 
+// Trust proxy (nginx/Docker) so rate limiters use real client IPs
+app.set('trust proxy', 1);
+
 // Liste des origines autorisées
 const allowedOrigins = [
   // Development
