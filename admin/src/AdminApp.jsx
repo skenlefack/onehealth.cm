@@ -17302,10 +17302,16 @@ const OHELearningPage = ({ isDark, token }) => {
   // ============ COURSE MODAL ============
   // ============ COURSE FORM INLINE ============
   const CourseFormInline = () => {
+    const parseJsonArray = (val) => {
+      if (Array.isArray(val)) return val;
+      if (typeof val === 'string') { try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; } }
+      return [];
+    };
     const [form, setForm] = useState({
       title_fr: editingCourse?.title_fr || '',
       title_en: editingCourse?.title_en || '',
       description_fr: editingCourse?.description_fr || '',
+      description_en: editingCourse?.description_en || '',
       short_description_fr: editingCourse?.short_description_fr || '',
       thumbnail: editingCourse?.thumbnail || '',
       level: editingCourse?.level || 'beginner',
@@ -17313,6 +17319,9 @@ const OHELearningPage = ({ isDark, token }) => {
       category_id: editingCourse?.category_id || '',
       status: editingCourse?.status || 'draft',
       is_featured: editingCourse?.is_featured || false,
+      learning_objectives: parseJsonArray(editingCourse?.learning_objectives),
+      prerequisites: parseJsonArray(editingCourse?.prerequisites),
+      target_audience: parseJsonArray(editingCourse?.target_audience),
       min_passing_score: editingCourse?.min_passing_score || 70,
       final_quiz_id: editingCourse?.final_quiz_id || null,
       final_quiz_weight: editingCourse?.final_quiz_weight || 1.00,
@@ -17438,6 +17447,95 @@ const OHELearningPage = ({ isDark, token }) => {
             <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
               style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
               placeholder="Une brève description du cours..." />
+          </div>
+
+          {/* Description complète */}
+          <div>
+            <label style={styles.label}>Description complète (Français)</label>
+            <textarea value={form.description_fr} onChange={e => setForm({ ...form, description_fr: e.target.value })}
+              style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
+              placeholder="Description détaillée du cours..." />
+          </div>
+          <div>
+            <label style={styles.label}>Description complète (Anglais)</label>
+            <textarea value={form.description_en} onChange={e => setForm({ ...form, description_en: e.target.value })}
+              style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
+              placeholder="Full course description (English)..." />
+          </div>
+
+          {/* Objectifs, Prérequis, Public cible */}
+          <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Target size={16} color={colors.primary} />
+                Objectifs d'apprentissage
+              </span>
+            </label>
+            {form.learning_objectives.map((obj, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+                <span style={{ color: colors.primary, fontWeight: '700', fontSize: '12px', minWidth: '20px' }}>{idx + 1}.</span>
+                <input value={obj} onChange={e => { const n = [...form.learning_objectives]; n[idx] = e.target.value; setForm({ ...form, learning_objectives: n }); }}
+                  style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Objectif..." />
+                <button onClick={() => { const n = form.learning_objectives.filter((_, i) => i !== idx); setForm({ ...form, learning_objectives: n }); }}
+                  style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error, flexShrink: 0 }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            <button onClick={() => setForm({ ...form, learning_objectives: [...form.learning_objectives, ''] })}
+              style={{ background: 'transparent', color: colors.primary, border: `1px dashed ${colors.primary}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
+              + Ajouter un objectif
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Prérequis */}
+            <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={16} color={colors.teal} />
+                  Prérequis
+                </span>
+              </label>
+              {form.prerequisites.map((pre, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                  <input value={pre} onChange={e => { const n = [...form.prerequisites]; n[idx] = e.target.value; setForm({ ...form, prerequisites: n }); }}
+                    style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Prérequis..." />
+                  <button onClick={() => setForm({ ...form, prerequisites: form.prerequisites.filter((_, i) => i !== idx) })}
+                    style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              <button onClick={() => setForm({ ...form, prerequisites: [...form.prerequisites, ''] })}
+                style={{ background: 'transparent', color: colors.teal, border: `1px dashed ${colors.teal}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
+                + Ajouter
+              </button>
+            </div>
+
+            {/* Public cible */}
+            <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={16} color={colors.purple} />
+                  Public cible
+                </span>
+              </label>
+              {form.target_audience.map((aud, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                  <input value={aud} onChange={e => { const n = [...form.target_audience]; n[idx] = e.target.value; setForm({ ...form, target_audience: n }); }}
+                    style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Public cible..." />
+                  <button onClick={() => setForm({ ...form, target_audience: form.target_audience.filter((_, i) => i !== idx) })}
+                    style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              <button onClick={() => setForm({ ...form, target_audience: [...form.target_audience, ''] })}
+                style={{ background: 'transparent', color: colors.purple, border: `1px dashed ${colors.purple}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
+                + Ajouter
+              </button>
+            </div>
           </div>
 
           {/* Row: Level, Duration, Category, Status */}
