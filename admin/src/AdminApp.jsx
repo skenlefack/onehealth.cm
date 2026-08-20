@@ -15758,6 +15758,7 @@ const OHELearningPage = ({ isDark, token }) => {
                               {lesson.content_type === 'video' ? 'Vidéo' : lesson.content_type === 'pdf' ? 'PDF' : lesson.content_type === 'quiz' ? 'Quiz' : lesson.content_type === 'interactive' ? 'Interactif' : 'Texte'}
                               {lesson.duration_minutes > 0 && ` • ${lesson.duration_minutes} min`}
                               {lesson.is_preview && ' • Aperçu gratuit'}
+                              {lesson.has_quiz && ' • 📝 Quiz'}
                             </p>
                           </div>
                         </div>
@@ -17910,6 +17911,9 @@ const OHELearningPage = ({ isDark, token }) => {
       duration_minutes: editingLesson?.duration_minutes || 0,
       is_preview: editingLesson?.is_preview || false,
       status: editingLesson?.status || 'draft',
+      has_quiz: editingLesson?.has_quiz || false,
+      quiz_id: editingLesson?.quiz_id || null,
+      quiz_position: editingLesson?.quiz_position || 'end',
       quiz_weight: editingLesson?.quiz_weight || 1.00
     });
 
@@ -18754,6 +18758,59 @@ const OHELearningPage = ({ isDark, token }) => {
                 <span style={{ fontSize: '14px' }}>Aperçu gratuit</span>
               </label>
             </div>
+          </div>
+
+          {/* Quiz association */}
+          <div style={{
+            background: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: '10px',
+            padding: '16px',
+            border: `1px solid ${form.has_quiz ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`
+          }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              marginBottom: form.has_quiz ? '16px' : '0'
+            }}>
+              <input type="checkbox" checked={form.has_quiz}
+                onChange={e => setForm({ ...form, has_quiz: e.target.checked, quiz_id: e.target.checked ? form.quiz_id : null })}
+                style={{ accentColor: colors.primary }} />
+              <FileQuestion size={18} color={form.has_quiz ? colors.primary : (isDark ? '#64748b' : '#94a3b8')} />
+              <span style={{ fontSize: '14px', fontWeight: '600' }}>Cette leçon a un quiz</span>
+            </label>
+
+            {form.has_quiz && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={styles.label}>Quiz associé</label>
+                  <select
+                    value={form.quiz_id || ''}
+                    onChange={e => setForm({ ...form, quiz_id: e.target.value ? parseInt(e.target.value) : null })}
+                    style={styles.select}
+                  >
+                    <option value="">-- Sélectionner un quiz --</option>
+                    {quizzes.map(quiz => (
+                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Position du quiz</label>
+                  <select value={form.quiz_position} onChange={e => setForm({ ...form, quiz_position: e.target.value })} style={styles.select}>
+                    <option value="start">Début de leçon</option>
+                    <option value="middle">Milieu de leçon</option>
+                    <option value="end">Fin de leçon</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Poids du quiz</label>
+                  <input type="number" value={form.quiz_weight} onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
+                    style={styles.input} min="0.1" max="10" step="0.1" />
+                  <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Coefficient dans la note du module
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Upload progress overlay message */}
