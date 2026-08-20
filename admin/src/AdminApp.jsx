@@ -20972,6 +20972,9 @@ const OHELearningPage = ({ isDark, token }) => {
                 <option value="multiple_select">Multiple</option>
                 <option value="true_false">Vrai/Faux</option>
                 <option value="short_answer">Courte</option>
+                <option value="matching">Association</option>
+                <option value="fill_blank">Texte à trous</option>
+                <option value="ordering">Classement</option>
               </select>
             </div>
             {/* Questions List */}
