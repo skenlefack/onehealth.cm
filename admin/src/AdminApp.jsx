@@ -15588,7 +15588,7 @@ const OHELearningPage = ({ isDark, token }) => {
           />
           {/* Drawer panel */}
           <div style={{
-            position: 'relative', width: '680px', maxWidth: '90vw', height: '100vh',
+            position: 'relative', width: '55vw', minWidth: '700px', maxWidth: '95vw', height: '100vh',
             background: isDark ? '#0f172a' : '#ffffff', boxShadow: '-4px 0 24px rgba(0,0,0,0.2)',
             overflowY: 'auto', padding: '24px', zIndex: 1
           }}>
