@@ -425,12 +425,12 @@ router.get('/courses/:id/curriculum', optionalAuth, async (req, res) => {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    const [course] = await db.query('SELECT id, title_fr, sequential_modules FROM courses WHERE id = ?', [id]);
+    const [course] = await db.query('SELECT id, title_fr, sequential_modules, require_quiz_pass, free_navigation, min_passing_score FROM courses WHERE id = ?', [id]);
     if (course.length === 0) {
       return res.status(404).json({ success: false, message: 'Cours non trouvé' });
     }
 
-    const sequentialModules = course[0].sequential_modules;
+    const { sequential_modules: sequentialModules, require_quiz_pass: requireQuizPass, free_navigation: freeNavigation, min_passing_score: courseMinScore } = course[0];
 
     const [modules] = await db.query(`
       SELECT * FROM course_modules
@@ -440,7 +440,10 @@ router.get('/courses/:id/curriculum', optionalAuth, async (req, res) => {
 
     // Track completion status for sequential unlock logic
     let previousLessonCompleted = true;
+    let previousLessonHasQuiz = false;
+    let previousLessonQuizPassed = true;
     let previousModuleCompleted = true;
+    let previousModuleQuizPassed = true;
 
     for (let moduleIdx = 0; moduleIdx < modules.length; moduleIdx++) {
       const module = modules[moduleIdx];
@@ -455,34 +458,53 @@ router.get('/courses/:id/curriculum', optionalAuth, async (req, res) => {
         for (let lessonIdx = 0; lessonIdx < lessons.length; lessonIdx++) {
           const lesson = lessons[lessonIdx];
           const [progress] = await db.query(`
-            SELECT status, progress_percent FROM lesson_progress
+            SELECT status, progress_percent, quiz_completed, quiz_score FROM lesson_progress
             WHERE user_id = ? AND lesson_id = ?
           `, [userId, lesson.id]);
 
           lesson.is_completed = progress.length > 0 && progress[0].status === 'completed';
           lesson.progress_percent = progress.length > 0 ? progress[0].progress_percent : 0;
+          lesson.quiz_passed = progress.length > 0 && progress[0].quiz_completed && (progress[0].quiz_score >= (courseMinScore || 70));
 
-          // Determine if lesson is locked (sequential unlock logic)
-          if (sequentialModules) {
-            // First lesson of first module is never locked
+          // Determine if lesson is locked
+          if (freeNavigation) {
+            // Free navigation: nothing is locked
+            lesson.is_locked = false;
+          } else if (sequentialModules) {
+            // Sequential mode
             if (moduleIdx === 0 && lessonIdx === 0) {
               lesson.is_locked = false;
             } else if (lessonIdx === 0) {
-              // First lesson of a module: locked if previous module not completed
-              lesson.is_locked = !previousModuleCompleted;
+              // First lesson of module: locked if previous module not completed
+              // If require_quiz_pass, also check module quiz
+              lesson.is_locked = !previousModuleCompleted || (requireQuizPass && !previousModuleQuizPassed);
             } else {
               // Other lessons: locked if previous lesson not completed
-              lesson.is_locked = !previousLessonCompleted;
+              // If require_quiz_pass and previous lesson has a quiz, check quiz pass
+              lesson.is_locked = !previousLessonCompleted || (requireQuizPass && previousLessonHasQuiz && !previousLessonQuizPassed);
             }
           } else {
             lesson.is_locked = false;
           }
 
           previousLessonCompleted = lesson.is_completed;
+          previousLessonHasQuiz = lesson.has_quiz;
+          previousLessonQuizPassed = lesson.quiz_passed;
         }
 
         // Check if this module is completed (all lessons completed)
-        previousModuleCompleted = lessons.every(l => l.is_completed);
+        const allLessonsCompleted = lessons.every(l => l.is_completed);
+        // If module has a quiz, check if quiz is passed
+        let moduleQuizPassed = true;
+        if (module.has_quiz && module.quiz_id && requireQuizPass) {
+          const [modQuizAttempts] = await db.query(`
+            SELECT MAX(score_percent) as best_score FROM quiz_attempts
+            WHERE user_id = ? AND quiz_id = ? AND status = 'completed'
+          `, [userId, module.quiz_id]);
+          moduleQuizPassed = modQuizAttempts.length > 0 && modQuizAttempts[0].best_score >= (module.min_quiz_score || courseMinScore || 70);
+        }
+        previousModuleCompleted = allLessonsCompleted;
+        previousModuleQuizPassed = moduleQuizPassed;
       } else {
         // No user - mark all as not completed, not locked
         lessons.forEach(lesson => {
@@ -511,7 +533,7 @@ router.post('/courses', auth, authorize('admin', 'editor'), async (req, res) => 
       short_description_fr, short_description_en,
       thumbnail, cover_image, intro_video_url,
       level, duration_hours, estimated_weeks,
-      min_passing_score, max_attempts, sequential_modules,
+      min_passing_score, max_attempts, sequential_modules, require_quiz_pass, free_navigation,
       is_free, price,
       instructor_id, category_id,
       learning_objectives, prerequisites, target_audience, what_you_will_learn, requirements,
@@ -532,14 +554,14 @@ router.post('/courses', auth, authorize('admin', 'editor'), async (req, res) => 
         short_description_fr, short_description_en,
         thumbnail, cover_image, intro_video_url,
         level, duration_hours, estimated_weeks,
-        min_passing_score, max_attempts, sequential_modules,
+        min_passing_score, max_attempts, sequential_modules, require_quiz_pass, free_navigation,
         is_free, price,
         instructor_id, category_id,
         learning_objectives, prerequisites, target_audience, what_you_will_learn, requirements,
         tags, status, is_featured,
         published_at,
         final_quiz_id, final_quiz_weight, module_quizzes_weight
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title_fr, title_en, slug,
       description_fr, description_en,
@@ -547,6 +569,7 @@ router.post('/courses', auth, authorize('admin', 'editor'), async (req, res) => 
       thumbnail, cover_image, intro_video_url,
       level || 'beginner', duration_hours || 0, estimated_weeks || 0,
       min_passing_score || 70, max_attempts || 3, sequential_modules !== false,
+      require_quiz_pass || false, free_navigation || false,
       is_free !== false, price || 0,
       instructor_id, category_id,
       JSON.stringify(learning_objectives || []),
@@ -595,7 +618,7 @@ router.put('/courses/:id', auth, authorize('admin', 'editor'), async (req, res) 
       'short_description_fr', 'short_description_en',
       'thumbnail', 'cover_image', 'intro_video_url',
       'level', 'duration_hours', 'estimated_weeks',
-      'min_passing_score', 'max_attempts', 'sequential_modules',
+      'min_passing_score', 'max_attempts', 'sequential_modules', 'require_quiz_pass', 'free_navigation',
       'is_free', 'price', 'instructor_id', 'category_id',
       'status', 'is_featured', 'sort_order',
       'final_quiz_id', 'final_quiz_weight', 'module_quizzes_weight'

@@ -17346,6 +17346,9 @@ const OHELearningPage = ({ isDark, token }) => {
       category_id: editingCourse?.category_id || '',
       status: editingCourse?.status || 'draft',
       is_featured: editingCourse?.is_featured || false,
+      sequential_modules: editingCourse?.sequential_modules !== false,
+      require_quiz_pass: editingCourse?.require_quiz_pass || false,
+      free_navigation: editingCourse?.free_navigation || false,
       learning_objectives: parseJsonArray(editingCourse?.learning_objectives),
       prerequisites: parseJsonArray(editingCourse?.prerequisites),
       target_audience: parseJsonArray(editingCourse?.target_audience),
@@ -17614,6 +17617,79 @@ const OHELearningPage = ({ isDark, token }) => {
             <Star size={16} color={form.is_featured ? colors.warning : (isDark ? '#64748b' : '#94a3b8')} />
             <span style={{ fontSize: '13px' }}>Mettre en vedette</span>
           </label>
+
+          {/* Progression settings */}
+          <div style={{
+            background: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: '10px',
+            padding: '16px',
+            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+          }}>
+            <label style={{ ...styles.label, marginBottom: '14px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Lock size={16} color={colors.primary} />
+                Règles de progression
+              </span>
+            </label>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Free navigation */}
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
+                padding: '12px', borderRadius: '10px',
+                background: form.free_navigation ? `${colors.success}10` : 'transparent',
+                border: `1px solid ${form.free_navigation ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+              }}>
+                <input type="checkbox" checked={form.free_navigation}
+                  onChange={e => setForm({ ...form, free_navigation: e.target.checked, sequential_modules: e.target.checked ? false : form.sequential_modules })}
+                  style={{ accentColor: colors.success, marginTop: '2px' }} />
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Navigation libre</span>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    L'apprenant peut commencer par n'importe quel module et leçon
+                  </p>
+                </div>
+              </label>
+
+              {/* Sequential modules */}
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
+                padding: '12px', borderRadius: '10px',
+                background: !form.free_navigation && form.sequential_modules ? `${colors.primary}10` : 'transparent',
+                border: `1px solid ${!form.free_navigation && form.sequential_modules ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
+                opacity: form.free_navigation ? 0.5 : 1
+              }}>
+                <input type="checkbox" checked={form.sequential_modules} disabled={form.free_navigation}
+                  onChange={e => setForm({ ...form, sequential_modules: e.target.checked })}
+                  style={{ accentColor: colors.primary, marginTop: '2px' }} />
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Progression séquentielle</span>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    L'apprenant doit terminer chaque module/leçon avant de passer au suivant
+                  </p>
+                </div>
+              </label>
+
+              {/* Require quiz pass */}
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
+                padding: '12px', borderRadius: '10px',
+                background: form.require_quiz_pass ? `${colors.warning}10` : 'transparent',
+                border: `1px solid ${form.require_quiz_pass ? colors.warning : (isDark ? '#334155' : '#e2e8f0')}`,
+                opacity: form.free_navigation ? 0.5 : 1
+              }}>
+                <input type="checkbox" checked={form.require_quiz_pass} disabled={form.free_navigation}
+                  onChange={e => setForm({ ...form, require_quiz_pass: e.target.checked })}
+                  style={{ accentColor: colors.warning, marginTop: '2px' }} />
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Validation quiz obligatoire</span>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    L'apprenant doit réussir le quiz d'une leçon/module avant de passer au suivant (score minimum requis)
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* Grade settings */}
           <div style={{
