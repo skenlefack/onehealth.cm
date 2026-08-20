@@ -268,33 +268,16 @@ struct ELearningCourseDetailView: View {
                     if expandedModules.contains(module.id), let lessons = module.lessons {
                         VStack(spacing: 0) {
                             ForEach(lessons) { lesson in
-                                HStack(spacing: 10) {
-                                    // Status icon
-                                    Image(systemName: lessonIcon(lesson))
-                                        .font(.caption)
-                                        .foregroundStyle(lessonColor(lesson))
-                                        .frame(width: 20)
-
-                                    Text(lesson.localizedTitle)
-                                        .font(.caption)
-                                        .foregroundStyle(lesson.isLocked == true ? AppColors.textTertiary : AppColors.textPrimary)
-                                        .lineLimit(1)
-
-                                    Spacer()
-
-                                    // Content type icon
-                                    Image(systemName: contentTypeIcon(lesson.contentType))
-                                        .font(.caption2)
-                                        .foregroundStyle(AppColors.textTertiary)
-
-                                    if let mins = lesson.durationMinutes, mins > 0 {
-                                        Text("\(mins)min")
-                                            .font(.caption2)
-                                            .foregroundStyle(AppColors.textTertiary)
+                                Group {
+                                    if lesson.isLocked == true {
+                                        lessonRow(lesson)
+                                    } else {
+                                        NavigationLink(destination: ELearningLessonView(lessonId: lesson.id, courseSlug: slug)) {
+                                            lessonRow(lesson)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
-                                .padding(.vertical, 6)
-                                .padding(.leading, 38)
                             }
                         }
                     }
@@ -305,6 +288,44 @@ struct ELearningCourseDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Lesson Row
+
+    private func lessonRow(_ lesson: ELLesson) -> some View {
+        HStack(spacing: 10) {
+            // Status icon
+            Image(systemName: lessonIcon(lesson))
+                .font(.caption)
+                .foregroundStyle(lessonColor(lesson))
+                .frame(width: 20)
+
+            Text(lesson.localizedTitle)
+                .font(.caption)
+                .foregroundStyle(lesson.isLocked == true ? AppColors.textTertiary : AppColors.textPrimary)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Content type icon
+            Image(systemName: contentTypeIcon(lesson.contentType))
+                .font(.caption2)
+                .foregroundStyle(AppColors.textTertiary)
+
+            if let mins = lesson.durationMinutes, mins > 0 {
+                Text("\(mins)min")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+
+            if lesson.isLocked != true {
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.leading, 38)
     }
 
     // MARK: - Helpers
@@ -342,8 +363,12 @@ struct ELearningCourseDetailView: View {
         case "video": "play.rectangle.fill"
         case "pdf": "doc.fill"
         case "powerpoint", "pptx": "rectangle.stack.fill"
+        case "word", "docx": "doc.richtext.fill"
+        case "excel", "xlsx": "tablecells.fill"
         case "quiz": "questionmark.circle.fill"
         case "text": "doc.text.fill"
+        case "mixed": "doc.text.fill"
+        case "interactive": "hand.tap.fill"
         default: "doc.fill"
         }
     }

@@ -205,6 +205,8 @@ struct ELLesson: Codable, Identifiable {
     let videoProvider: String?
     let pdfUrl: String?
     let pptxUrl: String?
+    let docxUrl: String?
+    let xlsxUrl: String?
     let durationMinutes: Int?
     let sortOrder: Int?
     let isPreview: Bool?
@@ -242,6 +244,8 @@ struct ELLesson: Codable, Identifiable {
         case videoProvider = "video_provider"
         case pdfUrl = "pdf_url"
         case pptxUrl = "pptx_url"
+        case docxUrl = "docx_url"
+        case xlsxUrl = "xlsx_url"
         case durationMinutes = "duration_minutes"
         case sortOrder = "sort_order"
         case isPreview = "is_preview"
