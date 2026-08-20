@@ -24,6 +24,31 @@ import {
   ThermometerSun, Bug, Skull, Siren, MapPinned, Share2, QrCode, ToggleLeft, TextCursorInput, Shuffle,
   Brain
 } from 'lucide-react';
+import { Editor } from '@tinymce/tinymce-react';
+
+// Reusable WYSIWYG editor component (self-hosted TinyMCE)
+const RichTextEditor = ({ value, onChange, placeholder, height = 250, isDark }) => (
+  <Editor
+    tinymceScriptSrc="/tinymce/tinymce.min.js"
+    value={value || ''}
+    onEditorChange={(content) => onChange(content)}
+    init={{
+      height,
+      menubar: false,
+      branding: false,
+      promotion: false,
+      plugins: 'lists link table code fullscreen',
+      toolbar: 'undo redo | bold italic underline | bullist numlist | link table | code fullscreen',
+      placeholder: placeholder || '',
+      content_style: `body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: ${isDark ? '#e2e8f0' : '#1e293b'}; background: ${isDark ? '#0f172a' : '#ffffff'}; padding: 8px; }`,
+      skin: isDark ? 'oxide-dark' : 'oxide',
+      content_css: isDark ? 'dark' : 'default',
+      statusbar: false,
+      resize: true,
+      license_key: 'gpl',
+    }}
+  />
+);
 
 // ============== COULEURS ONE HEALTH ==============
 const colors = {
@@ -17313,6 +17338,7 @@ const OHELearningPage = ({ isDark, token }) => {
       description_fr: editingCourse?.description_fr || '',
       description_en: editingCourse?.description_en || '',
       short_description_fr: editingCourse?.short_description_fr || '',
+      short_description_en: editingCourse?.short_description_en || '',
       thumbnail: editingCourse?.thumbnail || '',
       level: editingCourse?.level || 'beginner',
       duration_hours: editingCourse?.duration_hours || 0,
@@ -17441,26 +17467,30 @@ const OHELearningPage = ({ isDark, token }) => {
             </div>
           </div>
 
-          {/* Short Description */}
-          <div>
-            <label style={styles.label}>Description courte</label>
-            <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
-              placeholder="Une brève description du cours..." />
+          {/* Short Description FR/EN */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Description courte (Français)</label>
+              <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
+                style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+                placeholder="Brève description du cours..." />
+            </div>
+            <div>
+              <label style={styles.label}>Description courte (Anglais)</label>
+              <textarea value={form.short_description_en} onChange={e => setForm({ ...form, short_description_en: e.target.value })}
+                style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+                placeholder="Short course description..." />
+            </div>
           </div>
 
           {/* Description complète */}
           <div>
             <label style={styles.label}>Description complète (Français)</label>
-            <textarea value={form.description_fr} onChange={e => setForm({ ...form, description_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
-              placeholder="Description détaillée du cours..." />
+            <RichTextEditor value={form.description_fr} onChange={v => setForm(f => ({ ...f, description_fr: v }))} placeholder="Description détaillée du cours..." isDark={isDark} />
           </div>
           <div>
             <label style={styles.label}>Description complète (Anglais)</label>
-            <textarea value={form.description_en} onChange={e => setForm({ ...form, description_en: e.target.value })}
-              style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
-              placeholder="Full course description (English)..." />
+            <RichTextEditor value={form.description_en} onChange={v => setForm(f => ({ ...f, description_en: v }))} placeholder="Full course description..." isDark={isDark} />
           </div>
 
           {/* Objectifs, Prérequis, Public cible */}
@@ -17752,8 +17782,7 @@ const OHELearningPage = ({ isDark, token }) => {
 
           <div>
             <label style={styles.label}>Description</label>
-            <textarea value={form.description_fr} onChange={e => setForm({ ...form, description_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px' }} placeholder="Description du module..." />
+            <RichTextEditor value={form.description_fr} onChange={v => setForm(f => ({ ...f, description_fr: v }))} placeholder="Description du module..." height={180} isDark={isDark} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -18492,8 +18521,7 @@ const OHELearningPage = ({ isDark, token }) => {
           {(form.content_type === 'text' || form.content_type === 'mixed') && (
             <div>
               <label style={styles.label}>Contenu texte</label>
-              <textarea value={form.content_fr} onChange={e => setForm({ ...form, content_fr: e.target.value })}
-                style={{ ...styles.input, minHeight: '150px' }} placeholder="Contenu de la leçon..." />
+              <RichTextEditor value={form.content_fr} onChange={v => setForm(f => ({ ...f, content_fr: v }))} placeholder="Contenu de la leçon..." height={350} isDark={isDark} />
             </div>
           )}
 
