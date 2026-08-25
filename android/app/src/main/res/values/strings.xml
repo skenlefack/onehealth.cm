@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">COHRM</string>
+    <string name="app_name">One Health Cameroon</string>
 
     <!-- Login -->
     <string name="login_title">Connexion</string>
@@ -10,7 +10,7 @@
     <string name="login_password">Mot de passe</string>
     <string name="login_password_hint">Entrez votre mot de passe</string>
     <string name="login_button">Se connecter</string>
-    <string name="login_footer">CAMEROON ONE HEALTH PLATFORM</string>
+    <string name="login_footer">PLATEFORME UNE SEULE SANTÉ DU CAMEROUN</string>
 
     <!-- Navigation -->
     <string name="nav_home">Accueil</string>
@@ -21,8 +21,8 @@
     <string name="nav_settings">Paramètres</string>
 
     <!-- Home / Dashboard -->
-    <string name="home_title">COHRM</string>
-    <string name="home_subtitle">Cameroon One Health Rumor Management System</string>
+    <string name="home_title">One Health</string>
+    <string name="home_subtitle">Plateforme Une Seule Santé du Cameroun</string>
     <string name="home_new_report">Nouveau signalement</string>
     <string name="home_sms_report">Signalement SMS</string>
     <string name="home_drafts">Brouillons</string>
@@ -320,7 +320,7 @@
     <string name="settings_device_id">ID appareil</string>
     <string name="settings_version">Version</string>
     <string name="settings_about">À propos</string>
-    <string name="settings_about_text">COHRM - Cameroon One Health Rumor Management System</string>
+    <string name="settings_about_text">One Health - Plateforme Une Seule Santé du Cameroun</string>
     <string name="settings_server_url">URL du serveur</string>
     <string name="settings_logout">Déconnexion</string>
 
@@ -368,6 +368,9 @@
 
     <!-- Top Bar & Profile -->
     <string name="profile_title">Mon profil</string>
+    <string name="profile_personal_info">Informations personnelles</string>
+    <string name="profile_logout_title">Deconnexion</string>
+    <string name="profile_logout_confirm">Etes-vous sur de vouloir vous deconnecter ?</string>
     <string name="profile_name">Nom complet</string>
     <string name="profile_email">Email</string>
     <string name="profile_phone">Telephone</string>
@@ -545,4 +548,247 @@
     <string name="region_OU">Ouest</string>
     <string name="region_SU">Sud</string>
     <string name="region_SW">Sud-Ouest</string>
+
+    <!-- Platform Home -->
+    <string name="platform_title">One Health Cameroon</string>
+    <string name="platform_subtitle">Plateforme Une Seule Santé du Cameroun</string>
+    <string name="platform_modules">Modules</string>
+    <string name="platform_latest_posts">Dernières publications</string>
+    <string name="platform_pillar_human">Humaine</string>
+    <string name="platform_pillar_animal">Animale</string>
+    <string name="platform_pillar_environment">Environnement</string>
+    <string name="platform_pillar_food">Alimentaire</string>
+    <string name="platform_cohrm_title">COHRM</string>
+    <string name="platform_cohrm_subtitle">Gestion des rumeurs One Health</string>
+    <string name="platform_elearning_title">E-Learning</string>
+    <string name="platform_elearning_subtitle">Formation en ligne</string>
+    <string name="platform_dussc_title">DUSS-C</string>
+    <string name="platform_dussc_subtitle">Défi Une Seule Santé</string>
+    <string name="platform_ohwr_title">Ressource Mapping</string>
+    <string name="platform_ohwr_subtitle">Cartographie des ressources</string>
+    <string name="platform_rumors">rumeurs</string>
+    <string name="platform_today">aujourd\'hui</string>
+    <string name="platform_courses">cours</string>
+    <string name="platform_quiz">quiz</string>
+    <string name="platform_experts">experts</string>
+    <string name="platform_organizations">orgs</string>
+
+    <!-- DUSS-C -->
+    <string name="dussc_title">DUSS-C</string>
+    <string name="dussc_full_title">Défi Une Seule Santé - Cameroun</string>
+    <string name="dussc_description">Testez vos connaissances en santé publique One Health</string>
+    <string name="dussc_questions">questions</string>
+    <string name="dussc_minutes">minutes</string>
+    <string name="dussc_modules_covered">Thèmes couverts</string>
+    <string name="dussc_select_profile">Votre profil</string>
+    <string name="dussc_family_a">Grand public</string>
+    <string name="dussc_family_b">Professionnels</string>
+    <string name="dussc_family_c">Décideurs</string>
+    <string name="dussc_family_d">Étudiants</string>
+    <string name="dussc_start_quiz">Commencer le défi</string>
+    <string name="dussc_quiz_title">Quiz DUSS-C</string>
+    <string name="dussc_bloc_pretest">Pré-test</string>
+    <string name="dussc_bloc_common">Tronc commun</string>
+    <string name="dussc_bloc_profile">Profil</string>
+    <string name="dussc_bloc_posttest">Post-test</string>
+    <string name="dussc_validate_answer">Valider</string>
+    <string name="dussc_correct">Bonne réponse !</string>
+    <string name="dussc_incorrect">Mauvaise réponse</string>
+    <string name="dussc_next_question">Question suivante</string>
+    <string name="dussc_finish">Terminer</string>
+    <string name="dussc_submitting">Soumission en cours…</string>
+    <string name="dussc_results_title">Résultats</string>
+    <string name="dussc_score">Score global</string>
+    <string name="dussc_correct_answers">bonnes réponses</string>
+    <string name="dussc_comparison">Comparaison Pré/Post</string>
+    <string name="dussc_pretest">Pré-test</string>
+    <string name="dussc_posttest">Post-test</string>
+    <string name="dussc_gain">Progression</string>
+    <string name="dussc_points">points</string>
+    <string name="dussc_result_excellent">Excellent ! Vous maîtrisez les concepts One Health. Continuez à partager vos connaissances.</string>
+    <string name="dussc_result_good">Bon travail ! Vous avez de bonnes bases. Continuez à approfondir vos connaissances.</string>
+    <string name="dussc_result_retry">Continuez à vous former ! Refaites le défi pour améliorer votre score.</string>
+    <string name="dussc_retry">Refaire</string>
+    <string name="dussc_back_home">Retour</string>
+    <string name="dussc_consent_title">Consentement</string>
+    <string name="dussc_consent_accept">J\'accepte les conditions</string>
+    <string name="dussc_demographics_title">Informations démographiques</string>
+    <string name="dussc_demographics_skip">Passer</string>
+    <string name="dussc_demographics_submit">Continuer</string>
+    <string name="dussc_region">Région</string>
+    <string name="dussc_milieu">Milieu</string>
+    <string name="dussc_urban">Urbain</string>
+    <string name="dussc_rural">Rural</string>
+    <string name="dussc_age_range">Tranche d\'âge</string>
+    <string name="dussc_sex">Sexe</string>
+    <string name="dussc_male">Masculin</string>
+    <string name="dussc_female">Féminin</string>
+    <string name="dussc_other">Autre</string>
+    <string name="dussc_share">Partager</string>
+    <string name="dussc_share_results">Partager mes résultats</string>
+    <string name="dussc_misconception">Idée fausse</string>
+    <string name="dussc_lessons_title">Leçons à retenir</string>
+    <string name="dussc_wrong_answers">réponses incorrectes</string>
+    <string name="dussc_see_all">Voir tout</string>
+
+    <!-- Rumors Map -->
+    <string name="rumors_map_title">Carte des rumeurs</string>
+    <string name="rumors_map_all">Tout</string>
+    <string name="rumors_map_pending">En attente</string>
+    <string name="rumors_map_investigating">Investigation</string>
+    <string name="rumors_map_confirmed">Confirmé</string>
+    <string name="rumors_map_tap_detail">Appuyez pour voir les détails</string>
+
+    <!-- OHWR -->
+    <string name="ohwr_title">Ressource Mapping</string>
+    <string name="ohwr_experts_label">Experts</string>
+    <string name="ohwr_organizations_label">Organisations</string>
+    <string name="ohwr_materials_label">Équipements</string>
+    <string name="ohwr_documents_label">Documents</string>
+    <string name="ohwr_view_map">Voir la carte</string>
+    <string name="ohwr_resources_mapped">ressources cartographiées</string>
+    <string name="ohwr_explore_resources">Explorer les ressources</string>
+    <string name="ohwr_recent_docs">Documents récents</string>
+    <string name="ohwr_expert_detail">Détail expert</string>
+    <string name="ohwr_experience">Expérience</string>
+    <string name="ohwr_years">ans</string>
+    <string name="ohwr_biography">Biographie</string>
+    <string name="ohwr_expertise">Expertise</string>
+    <string name="ohwr_map_title">Carte des ressources</string>
+    <string name="ohwr_nav_home">Accueil</string>
+    <string name="ohwr_nav_experts">Experts</string>
+    <string name="ohwr_nav_map">Carte</string>
+    <string name="ohwr_nav_documents">Docs</string>
+    <string name="ohwr_trending">Recherches tendances</string>
+    <string name="ohwr_results_found">résultats trouvés</string>
+    <string name="ohwr_search">Rechercher…</string>
+    <string name="ohwr_document_detail">Détail document</string>
+    <string name="ohwr_download">Télécharger</string>
+    <string name="ohwr_share">Partager</string>
+    <string name="ohwr_views">vues</string>
+    <string name="ohwr_downloads">téléchargements</string>
+    <string name="ohwr_publication_date">Date de publication</string>
+    <string name="ohwr_language">Langue</string>
+    <string name="ohwr_organization">Organisation</string>
+    <string name="ohwr_view_detail">Voir détail</string>
+    <string name="ohwr_category_human_health">Santé humaine</string>
+    <string name="ohwr_category_animal_health">Santé animale</string>
+    <string name="ohwr_category_environment">Environnement</string>
+    <string name="ohwr_type_guide">Guide</string>
+    <string name="ohwr_type_protocol">Protocole</string>
+    <string name="ohwr_type_article">Article</string>
+    <string name="ohwr_type_report">Rapport</string>
+    <string name="ohwr_type_policy">Politique</string>
+    <string name="ohwr_contact">Contact</string>
+    <string name="ohwr_submit_resource">Soumettre une ressource</string>
+    <string name="ohwr_my_submissions">Mes soumissions</string>
+    <string name="ohwr_submit_expert">Soumettre un expert</string>
+    <string name="ohwr_submit_org">Soumettre une organisation</string>
+    <string name="ohwr_select_type">Type de ressource</string>
+    <string name="ohwr_first_name">Prénom</string>
+    <string name="ohwr_last_name">Nom</string>
+    <string name="ohwr_title_field">Titre/Fonction</string>
+    <string name="ohwr_email">Email</string>
+    <string name="ohwr_phone">Téléphone</string>
+    <string name="ohwr_city">Ville</string>
+    <string name="ohwr_org_name">Nom de l\'organisation</string>
+    <string name="ohwr_acronym">Sigle</string>
+    <string name="ohwr_org_type">Type d\'organisation</string>
+    <string name="ohwr_submit_success">Soumission envoyée avec succès</string>
+    <string name="ohwr_no_submissions">Aucune soumission</string>
+    <string name="ohwr_status_pending">En attente</string>
+    <string name="ohwr_status_approved">Approuvé</string>
+    <string name="ohwr_status_rejected">Rejeté</string>
+
+    <!-- SMS Manager -->
+    <string name="sms_manager_title">Gestion SMS</string>
+    <string name="sms_decoder_tab">Décodeur</string>
+    <string name="sms_codes_tab">Codes</string>
+    <string name="sms_logs_tab">Journal</string>
+    <string name="sms_decode_button">Décoder</string>
+    <string name="sms_enter_message">Entrez le message SMS…</string>
+    <string name="sms_decoded_result">Résultat du décodage</string>
+    <string name="sms_add_code">Ajouter un code</string>
+    <string name="sms_no_codes">Aucun code SMS</string>
+    <string name="sms_no_logs">Aucun log SMS</string>
+
+    <!-- Export -->
+    <string name="export_title">Exporter</string>
+    <string name="export_format">Format d\'export</string>
+
+    <!-- Actors -->
+    <string name="actors_title">Acteurs</string>
+    <string name="actors_level">Niveau %1$d</string>
+    <string name="actors_no_results">Aucun acteur trouvé</string>
+
+    <!-- Kanban -->
+    <string name="kanban_view">Vue Kanban</string>
+    <string name="list_view">Vue liste</string>
+
+    <!-- E-Learning -->
+    <string name="el_title">E-Learning</string>
+    <string name="el_enrolled">Inscrits</string>
+    <string name="el_completed">Terminés</string>
+    <string name="el_certificates">Certificats</string>
+    <string name="el_all_courses">Tous les cours</string>
+    <string name="el_my_learning">Mon apprentissage</string>
+    <string name="el_paths">Parcours</string>
+    <string name="el_featured_courses">Cours en vedette</string>
+    <string name="el_continue_learning">Continuer</string>
+    <string name="el_categories">Catégories</string>
+    <string name="el_level_beginner">Débutant</string>
+    <string name="el_level_intermediate">Intermédiaire</string>
+    <string name="el_level_advanced">Avancé</string>
+    <string name="el_instructor">Formateur</string>
+    <string name="el_your_progress">Votre progression</string>
+    <string name="el_enroll">S\'inscrire</string>
+    <string name="el_description">Description</string>
+    <string name="el_objectives">Objectifs d\'apprentissage</string>
+    <string name="el_curriculum">Programme</string>
+    <string name="el_mark_complete">Terminer</string>
+    <string name="el_next_lesson">Leçon suivante</string>
+    <string name="el_back_to_course">Retour au cours</string>
+    <string name="el_lesson_complete">Leçon terminée !</string>
+    <string name="el_lesson_complete_msg">Bravo ! Vous avez terminé cette leçon.</string>
+    <string name="el_course_complete">Cours terminé ! 🎉</string>
+    <string name="el_quiz">Quiz</string>
+    <string name="el_type_answer">Tapez votre réponse…</string>
+    <string name="el_multiple_answers">Plusieurs réponses possibles</string>
+    <string name="el_true">Vrai</string>
+    <string name="el_false">Faux</string>
+    <string name="el_quiz_passed">Quiz réussi !</string>
+    <string name="el_quiz_failed">Quiz non réussi</string>
+    <string name="el_total_q">Questions</string>
+    <string name="el_time">Temps</string>
+    <string name="el_in_progress">En cours</string>
+    <string name="el_no_enrollments">Aucune inscription</string>
+    <string name="el_certificates_earned">certificats obtenus</string>
+    <string name="el_no_certificates">Terminez des cours pour obtenir vos certificats.</string>
+    <string name="el_path_courses">Cours du parcours</string>
+    <string name="el_nav_home">Accueil</string>
+    <string name="el_nav_courses">Cours</string>
+    <string name="el_nav_my_learning">Apprentissage</string>
+    <string name="el_nav_certificates">Certificats</string>
+    <string name="el_prerequisites">Prérequis</string>
+    <string name="el_unenroll">Se désinscrire</string>
+    <string name="el_lessons_done">leçons complétées</string>
+    <string name="el_essay_placeholder">Rédigez votre réponse…</string>
+    <string name="el_match_instruction">Associez les éléments de gauche avec ceux de droite</string>
+    <string name="el_sort">Trier par</string>
+    <string name="el_sort_recent">Récent</string>
+    <string name="el_sort_popular">Populaire</string>
+    <string name="el_sort_duration">Durée</string>
+    <string name="el_no_certificates_yet">Aucun certificat obtenu pour le moment</string>
+    <string name="el_cert_number">N° %1$s</string>
+    <string name="el_issued_on">Délivré le</string>
+    <string name="el_verify_code">Code de vérification</string>
+    <string name="el_review_answers">Réviser les réponses</string>
+    <string name="el_your_answer">Votre réponse</string>
+    <string name="el_correct_answer">Bonne réponse</string>
+    <string name="el_verify_certificate">Vérifier un certificat</string>
+    <string name="el_enter_code">Entrez le code de vérification</string>
+    <string name="el_verify_button">Vérifier</string>
+    <string name="el_cert_valid">Certificat valide</string>
+    <string name="el_cert_not_found">Certificat non trouvé</string>
+    <string name="el_resume_at">Reprendre à %1$s</string>
 </resources>

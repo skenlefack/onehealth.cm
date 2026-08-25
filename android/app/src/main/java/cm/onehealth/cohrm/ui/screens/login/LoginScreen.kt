@@ -186,11 +186,12 @@ fun LoginScreen(
 
             // Title
             Text(
-                text = "COHRM",
-                fontSize = 38.sp,
+                text = "One Health Cameroon",
+                fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
-                letterSpacing = 6.sp,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(

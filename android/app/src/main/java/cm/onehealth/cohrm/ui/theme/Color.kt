@@ -32,6 +32,23 @@ val EnvironmentalColor = Color(0xFF27AE60)
 val SafetyColor = Color(0xFFE67E22)
 val DisasterColor = Color(0xFF3498DB)
 
+// Module colors
+val ELearningPrimary = Color(0xFF9B59B6)
+val ELearningLight = Color(0xFFBB8FCE)
+val ELearningDark = Color(0xFF7D3C98)
+val DusscPrimary = Color(0xFF2F5D3A)
+val DusscLight = Color(0xFF27AE60)
+val DusscAccent = Color(0xFF2ECC71)
+val OhwrPrimary = Color(0xFFE65100)
+val OhwrLight = Color(0xFFFF8F00)
+val OhwrAccent = Color(0xFFFFA726)
+
+// Bloc colors (DUSS-C quiz)
+val BlocPreTest = Color(0xFFFF9800)
+val BlocTroncCommun = Color(0xFF2196F3)
+val BlocProfil = Color(0xFF9B59B6)
+val BlocPostTest = Color(0xFF27AE60)
+
 // Light theme
 val LightBackground = Color(0xFFFAFAFA)
 val LightSurface = Color(0xFFFFFFFF)

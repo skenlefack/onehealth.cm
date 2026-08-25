@@ -152,6 +152,13 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // Media3 / ExoPlayer (for E-Learning video lessons)
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
+
+    // WebView (for HTML/interactive content)
+    implementation("com.google.accompanist:accompanist-webview:0.34.0")
+
     // Charts - Vico
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
 

@@ -36,9 +36,12 @@ class AuthInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()
 
-        // Only skip auth for the login endpoint
+        // Skip auth for public endpoints
         val path = original.url.encodedPath
-        if (path.endsWith("mobile/login")) {
+        if (path.endsWith("mobile/login") ||
+            path.contains("/dussc/public/") ||
+            path.contains("/mapping/")
+        ) {
             return chain.proceed(original)
         }
 

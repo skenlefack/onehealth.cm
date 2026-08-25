@@ -1,5 +1,8 @@
 package cm.onehealth.cohrm.ui.screens.reports
 
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cm.onehealth.cohrm.data.remote.ApiService
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -110,6 +114,31 @@ class ReportsViewModel @Inject constructor(
                         error = e.localizedMessage ?: "Erreur lors du chargement des rapports",
                     )
                 }
+            }
+        }
+    }
+
+    fun export(context: Context, format: String) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.exportData(format)
+                val file = File(context.cacheDir, "export_cohrm.$format")
+                file.outputStream().use { output ->
+                    response.byteStream().copyTo(output)
+                }
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = if (format == "csv") "text/csv" else "application/json"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Exporter"))
+            } catch (_: Exception) {
+                _state.update { it.copy(error = "Erreur lors de l'export") }
             }
         }
     }

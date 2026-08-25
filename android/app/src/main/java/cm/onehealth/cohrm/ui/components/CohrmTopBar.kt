@@ -97,7 +97,7 @@ fun CohrmTopBar(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "COHRM",
+                        text = "One Health Cameroon",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,

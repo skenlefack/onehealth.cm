@@ -75,6 +75,12 @@ import cm.onehealth.cohrm.ui.theme.Muted
 import cm.onehealth.cohrm.ui.theme.Primary
 import cm.onehealth.cohrm.ui.theme.PrimaryLight
 import cm.onehealth.cohrm.ui.theme.Warning
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -177,6 +183,23 @@ fun RumorDetailScreen(
                             rumor.district?.takeIf { it.isNotEmpty() }?.let { DetailRow(stringResource(R.string.rumor_district), it) }
                             if (rumor.latitude != null && rumor.longitude != null) {
                                 DetailRow("GPS", "${rumor.latitude}, ${rumor.longitude}")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val position = LatLng(rumor.latitude, rumor.longitude)
+                                val miniMapCameraState = rememberCameraPositionState {
+                                    this.position = CameraPosition.fromLatLngZoom(position, 12f)
+                                }
+                                GoogleMap(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(150.dp)
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    cameraPositionState = miniMapCameraState,
+                                ) {
+                                    Marker(
+                                        state = MarkerState(position = position),
+                                        title = rumor.title,
+                                    )
+                                }
                             }
                         }
                     }

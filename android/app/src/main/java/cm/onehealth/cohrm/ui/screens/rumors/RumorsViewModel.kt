@@ -36,6 +36,7 @@ data class RumorsUiState(
     val isSelectionMode: Boolean = false,
     val isBatchActionLoading: Boolean = false,
     val batchResultMessage: String? = null,
+    val isKanbanView: Boolean = false,
 )
 
 sealed interface RumorsEvent {
@@ -168,6 +169,10 @@ class RumorsViewModel @Inject constructor(
     fun setSearch(query: String) {
         _state.update { it.copy(searchQuery = query) }
         loadRumors()
+    }
+
+    fun toggleView() {
+        _state.update { it.copy(isKanbanView = !it.isKanbanView) }
     }
 
     fun clearFilters() {

@@ -25,6 +25,7 @@ data class ProfileState(
     val organization: String = "",
     val region: String = "",
     val role: String = "",
+    val avatar: String? = null,
     val currentPassword: String = "",
     val newPassword: String = "",
     val confirmPassword: String = "",
@@ -54,6 +55,7 @@ class ProfileViewModel @Inject constructor(
                     it.copy(
                         name = prefs[LoginViewModel.USER_NAME] ?: "",
                         email = prefs[LoginViewModel.USER_EMAIL] ?: "",
+                        avatar = prefs[LoginViewModel.USER_AVATAR],
                         role = prefs[LoginViewModel.ACTOR_LEVEL_LABEL] ?: "",
                         organization = prefs[LoginViewModel.ACTOR_ORGANIZATION] ?: "",
                         region = prefs[LoginViewModel.ACTOR_REGION] ?: "",
@@ -63,6 +65,7 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    fun updateAvatar(uri: String) = _state.update { it.copy(avatar = uri) }
     fun updateName(value: String) = _state.update { it.copy(name = value, saveMessage = null) }
     fun updateEmail(value: String) = _state.update { it.copy(email = value, saveMessage = null) }
     fun updatePhone(value: String) = _state.update { it.copy(phone = value, saveMessage = null) }

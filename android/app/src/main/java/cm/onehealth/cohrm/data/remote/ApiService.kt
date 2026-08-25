@@ -29,6 +29,11 @@ import cm.onehealth.cohrm.data.remote.dto.ReportPerformanceResponse
 import cm.onehealth.cohrm.data.remote.dto.ReportSummaryResponse
 import cm.onehealth.cohrm.data.remote.dto.ReportTrendsResponse
 import cm.onehealth.cohrm.data.remote.dto.ScannerConfigResponse
+import cm.onehealth.cohrm.data.remote.dto.SmsCodeCreateRequest
+import cm.onehealth.cohrm.data.remote.dto.SmsCodesResponse
+import cm.onehealth.cohrm.data.remote.dto.SmsDecodeRequest
+import cm.onehealth.cohrm.data.remote.dto.SmsDecodeResponse
+import cm.onehealth.cohrm.data.remote.dto.SmsLogsResponse
 import cm.onehealth.cohrm.data.remote.dto.SmsRequest
 import cm.onehealth.cohrm.data.remote.dto.SyncResponse
 import cm.onehealth.cohrm.data.remote.dto.TrackingResponse
@@ -40,7 +45,9 @@ import cm.onehealth.cohrm.data.remote.dto.ValidationRequest
 import cm.onehealth.cohrm.data.remote.dto.ValidationsResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
@@ -49,6 +56,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 interface ApiService {
     // Auth
@@ -99,7 +107,7 @@ interface ApiService {
     @GET("rumors/{id}")
     suspend fun getRumorDetail(@Path("id") id: Int): RumorDetailResponse
 
-    @retrofit2.http.DELETE("rumors/{id}")
+    @DELETE("rumors/{id}")
     suspend fun deleteRumor(@Path("id") id: Int): GenericResponse
 
     @PUT("rumors/{id}")
@@ -116,14 +124,14 @@ interface ApiService {
     ): GenericResponse
 
     // Risk Assessment
-    @POST("cohrm/rumors/{id}/risk-assessment")
+    @POST("rumors/{id}/risk-assessment")
     suspend fun assessRisk(
         @Path("id") id: Int,
         @Body request: RiskAssessmentRequest,
     ): GenericResponse
 
     // Validations list
-    @GET("cohrm/rumors/{id}/validations")
+    @GET("rumors/{id}/validations")
     suspend fun getValidations(@Path("id") id: Int): ValidationsResponse
 
     // Feedback
@@ -156,7 +164,7 @@ interface ApiService {
     suspend fun getScanDetail(@Path("id") id: Int): ScanDetailResponse
 
     // Notifications
-    @GET("cohrm/notifications/my")
+    @GET("notifications/my")
     suspend fun getMyNotifications(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -174,17 +182,17 @@ interface ApiService {
     suspend fun registerDevice(@Body request: DeviceRegistrationRequest): GenericResponse
 
     // Public form (no auth)
-    @POST("cohrm/public/report")
+    @POST("public/report")
     suspend fun submitPublicReport(@Body request: PublicReportRequest): ReportResponse
 
-    @GET("cohrm/public/track/{code}")
+    @GET("public/track/{code}")
     suspend fun trackPublicReport(@Path("code") code: String): TrackingResponse
 
-    @GET("cohrm/public/regions")
+    @GET("public/regions")
     suspend fun getPublicRegions(): RegionsResponse
 
     // Reports summary
-    @GET("cohrm/reports/summary")
+    @GET("reports/summary")
     suspend fun getReportSummary(
         @Query("date_from") dateFrom: String?,
         @Query("date_to") dateTo: String?,
@@ -192,7 +200,7 @@ interface ApiService {
         @Query("group_by") groupBy: String? = "day",
     ): ReportSummaryResponse
 
-    @GET("cohrm/reports/trends")
+    @GET("reports/trends")
     suspend fun getReportTrends(
         @Query("date_from") dateFrom: String?,
         @Query("date_to") dateTo: String?,
@@ -200,13 +208,13 @@ interface ApiService {
         @Query("group_by") groupBy: String? = "day",
     ): ReportTrendsResponse
 
-    @GET("cohrm/reports/geographic")
+    @GET("reports/geographic")
     suspend fun getReportGeographic(
         @Query("date_from") dateFrom: String?,
         @Query("date_to") dateTo: String?,
     ): ReportGeographicResponse
 
-    @GET("cohrm/reports/performance")
+    @GET("reports/performance")
     suspend fun getReportPerformance(
         @Query("date_from") dateFrom: String?,
         @Query("date_to") dateTo: String?,
@@ -214,40 +222,67 @@ interface ApiService {
     ): ReportPerformanceResponse
 
     // Scanner config
-    @GET("cohrm/scanner/config")
+    @GET("scanner/config")
     suspend fun getScannerConfig(): ScannerConfigResponse
 
     // Scanner results
-    @GET("cohrm/scanner/results")
+    @GET("scanner/results")
     suspend fun getScannerResults(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
         @Query("status") status: String? = null,
     ): ScannerResultsResponse
 
-    @PUT("cohrm/scanner/results/{id}/review")
+    @PUT("scanner/results/{id}/review")
     suspend fun reviewScanResult(
         @Path("id") id: Int,
         @Body request: ReviewRequest,
     ): GenericResponse
 
-    @POST("cohrm/scanner/results/{id}/convert")
+    @POST("scanner/results/{id}/convert")
     suspend fun convertScanResult(
         @Path("id") id: Int,
         @Body request: ConvertRequest,
     ): GenericResponse
 
     // Notification preferences
-    @GET("cohrm/notification-preferences")
+    @GET("notification-preferences")
     suspend fun getNotificationPreferences(): NotificationPrefsResponse
 
-    @PUT("cohrm/notification-preferences")
+    @PUT("notification-preferences")
     suspend fun updateNotificationPreferences(@Body prefs: NotificationPrefsUpdate): GenericResponse
 
     // Notifications mark read
-    @PUT("cohrm/notifications/{id}/read")
+    @PUT("notifications/{id}/read")
     suspend fun markNotificationRead(@Path("id") id: Int): GenericResponse
 
-    @PUT("cohrm/notifications/read-all")
+    @PUT("notifications/read-all")
     suspend fun markAllNotificationsRead(): GenericResponse
+
+    // SMS Manager
+    @GET("sms-codes")
+    suspend fun getSmsCodes(): SmsCodesResponse
+
+    @POST("sms-codes")
+    suspend fun createSmsCode(@Body request: SmsCodeCreateRequest): GenericResponse
+
+    @DELETE("sms-codes/{id}")
+    suspend fun deleteSmsCode(@Path("id") id: Int): GenericResponse
+
+    @GET("sms-logs")
+    suspend fun getSmsLogs(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+    ): SmsLogsResponse
+
+    @POST("decode-sms")
+    suspend fun decodeSms(@Body request: SmsDecodeRequest): SmsDecodeResponse
+
+    // Export
+    @GET("export")
+    @Streaming
+    suspend fun exportData(
+        @Query("format") format: String,
+        @Query("status") status: String? = null,
+    ): ResponseBody
 }

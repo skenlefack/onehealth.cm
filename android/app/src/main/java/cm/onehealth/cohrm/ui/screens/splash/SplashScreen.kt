@@ -252,11 +252,12 @@ fun SplashScreen(
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "COHRM",
-                fontSize = 44.sp,
+                text = "One Health Cameroon",
+                fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
-                letterSpacing = 6.sp,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(

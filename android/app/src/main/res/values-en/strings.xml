@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">COHRM</string>
+    <string name="app_name">One Health Cameroon</string>
 
     <!-- Login -->
     <string name="login_title">Login</string>
@@ -21,8 +21,8 @@
     <string name="nav_settings">Settings</string>
 
     <!-- Home / Dashboard -->
-    <string name="home_title">COHRM</string>
-    <string name="home_subtitle">Cameroon One Health Rumor Management System</string>
+    <string name="home_title">One Health</string>
+    <string name="home_subtitle">Cameroon One Health Platform</string>
     <string name="home_new_report">New Report</string>
     <string name="home_sms_report">SMS Report</string>
     <string name="home_drafts">Drafts</string>
@@ -318,7 +318,7 @@
     <string name="settings_device_id">Device ID</string>
     <string name="settings_version">Version</string>
     <string name="settings_about">About</string>
-    <string name="settings_about_text">COHRM - Cameroon One Health Rumor Management System</string>
+    <string name="settings_about_text">One Health - Cameroon One Health Platform</string>
     <string name="settings_server_url">Server URL</string>
     <string name="settings_logout">Logout</string>
 
@@ -359,6 +359,9 @@
 
     <!-- Profile -->
     <string name="profile_title">My Profile</string>
+    <string name="profile_personal_info">Personal Information</string>
+    <string name="profile_logout_title">Logout</string>
+    <string name="profile_logout_confirm">Are you sure you want to logout?</string>
     <string name="profile_name">Full Name</string>
     <string name="profile_email">Email</string>
     <string name="profile_phone">Phone</string>
@@ -482,4 +485,229 @@
     <string name="region_OU">West</string>
     <string name="region_SU">South</string>
     <string name="region_SW">South-West</string>
+
+    <!-- Platform Home -->
+    <string name="platform_title">One Health Cameroon</string>
+    <string name="platform_subtitle">Cameroon One Health Platform</string>
+    <string name="platform_modules">Modules</string>
+    <string name="platform_latest_posts">Latest Publications</string>
+    <string name="platform_pillar_human">Human</string>
+    <string name="platform_pillar_animal">Animal</string>
+    <string name="platform_pillar_environment">Environment</string>
+    <string name="platform_pillar_food">Food Safety</string>
+    <string name="platform_cohrm_title">COHRM</string>
+    <string name="platform_cohrm_subtitle">One Health Rumor Management</string>
+    <string name="platform_elearning_title">E-Learning</string>
+    <string name="platform_elearning_subtitle">Online Training</string>
+    <string name="platform_dussc_title">DUSS-C</string>
+    <string name="platform_dussc_subtitle">One Health Challenge</string>
+    <string name="platform_ohwr_title">Resource Mapping</string>
+    <string name="platform_ohwr_subtitle">Resource Mapping</string>
+    <string name="platform_rumors">rumors</string>
+    <string name="platform_today">today</string>
+    <string name="platform_courses">courses</string>
+    <string name="platform_quiz">quiz</string>
+    <string name="platform_experts">experts</string>
+    <string name="platform_organizations">orgs</string>
+
+    <!-- DUSS-C -->
+    <string name="dussc_title">DUSS-C</string>
+    <string name="dussc_full_title">One Health Challenge - Cameroon</string>
+    <string name="dussc_description">Test your One Health public health knowledge</string>
+    <string name="dussc_questions">questions</string>
+    <string name="dussc_minutes">minutes</string>
+    <string name="dussc_modules_covered">Topics Covered</string>
+    <string name="dussc_select_profile">Your Profile</string>
+    <string name="dussc_family_a">General Public</string>
+    <string name="dussc_family_b">Professionals</string>
+    <string name="dussc_family_c">Decision Makers</string>
+    <string name="dussc_family_d">Students</string>
+    <string name="dussc_start_quiz">Start Challenge</string>
+    <string name="dussc_quiz_title">DUSS-C Quiz</string>
+    <string name="dussc_bloc_pretest">Pre-test</string>
+    <string name="dussc_bloc_common">Common Core</string>
+    <string name="dussc_bloc_profile">Profile</string>
+    <string name="dussc_bloc_posttest">Post-test</string>
+    <string name="dussc_validate_answer">Validate</string>
+    <string name="dussc_correct">Correct!</string>
+    <string name="dussc_incorrect">Incorrect</string>
+    <string name="dussc_next_question">Next Question</string>
+    <string name="dussc_finish">Finish</string>
+    <string name="dussc_submitting">Submitting…</string>
+    <string name="dussc_results_title">Results</string>
+    <string name="dussc_score">Overall Score</string>
+    <string name="dussc_correct_answers">correct answers</string>
+    <string name="dussc_comparison">Pre/Post Comparison</string>
+    <string name="dussc_pretest">Pre-test</string>
+    <string name="dussc_posttest">Post-test</string>
+    <string name="dussc_gain">Progress</string>
+    <string name="dussc_points">points</string>
+    <string name="dussc_result_excellent">Excellent! You master One Health concepts. Keep sharing your knowledge.</string>
+    <string name="dussc_result_good">Good work! You have a solid foundation. Keep deepening your knowledge.</string>
+    <string name="dussc_result_retry">Keep learning! Retake the challenge to improve your score.</string>
+    <string name="dussc_retry">Retry</string>
+    <string name="dussc_back_home">Back</string>
+    <string name="dussc_consent_title">Consent</string>
+    <string name="dussc_consent_accept">I accept the terms</string>
+    <string name="dussc_demographics_title">Demographic Information</string>
+    <string name="dussc_demographics_skip">Skip</string>
+    <string name="dussc_demographics_submit">Continue</string>
+    <string name="dussc_region">Region</string>
+    <string name="dussc_milieu">Area</string>
+    <string name="dussc_urban">Urban</string>
+    <string name="dussc_rural">Rural</string>
+    <string name="dussc_age_range">Age range</string>
+    <string name="dussc_sex">Sex</string>
+    <string name="dussc_male">Male</string>
+    <string name="dussc_female">Female</string>
+    <string name="dussc_other">Other</string>
+    <string name="dussc_share">Share</string>
+    <string name="dussc_share_results">Share my results</string>
+    <string name="dussc_misconception">Misconception</string>
+    <string name="dussc_lessons_title">Lessons to remember</string>
+    <string name="dussc_wrong_answers">incorrect answers</string>
+    <string name="dussc_see_all">See all</string>
+
+    <!-- Rumors Map -->
+    <string name="rumors_map_title">Rumors Map</string>
+    <string name="rumors_map_all">All</string>
+    <string name="rumors_map_pending">Pending</string>
+    <string name="rumors_map_investigating">Investigating</string>
+    <string name="rumors_map_confirmed">Confirmed</string>
+    <string name="rumors_map_tap_detail">Tap to view details</string>
+
+    <!-- OHWR -->
+    <string name="ohwr_title">Resource Mapping</string>
+    <string name="ohwr_experts_label">Experts</string>
+    <string name="ohwr_organizations_label">Organizations</string>
+    <string name="ohwr_materials_label">Equipment</string>
+    <string name="ohwr_documents_label">Documents</string>
+    <string name="ohwr_view_map">View Map</string>
+    <string name="ohwr_resources_mapped">resources mapped</string>
+    <string name="ohwr_explore_resources">Explore Resources</string>
+    <string name="ohwr_recent_docs">Recent Documents</string>
+    <string name="ohwr_expert_detail">Expert Detail</string>
+    <string name="ohwr_experience">Experience</string>
+    <string name="ohwr_years">years</string>
+    <string name="ohwr_biography">Biography</string>
+    <string name="ohwr_expertise">Expertise</string>
+    <string name="ohwr_map_title">Resource Map</string>
+    <string name="ohwr_nav_home">Home</string>
+    <string name="ohwr_nav_experts">Experts</string>
+    <string name="ohwr_nav_map">Map</string>
+    <string name="ohwr_nav_documents">Docs</string>
+    <string name="ohwr_trending">Trending searches</string>
+    <string name="ohwr_results_found">results found</string>
+    <string name="ohwr_search">Search…</string>
+    <string name="ohwr_submit_resource">Submit a resource</string>
+    <string name="ohwr_my_submissions">My submissions</string>
+    <string name="ohwr_submit_expert">Submit an expert</string>
+    <string name="ohwr_submit_org">Submit an organization</string>
+    <string name="ohwr_select_type">Resource type</string>
+    <string name="ohwr_first_name">First name</string>
+    <string name="ohwr_last_name">Last name</string>
+    <string name="ohwr_title_field">Title/Position</string>
+    <string name="ohwr_email">Email</string>
+    <string name="ohwr_phone">Phone</string>
+    <string name="ohwr_city">City</string>
+    <string name="ohwr_org_name">Organization name</string>
+    <string name="ohwr_acronym">Acronym</string>
+    <string name="ohwr_org_type">Organization type</string>
+    <string name="ohwr_submit_success">Submission sent successfully</string>
+    <string name="ohwr_no_submissions">No submissions</string>
+    <string name="ohwr_status_pending">Pending</string>
+    <string name="ohwr_status_approved">Approved</string>
+    <string name="ohwr_status_rejected">Rejected</string>
+
+    <!-- SMS Manager -->
+    <string name="sms_manager_title">SMS Management</string>
+    <string name="sms_decoder_tab">Decoder</string>
+    <string name="sms_codes_tab">Codes</string>
+    <string name="sms_logs_tab">Logs</string>
+    <string name="sms_decode_button">Decode</string>
+    <string name="sms_enter_message">Enter the SMS message…</string>
+    <string name="sms_decoded_result">Decoded result</string>
+    <string name="sms_add_code">Add a code</string>
+    <string name="sms_no_codes">No SMS codes</string>
+    <string name="sms_no_logs">No SMS logs</string>
+
+    <!-- Export -->
+    <string name="export_title">Export</string>
+    <string name="export_format">Export format</string>
+
+    <!-- Actors -->
+    <string name="actors_title">Actors</string>
+    <string name="actors_level">Level %1$d</string>
+    <string name="actors_no_results">No actors found</string>
+
+    <!-- Kanban -->
+    <string name="kanban_view">Kanban view</string>
+    <string name="list_view">List view</string>
+
+    <!-- E-Learning -->
+    <string name="el_title">E-Learning</string>
+    <string name="el_enrolled">Enrolled</string>
+    <string name="el_completed">Completed</string>
+    <string name="el_certificates">Certificates</string>
+    <string name="el_all_courses">All Courses</string>
+    <string name="el_my_learning">My Learning</string>
+    <string name="el_paths">Learning Paths</string>
+    <string name="el_featured_courses">Featured Courses</string>
+    <string name="el_continue_learning">Continue Learning</string>
+    <string name="el_categories">Categories</string>
+    <string name="el_level_beginner">Beginner</string>
+    <string name="el_level_intermediate">Intermediate</string>
+    <string name="el_level_advanced">Advanced</string>
+    <string name="el_instructor">Instructor</string>
+    <string name="el_your_progress">Your Progress</string>
+    <string name="el_enroll">Enroll</string>
+    <string name="el_description">Description</string>
+    <string name="el_objectives">Learning Objectives</string>
+    <string name="el_curriculum">Curriculum</string>
+    <string name="el_mark_complete">Complete</string>
+    <string name="el_next_lesson">Next Lesson</string>
+    <string name="el_back_to_course">Back to Course</string>
+    <string name="el_lesson_complete">Lesson Complete!</string>
+    <string name="el_lesson_complete_msg">Great job! You completed this lesson.</string>
+    <string name="el_course_complete">Course Complete!</string>
+    <string name="el_quiz">Quiz</string>
+    <string name="el_type_answer">Type your answer…</string>
+    <string name="el_multiple_answers">Multiple answers allowed</string>
+    <string name="el_true">True</string>
+    <string name="el_false">False</string>
+    <string name="el_quiz_passed">Quiz Passed!</string>
+    <string name="el_quiz_failed">Quiz Not Passed</string>
+    <string name="el_total_q">Questions</string>
+    <string name="el_time">Time</string>
+    <string name="el_in_progress">In Progress</string>
+    <string name="el_no_enrollments">No enrollments</string>
+    <string name="el_certificates_earned">certificates earned</string>
+    <string name="el_no_certificates">Complete courses to earn certificates.</string>
+    <string name="el_path_courses">Path Courses</string>
+    <string name="el_nav_home">Home</string>
+    <string name="el_nav_courses">Courses</string>
+    <string name="el_nav_my_learning">Learning</string>
+    <string name="el_nav_certificates">Certificates</string>
+    <string name="el_prerequisites">Prerequisites</string>
+    <string name="el_unenroll">Unenroll</string>
+    <string name="el_lessons_done">lessons completed</string>
+    <string name="el_essay_placeholder">Write your answer…</string>
+    <string name="el_match_instruction">Match items from left with items on the right</string>
+    <string name="el_sort">Sort by</string>
+    <string name="el_sort_recent">Recent</string>
+    <string name="el_sort_popular">Popular</string>
+    <string name="el_sort_duration">Duration</string>
+    <string name="el_no_certificates_yet">No certificates earned yet</string>
+    <string name="el_cert_number">No. %1$s</string>
+    <string name="el_issued_on">Issued on</string>
+    <string name="el_verify_code">Verification code</string>
+    <string name="el_review_answers">Review answers</string>
+    <string name="el_your_answer">Your answer</string>
+    <string name="el_correct_answer">Correct answer</string>
+    <string name="el_verify_certificate">Verify a certificate</string>
+    <string name="el_enter_code">Enter verification code</string>
+    <string name="el_verify_button">Verify</string>
+    <string name="el_cert_valid">Valid certificate</string>
+    <string name="el_cert_not_found">Certificate not found</string>
+    <string name="el_resume_at">Resume at %1$s</string>
 </resources>

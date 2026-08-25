@@ -2,15 +2,16 @@ package cm.onehealth.cohrm.ui.screens.rumors
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,14 +19,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,14 +68,12 @@ import cm.onehealth.cohrm.ui.theme.Accent
 import cm.onehealth.cohrm.ui.theme.Alert
 import cm.onehealth.cohrm.ui.theme.Danger
 import cm.onehealth.cohrm.ui.theme.Info
-import cm.onehealth.cohrm.ui.theme.Primary
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import cm.onehealth.cohrm.ui.theme.Info
 import cm.onehealth.cohrm.ui.theme.Muted
 import cm.onehealth.cohrm.ui.theme.Primary
 import cm.onehealth.cohrm.ui.theme.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,19 +118,33 @@ fun RumorsListScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = {
-                Text("${stringResource(R.string.rumors_title)} (${state.total})")
-            },
-            actions = {
-                androidx.compose.material3.IconButton(onClick = { showSearch = !showSearch }) {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                }
-                androidx.compose.material3.IconButton(onClick = { viewModel.clearFilters() }) {
-                    Icon(Icons.Default.FilterList, contentDescription = null)
-                }
-            },
-        )
+        // Action row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${state.total}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Muted,
+                modifier = Modifier.weight(1f).padding(start = 8.dp),
+            )
+            androidx.compose.material3.IconButton(onClick = { viewModel.toggleView() }) {
+                Icon(
+                    if (state.isKanbanView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.ViewColumn,
+                    contentDescription = if (state.isKanbanView) stringResource(R.string.list_view) else stringResource(R.string.kanban_view),
+                )
+            }
+            androidx.compose.material3.IconButton(onClick = { showSearch = !showSearch }) {
+                Icon(Icons.Default.Search, contentDescription = null)
+            }
+            androidx.compose.material3.IconButton(onClick = { viewModel.clearFilters() }) {
+                Icon(Icons.Default.FilterList, contentDescription = null)
+            }
+        }
 
         // Search bar
         if (showSearch) {
@@ -218,6 +234,8 @@ fun RumorsListScreen(
                     )
                 }
             }
+        } else if (state.isKanbanView) {
+            KanbanView(rumors = state.rumors, onRumorClick = onRumorClick)
         } else {
             val listState = rememberLazyListState()
             val shouldLoadMore by remember {
@@ -521,5 +539,143 @@ private fun formatDate(dateStr: String): String {
         "${dateStr.substring(8, 10)}/${dateStr.substring(5, 7)}/${dateStr.substring(0, 4)}"
     } catch (e: Exception) {
         dateStr
+    }
+}
+
+// --- Kanban View ---
+
+@Composable
+private fun KanbanView(
+    rumors: List<RumorDetail>,
+    onRumorClick: (Int) -> Unit,
+) {
+    val statuses = listOf("pending", "investigating", "confirmed", "false_alarm", "closed")
+    val statusLabels = mapOf(
+        "pending" to "En attente",
+        "investigating" to "Investigation",
+        "confirmed" to "Confirmee",
+        "false_alarm" to "Fausse alerte",
+        "closed" to "Cloturee",
+    )
+
+    LazyRow(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(statuses) { status ->
+            val columnRumors = rumors.filter { it.status == status }
+            KanbanColumn(
+                title = statusLabels[status] ?: status,
+                count = columnRumors.size,
+                color = statusColor(status),
+                rumors = columnRumors,
+                onRumorClick = onRumorClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun KanbanColumn(
+    title: String,
+    count: Int,
+    color: Color,
+    rumors: List<RumorDetail>,
+    onRumorClick: (Int) -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .width(260.dp)
+            .fillMaxHeight(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.05f)),
+    ) {
+        Column {
+            // Column header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.2f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = "$count",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = color,
+                    )
+                }
+            }
+
+            // Column body
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(rumors, key = { it.id }) { rumor ->
+                    KanbanCard(rumor = rumor, onClick = { onRumorClick(rumor.id) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KanbanCard(rumor: RumorDetail, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(
+                text = rumor.title.ifEmpty { "Sans titre" },
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                if (rumor.code.isNotEmpty()) {
+                    Text(
+                        text = rumor.code,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Muted,
+                    )
+                }
+                Text(
+                    text = formatDate(rumor.createdAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Muted,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            PriorityChip(rumor.priority)
+        }
     }
 }

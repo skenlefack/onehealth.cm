@@ -8,10 +8,16 @@ import cm.onehealth.cohrm.data.repository.CohrmRepositoryImpl
 import cm.onehealth.cohrm.data.repository.ReportRepositoryImpl
 import cm.onehealth.cohrm.data.repository.ScanRepositoryImpl
 import cm.onehealth.cohrm.data.repository.SyncRepositoryImpl
+import cm.onehealth.cohrm.data.repository.dussc.DusscRepositoryImpl
+import cm.onehealth.cohrm.data.repository.elearning.ELearningRepositoryImpl
+import cm.onehealth.cohrm.data.repository.ohwr.OhwrRepositoryImpl
 import cm.onehealth.cohrm.domain.repository.CohrmRepository
 import cm.onehealth.cohrm.domain.repository.ReportRepository
 import cm.onehealth.cohrm.domain.repository.ScanRepository
 import cm.onehealth.cohrm.domain.repository.SyncRepository
+import cm.onehealth.cohrm.domain.repository.dussc.DusscRepository
+import cm.onehealth.cohrm.domain.repository.elearning.ELearningRepository
+import cm.onehealth.cohrm.domain.repository.ohwr.OhwrRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -41,6 +47,18 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindScanRepository(impl: ScanRepositoryImpl): ScanRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDusscRepository(impl: DusscRepositoryImpl): DusscRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindOhwrRepository(impl: OhwrRepositoryImpl): OhwrRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindELearningRepository(impl: ELearningRepositoryImpl): ELearningRepository
 
     companion object {
         @Provides
