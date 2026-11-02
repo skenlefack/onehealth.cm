@@ -385,6 +385,36 @@ export interface ELearningModule {
   is_locked?: boolean;
 }
 
+export type LessonBlockType =
+  | 'text' | 'video' | 'pdf' | 'powerpoint' | 'word' | 'excel'
+  | 'image' | 'audio' | 'embed' | 'files' | 'callout' | 'accordion'
+  | 'knowledge_check' | 'divider';
+
+/** Bloc de contenu d'une leçon multi-contenus (l'ordre du tableau = l'ordre pédagogique) */
+export interface LessonBlock {
+  id: string;
+  type: LessonBlockType;
+  title?: string;
+  data: {
+    html?: string;
+    url?: string;
+    name?: string;
+    provider?: string;
+    source?: string;
+    alt?: string;
+    caption?: string;
+    transcript?: string;
+    height?: number;
+    variant?: 'info' | 'tip' | 'warning' | 'important';
+    files?: { name: string; url: string; size?: number }[];
+    items?: { title: string; html: string }[];
+    question?: string;
+    options?: { text: string; is_correct: boolean }[];
+    explanation?: string;
+  };
+  settings?: { downloadable?: boolean };
+}
+
 export interface ELearningLesson {
   id: number;
   module_id: number;
@@ -392,6 +422,7 @@ export interface ELearningLesson {
   title_en?: string;
   content_fr?: string;
   content_en?: string;
+  content_blocks?: LessonBlock[];
   content_type: 'video' | 'text' | 'pdf' | 'mixed' | 'quiz' | 'powerpoint' | 'word' | 'excel' | 'interactive';
   video_url?: string;
   video_duration_seconds: number;
@@ -414,6 +445,12 @@ export interface ELearningLesson {
   is_locked?: boolean;
   progress_percent?: number;
   video_last_position?: number;
+  progress?: {
+    notes?: string | null;
+    bookmarked?: boolean | number;
+    completed_blocks?: string[];
+    video_last_position_seconds?: number;
+  } | null;
 }
 
 export interface ELearningLearningPath {

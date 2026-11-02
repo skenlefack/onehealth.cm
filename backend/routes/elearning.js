@@ -19,6 +19,28 @@ const { auth, authorize, optionalAuth } = require('../middleware/auth');
 const slugify = require('slugify');
 const { v4: uuidv4 } = require('uuid');
 const { generateCertificatePDF } = require('../services/certificateService');
+const { parseJson, normalizeBlocks, blocksToFallbackHtml } = require('../services/lessonBlocks');
+
+// Migration 023 appliquée automatiquement au démarrage si nécessaire (idempotent)
+(async () => {
+  const ensureColumn = async (table, column, definition) => {
+    const [[row]] = await db.query(
+      `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [table, column]
+    );
+    if (row.n === 0) {
+      await db.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      console.log(`✅ E-learning: colonne ${table}.${column} ajoutée`);
+    }
+  };
+  try {
+    await ensureColumn('lessons', 'content_blocks', 'JSON NULL AFTER content_en');
+    await ensureColumn('lesson_progress', 'completed_blocks', 'JSON NULL AFTER progress_percent');
+  } catch (err) {
+    console.error('E-learning schema check (023) failed:', err.message);
+  }
+})();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -452,6 +474,8 @@ router.get('/courses/:id/curriculum', optionalAuth, async (req, res) => {
         WHERE module_id = ? AND is_active = 1
         ORDER BY sort_order ASC
       `, [module.id]);
+      // MariaDB renvoie les colonnes JSON sous forme de texte
+      lessons.forEach(l => { l.content_blocks = parseJson(l.content_blocks, []); });
 
       // Get progress for each lesson if user is authenticated
       if (userId) {
@@ -888,17 +912,10 @@ router.get('/lessons/:id', optionalAuth, async (req, res) => {
 
     const lesson = lessons[0];
 
-    // Parse JSON fields
-    try {
-      lesson.attachments = lesson.attachments ? JSON.parse(lesson.attachments) : [];
-    } catch (e) {
-      lesson.attachments = [];
-    }
-    try {
-      lesson.resources = lesson.resources ? JSON.parse(lesson.resources) : [];
-    } catch (e) {
-      lesson.resources = [];
-    }
+    // Parse JSON fields (mysql2 peut déjà renvoyer un objet)
+    lesson.attachments = parseJson(lesson.attachments, []);
+    lesson.resources = parseJson(lesson.resources, []);
+    lesson.content_blocks = parseJson(lesson.content_blocks, []);
 
     // Vérifier que l'utilisateur est inscrit au cours (sauf si preview)
     if (!lesson.is_preview && req.user) {
@@ -923,6 +940,9 @@ router.get('/lessons/:id', optionalAuth, async (req, res) => {
       `, [req.user.id, id]);
 
       lesson.progress = progress.length > 0 ? progress[0] : null;
+      if (lesson.progress) {
+        lesson.progress.completed_blocks = parseJson(lesson.progress.completed_blocks, []);
+      }
     }
 
     // Leçons précédente et suivante
@@ -950,7 +970,7 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
   try {
     const {
       module_id, title_fr, title_en,
-      content_fr, content_en, summary_fr, summary_en,
+      content_en, summary_fr, summary_en,
       content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
       pdf_url, pptx_url, docx_url, xlsx_url, attachments, resources,
       duration_minutes, sort_order, is_preview, is_required, is_downloadable,
@@ -958,6 +978,13 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
       completion_type, min_video_watch_percent, min_time_spent_seconds,
       status
     } = req.body;
+    let { content_fr } = req.body;
+
+    // Leçon multi-contenus : blocs ordonnés + version HTML de secours
+    const blocks = normalizeBlocks(req.body.content_blocks);
+    if (content_type === 'mixed' && blocks.length > 0) {
+      content_fr = blocksToFallbackHtml(blocks);
+    }
 
     if (!module_id || !title_fr) {
       return res.status(400).json({ success: false, message: 'Le module et le titre sont requis' });
@@ -982,17 +1009,17 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
     const [result] = await db.query(`
       INSERT INTO lessons (
         module_id, title_fr, title_en,
-        content_fr, content_en, summary_fr, summary_en,
+        content_fr, content_en, content_blocks, summary_fr, summary_en,
         content_type, video_url, video_duration_seconds, video_provider, video_thumbnail,
         pdf_url, pptx_url, docx_url, xlsx_url, attachments, resources,
         duration_minutes, sort_order, is_preview, is_required, is_downloadable,
         has_quiz, quiz_id, quiz_position, quiz_weight,
         completion_type, min_video_watch_percent, min_time_spent_seconds,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       module_id, title_fr, title_en,
-      content_fr, content_en, summary_fr, summary_en,
+      content_fr, content_en, blocks.length ? JSON.stringify(blocks) : null, summary_fr, summary_en,
       content_type || 'text', video_url, video_duration_seconds || 0, video_provider || 'upload', video_thumbnail,
       pdf_url, pptx_url, docx_url, xlsx_url, JSON.stringify(attachments || []), JSON.stringify(resources || []),
       duration_minutes || 0, order, is_preview || false, is_required !== false, is_downloadable || false,
@@ -1013,6 +1040,99 @@ router.post('/lessons', auth, authorize('admin', 'editor'), async (req, res) => 
     res.status(201).json({ success: true, data: newLesson[0], message: 'Leçon créée' });
   } catch (error) {
     console.error('Create lesson error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/elearning/lessons/reorder - Réordonner les leçons (et/ou les déplacer de module)
+// body: { lessons: [{ id, sort_order, module_id? }] }
+router.put('/lessons/reorder', auth, authorize('admin', 'editor'), async (req, res) => {
+  const { lessons } = req.body;
+  if (!Array.isArray(lessons) || lessons.length === 0) {
+    return res.status(400).json({ success: false, message: 'Liste de leçons requise' });
+  }
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const touchedModules = new Set();
+    for (const item of lessons) {
+      const id = parseInt(item.id);
+      const order = parseInt(item.sort_order);
+      if (!id || Number.isNaN(order)) continue;
+      const [[row]] = await conn.query('SELECT module_id FROM lessons WHERE id = ?', [id]);
+      if (!row) continue;
+      touchedModules.add(row.module_id);
+      const targetModule = item.module_id ? parseInt(item.module_id) : row.module_id;
+      if (targetModule !== row.module_id) {
+        await conn.query('UPDATE lessons SET sort_order = ?, module_id = ? WHERE id = ?', [order, targetModule, id]);
+        touchedModules.add(targetModule);
+      } else {
+        await conn.query('UPDATE lessons SET sort_order = ? WHERE id = ?', [order, id]);
+      }
+    }
+    for (const moduleId of touchedModules) {
+      await conn.query(`
+        UPDATE course_modules SET lesson_count = (
+          SELECT COUNT(*) FROM lessons WHERE module_id = ? AND is_active = 1
+        ) WHERE id = ?
+      `, [moduleId, moduleId]);
+    }
+    await conn.commit();
+    res.json({ success: true, message: 'Ordre des leçons mis à jour' });
+  } catch (error) {
+    await conn.rollback();
+    console.error('Reorder lessons error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  } finally {
+    conn.release();
+  }
+});
+
+// POST /api/elearning/lessons/:id/duplicate - Dupliquer une leçon (placée juste après l'originale)
+router.post('/lessons/:id/duplicate', auth, authorize('admin', 'editor'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [[original]] = await db.query('SELECT * FROM lessons WHERE id = ? AND is_active = 1', [id]);
+    if (!original) {
+      return res.status(404).json({ success: false, message: 'Leçon non trouvée' });
+    }
+
+    // Décaler les leçons suivantes pour insérer la copie juste après
+    await db.query(
+      'UPDATE lessons SET sort_order = sort_order + 1 WHERE module_id = ? AND sort_order > ?',
+      [original.module_id, original.sort_order]
+    );
+
+    const copy = { ...original };
+    delete copy.id;
+    delete copy.created_at;
+    delete copy.updated_at;
+    copy.title_fr = `${original.title_fr} (copie)`;
+    if (original.title_en) copy.title_en = `${original.title_en} (copy)`;
+    copy.sort_order = original.sort_order + 1;
+    copy.status = 'draft';
+    for (const key of ['attachments', 'resources', 'content_blocks']) {
+      if (copy[key] !== null && copy[key] !== undefined && typeof copy[key] !== 'string') {
+        copy[key] = JSON.stringify(copy[key]);
+      }
+    }
+
+    const columns = Object.keys(copy);
+    const [result] = await db.query(
+      `INSERT INTO lessons (${columns.map(c => `\`${c}\``).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+      columns.map(c => copy[c])
+    );
+
+    await db.query(`
+      UPDATE course_modules SET lesson_count = (
+        SELECT COUNT(*) FROM lessons WHERE module_id = ? AND is_active = 1
+      ) WHERE id = ?
+    `, [original.module_id, original.module_id]);
+
+    const [[created]] = await db.query('SELECT * FROM lessons WHERE id = ?', [result.insertId]);
+    res.status(201).json({ success: true, data: created, message: 'Leçon dupliquée' });
+  } catch (error) {
+    console.error('Duplicate lesson error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -1039,8 +1159,23 @@ router.put('/lessons/:id', auth, authorize('admin', 'editor'), async (req, res) 
 
     const jsonFields = ['attachments', 'resources'];
 
+    // Blocs : validation + régénération de la version HTML de secours
+    let blocksValue;
+    if (updates.content_blocks !== undefined) {
+      const blocks = normalizeBlocks(updates.content_blocks);
+      blocksValue = blocks.length ? JSON.stringify(blocks) : null;
+      const type = updates.content_type || existing[0].content_type;
+      if (type === 'mixed' && blocks.length > 0) {
+        updates.content_fr = blocksToFallbackHtml(blocks);
+      }
+    }
+
     const setClauses = [];
     const params = [];
+    if (blocksValue !== undefined) {
+      setClauses.push('content_blocks = ?');
+      params.push(blocksValue);
+    }
 
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
@@ -1317,7 +1452,8 @@ router.post('/lessons/:id/progress', auth, async (req, res) => {
       progress_percent,
       video_watch_time_seconds,
       video_last_position_seconds,
-      time_spent_seconds
+      time_spent_seconds,
+      completed_blocks
     } = req.body;
 
     // Récupérer la leçon et vérifier l'inscription
@@ -1363,7 +1499,7 @@ router.post('/lessons/:id/progress', auth, async (req, res) => {
         UPDATE lesson_progress SET
           progress_percent = GREATEST(progress_percent, ?),
           video_watch_time_seconds = GREATEST(video_watch_time_seconds, ?),
-          video_last_position_seconds = ?,
+          video_last_position_seconds = COALESCE(?, video_last_position_seconds),
           time_spent_seconds = time_spent_seconds + ?,
           last_accessed_at = NOW(),
           access_count = access_count + 1,
@@ -1371,19 +1507,87 @@ router.post('/lessons/:id/progress', auth, async (req, res) => {
         WHERE user_id = ? AND lesson_id = ?
       `, [
         progress_percent || 0, video_watch_time_seconds || 0,
-        video_last_position_seconds || 0, time_spent_seconds || 0,
+        video_last_position_seconds === undefined || video_last_position_seconds === null ? null : video_last_position_seconds,
+        time_spent_seconds || 0,
         req.user.id, id
       ]);
+    }
+
+    // Sections consultées : fusion avec celles déjà enregistrées
+    if (Array.isArray(completed_blocks)) {
+      const [[row]] = await db.query(
+        'SELECT completed_blocks FROM lesson_progress WHERE user_id = ? AND lesson_id = ?',
+        [req.user.id, id]
+      );
+      const merged = new Set([
+        ...parseJson(row && row.completed_blocks, []),
+        ...completed_blocks.filter(b => typeof b === 'string').map(b => b.slice(0, 40))
+      ]);
+      await db.query(
+        'UPDATE lesson_progress SET completed_blocks = ? WHERE user_id = ? AND lesson_id = ?',
+        [JSON.stringify([...merged].slice(0, 200)), req.user.id, id]
+      );
     }
 
     // Mettre à jour l'inscription
     await db.query('UPDATE enrollments SET last_accessed_at = NOW() WHERE id = ?', [enrollment[0].id]);
 
     const [progress] = await db.query('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?', [req.user.id, id]);
+    if (progress[0]) progress[0].completed_blocks = parseJson(progress[0].completed_blocks, []);
 
     res.json({ success: true, data: progress[0] });
   } catch (error) {
     console.error('Update progress error:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/elearning/lessons/:id/notes - Notes personnelles et favori de l'apprenant
+router.put('/lessons/:id/notes', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes, bookmarked } = req.body;
+
+    const [[lesson]] = await db.query(`
+      SELECT l.id, m.course_id FROM lessons l
+      JOIN course_modules m ON l.module_id = m.id
+      WHERE l.id = ?
+    `, [id]);
+    if (!lesson) {
+      return res.status(404).json({ success: false, message: 'Leçon non trouvée' });
+    }
+
+    const [[enrollment]] = await db.query(`
+      SELECT id FROM enrollments
+      WHERE user_id = ? AND enrollable_type = 'course' AND enrollable_id = ?
+    `, [req.user.id, lesson.course_id]);
+    if (!enrollment) {
+      return res.status(403).json({ success: false, message: 'Non inscrit à ce cours' });
+    }
+
+    const notesValue = typeof notes === 'string' ? notes.slice(0, 20000) : null;
+    const [[existing]] = await db.query(
+      'SELECT id FROM lesson_progress WHERE user_id = ? AND lesson_id = ?', [req.user.id, id]
+    );
+    if (!existing) {
+      await db.query(`
+        INSERT INTO lesson_progress (user_id, lesson_id, enrollment_id, status, notes, bookmarked, first_accessed_at, last_accessed_at)
+        VALUES (?, ?, ?, 'in_progress', ?, ?, NOW(), NOW())
+      `, [req.user.id, id, enrollment.id, notesValue, bookmarked ? 1 : 0]);
+    } else {
+      const sets = [];
+      const params = [];
+      if (notes !== undefined) { sets.push('notes = ?'); params.push(notesValue); }
+      if (bookmarked !== undefined) { sets.push('bookmarked = ?'); params.push(bookmarked ? 1 : 0); }
+      if (sets.length) {
+        params.push(req.user.id, id);
+        await db.query(`UPDATE lesson_progress SET ${sets.join(', ')} WHERE user_id = ? AND lesson_id = ?`, params);
+      }
+    }
+
+    res.json({ success: true, message: 'Notes enregistrées' });
+  } catch (error) {
+    console.error('Save lesson notes error:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

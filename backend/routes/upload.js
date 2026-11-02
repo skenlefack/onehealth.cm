@@ -548,6 +548,117 @@ router.post('/elearning/thumbnail', auth, uploadImage.single('file'), async (req
   }
 });
 
+// ============================================
+// E-LEARNING : RESSOURCES DES BLOCS DE LEÇON (image, audio, fichiers)
+// ============================================
+
+const makeElearningStorage = (subdir) => multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads', 'elearning', subdir);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_').slice(-120);
+    cb(null, `${uuidv4()}-${safeName}`);
+  }
+});
+
+const mimeFilter = (allowed, message) => (req, file, cb) => {
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error(message), false);
+};
+
+const AUDIO_TYPES = [
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg',
+  'audio/webm', 'audio/mp4', 'audio/x-m4a', 'audio/aac'
+];
+
+// Pas de HTML/SVG/JS : ces fichiers seraient servis depuis notre domaine.
+const RESOURCE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.presentation',
+  'application/zip', 'application/x-zip-compressed',
+  'text/plain', 'text/csv',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  ...AUDIO_TYPES,
+  'video/mp4', 'video/webm'
+];
+
+const uploadLessonImage = multer({
+  storage: makeElearningStorage('images'),
+  fileFilter: mimeFilter(['image/jpeg', 'image/png', 'image/gif', 'image/webp'], 'Seules les images (JPEG, PNG, GIF, WebP) sont autorisées'),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+const uploadLessonAudio = multer({
+  storage: makeElearningStorage('audio'),
+  fileFilter: mimeFilter(AUDIO_TYPES, 'Seuls les fichiers audio (MP3, WAV, OGG, M4A) sont autorisés'),
+  limits: { fileSize: 100 * 1024 * 1024 }
+});
+
+const uploadLessonResource = multer({
+  storage: makeElearningStorage('attachments'),
+  fileFilter: mimeFilter(RESOURCE_TYPES, 'Type de fichier non autorisé'),
+  limits: { fileSize: 100 * 1024 * 1024 }
+});
+
+const fileResponse = (req, subdir, type) => ({
+  success: true,
+  data: {
+    url: `/uploads/elearning/${subdir}/${req.file.filename}`,
+    filename: req.file.filename,
+    originalName: req.file.originalname,
+    size: req.file.size,
+    mimeType: req.file.mimetype,
+    type
+  }
+});
+
+// Image de leçon : redimensionnée (max 1600px) et convertie en WebP
+router.post('/elearning/image', auth, uploadLessonImage.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Aucun fichier uploadé' });
+    const ext = path.extname(req.file.filename).toLowerCase();
+    if (['.jpg', '.jpeg', '.png'].includes(ext)) {
+      const webpName = req.file.filename.slice(0, -ext.length) + '.webp';
+      const webpPath = path.join(path.dirname(req.file.path), webpName);
+      try {
+        await sharp(req.file.path)
+          .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 85 })
+          .toFile(webpPath);
+        fs.unlinkSync(req.file.path);
+        req.file.filename = webpName;
+      } catch (sharpError) {
+        console.error('Lesson image processing error:', sharpError);
+      }
+    }
+    res.json(fileResponse(req, 'images', 'image'));
+  } catch (error) {
+    console.error('Lesson image upload error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de l\'upload de l\'image' });
+  }
+});
+
+router.post('/elearning/audio', auth, uploadLessonAudio.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'Aucun fichier uploadé' });
+  res.json(fileResponse(req, 'audio', 'audio'));
+});
+
+router.post('/elearning/resource', auth, uploadLessonResource.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'Aucun fichier uploadé' });
+  res.json(fileResponse(req, 'attachments', 'file'));
+});
+
 // Allowed upload subdirectories (whitelist)
 const ALLOWED_UPLOAD_TYPES = [
   'experts', 'organizations', 'materials', 'documents', 'thumbnails', 'general',

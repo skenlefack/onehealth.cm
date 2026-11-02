@@ -4,6 +4,7 @@ import CohrmModule from './modules/cohrm';
 import DusscModule from './modules/dussc';
 import NewsletterPage from './NewsletterPage';
 import AnalyticsModule from './modules/analytics';
+import LessonBlocksEditor, { legacyLessonToBlocks, estimateBlocksMinutes } from './modules/elearning/LessonBlocksEditor';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline, Polygon, Autocomplete } from '@react-google-maps/api';
 import {
@@ -14641,6 +14642,4158 @@ const OHWRMappingPage = ({ isDark, token }) => {
 };
 
 // ============== OH E-LEARNING ==============
+// Formulaire de leçon défini hors de OHELearningPage : s'il était recréé à chaque rendu
+// de la page, React le réinitialiserait (perte des modifications non enregistrées).
+const LessonFormInline = ({
+  editingLesson, setShowLessonForm, handleSaveLesson, quizzes, styles, token, isDark,
+  detectVideoProvider, parseLessonBlocks
+}) => {
+  const [form, setForm] = useState({
+    content_blocks: parseLessonBlocks(editingLesson),
+    title_fr: editingLesson?.title_fr || '',
+    title_en: editingLesson?.title_en || '',
+    content_type: editingLesson?.content_type || 'text',
+    content_fr: editingLesson?.content_fr || '',
+    video_url: editingLesson?.video_url || '',
+    video_provider: editingLesson?.video_provider || 'upload',
+    video_source_type: editingLesson?.video_url && !editingLesson?.video_url.startsWith('/uploads') ? 'url' : 'upload',
+    pdf_url: editingLesson?.pdf_url || '',
+    pptx_url: editingLesson?.pptx_url || '',
+    pptx_source_type: editingLesson?.pptx_url && editingLesson?.pptx_url.startsWith('http') ? 'url' : 'upload',
+    docx_url: editingLesson?.docx_url || '',
+    xlsx_url: editingLesson?.xlsx_url || '',
+    duration_minutes: editingLesson?.duration_minutes || 0,
+    is_preview: editingLesson?.is_preview || false,
+    status: editingLesson?.status || 'draft',
+    has_quiz: editingLesson?.has_quiz || false,
+    quiz_id: editingLesson?.quiz_id || null,
+    quiz_position: editingLesson?.quiz_position || 'end',
+    quiz_weight: editingLesson?.quiz_weight || 1.00
+  });
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingType, setUploadingType] = useState(''); // 'video', 'pdf', 'powerpoint', 'word', 'excel'
+  const [uploadFileName, setUploadFileName] = useState('');
+
+  // Helper function for upload with progress
+  const uploadWithProgress = (url, file, onSuccess, type) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('file', file);
+
+      setUploading(true);
+      setUploadProgress(0);
+      setUploadingType(type);
+      setUploadFileName(file.name);
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(percent);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const res = JSON.parse(xhr.responseText);
+            if (res.success) {
+              onSuccess(res.data.url);
+            }
+          } catch (err) {
+            console.error('Parse error:', err);
+          }
+        }
+        setUploading(false);
+        setUploadProgress(0);
+        setUploadingType('');
+        setUploadFileName('');
+        resolve();
+      });
+
+      xhr.addEventListener('error', () => {
+        console.error(`${type} upload error`);
+        setUploading(false);
+        setUploadProgress(0);
+        setUploadingType('');
+        setUploadFileName('');
+        reject(new Error('Upload failed'));
+      });
+
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.send(formData);
+    });
+  };
+
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadWithProgress(
+      '/api/upload/elearning/video',
+      file,
+      (url) => setForm(prev => ({ ...prev, video_url: url, video_provider: 'upload' })),
+      'video'
+    );
+  };
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadWithProgress(
+      '/api/upload/elearning/pdf',
+      file,
+      (url) => setForm(prev => ({ ...prev, pdf_url: url })),
+      'pdf'
+    );
+  };
+
+  const handlePptxUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadWithProgress(
+      '/api/upload/elearning/powerpoint',
+      file,
+      (url) => setForm(prev => ({ ...prev, pptx_url: url })),
+      'powerpoint'
+    );
+  };
+
+  const handleWordUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadWithProgress(
+      '/api/upload/elearning/word',
+      file,
+      (url) => setForm(prev => ({ ...prev, docx_url: url })),
+      'word'
+    );
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadWithProgress(
+      '/api/upload/elearning/excel',
+      file,
+      (url) => setForm(prev => ({ ...prev, xlsx_url: url })),
+      'excel'
+    );
+  };
+
+  const handleVideoUrlChange = (url) => {
+    const provider = detectVideoProvider(url);
+    setForm(prev => ({ ...prev, video_url: url, video_provider: provider }));
+  };
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header with title and Retour button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `${colors.success}15`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <FileText size={20} color={colors.success} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+              {editingLesson ? 'Modifier la Leçon' : 'Nouvelle Leçon'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Configurez le contenu de la leçon
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowLessonForm(false)}
+          style={{
+            ...styles.btnSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ArrowLeft size={16} />
+          Retour
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div>
+          <label style={styles.label}>Titre (Français) *</label>
+          <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+            style={styles.input} placeholder="Leçon 1: Introduction" />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Type de contenu</label>
+            <select value={form.content_type} onChange={e => {
+              const nextType = e.target.value;
+              setForm(prev => ({
+                ...prev,
+                content_type: nextType,
+                // Passage en multi-contenus : on reprend les ressources déjà saisies
+                content_blocks: nextType === 'mixed' && !(prev.content_blocks || []).length
+                  ? legacyLessonToBlocks(prev)
+                  : prev.content_blocks
+              }));
+            }} style={styles.select}>
+              <option value="mixed">Multi-contenus (blocs) — recommandé</option>
+              <option value="text">Texte</option>
+              <option value="video">Vidéo</option>
+              <option value="pdf">PDF</option>
+              <option value="powerpoint">PowerPoint</option>
+              <option value="word">Word</option>
+              <option value="excel">Excel</option>
+              <option value="interactive">Contenu Interactif</option>
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Durée (minutes)</label>
+            <input type="number" value={form.duration_minutes} onChange={e => setForm({ ...form, duration_minutes: parseInt(e.target.value) || 0 })}
+              style={styles.input} min="0" />
+          </div>
+          <div>
+            <label style={styles.label}>Poids quiz</label>
+            <input type="number" value={form.quiz_weight} onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
+              style={styles.input} min="0.1" max="10" step="0.1" />
+          </div>
+        </div>
+
+        {/* Video Upload/URL */}
+        {form.content_type === 'video' && (
+          <div>
+            <label style={styles.label}>Vidéo</label>
+
+            {/* Toggle between upload and URL */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, video_source_type: 'upload', video_url: '', video_provider: 'upload' })}
+                style={{
+                  ...styles.btnSecondary,
+                  flex: 1,
+                  background: form.video_source_type === 'upload' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                  color: form.video_source_type === 'upload' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                  border: 'none'
+                }}
+              >
+                <Upload size={16} style={{ marginRight: '8px' }} />
+                Uploader un fichier
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, video_source_type: 'url', video_url: '', video_provider: 'other' })}
+                style={{
+                  ...styles.btnSecondary,
+                  flex: 1,
+                  background: form.video_source_type === 'url' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                  color: form.video_source_type === 'url' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                  border: 'none'
+                }}
+              >
+                <Link size={16} style={{ marginRight: '8px' }} />
+                URL externe
+              </button>
+            </div>
+
+            {/* Upload mode */}
+            {form.video_source_type === 'upload' && (
+              <>
+                {form.video_url ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
+                    <Play size={20} color={colors.success} />
+                    <span style={{ flex: 1, fontSize: '13px' }}>{form.video_url}</span>
+                    <button onClick={() => setForm({ ...form, video_url: '', video_provider: 'upload' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : uploading && uploadingType === 'video' ? (
+                  <div style={{
+                    padding: '24px', borderRadius: '10px', border: `2px solid ${colors.primary}`,
+                    background: isDark ? '#1e293b' : '#f0f9ff'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <Loader size={24} color={colors.primary} style={{ animation: 'spin 1s linear infinite' }} />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                          Upload en cours...
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                          {uploadFileName}
+                        </p>
+                      </div>
+                      <span style={{ fontSize: '16px', fontWeight: '600', color: colors.primary }}>{uploadProgress}%</span>
+                    </div>
+                    <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${uploadProgress}%`,
+                        background: `linear-gradient(90deg, ${colors.primary}, ${colors.success})`,
+                        borderRadius: '4px',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                    textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                    opacity: uploading ? 0.5 : 1
+                  }} onClick={() => !uploading && document.getElementById('lesson-video-input').click()}>
+                    <Play size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                    <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Cliquer pour uploader une vidéo (max 500MB)
+                    </p>
+                  </div>
+                )}
+                <input type="file" id="lesson-video-input" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} disabled={uploading} />
+              </>
+            )}
+
+            {/* URL mode */}
+            {form.video_source_type === 'url' && (
+              <div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="url"
+                    value={form.video_url}
+                    onChange={e => handleVideoUrlChange(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
+                    style={{
+                      ...styles.input,
+                      paddingLeft: form.video_provider && form.video_provider !== 'other' ? '40px' : '12px'
+                    }}
+                  />
+                  {form.video_provider === 'youtube' && (
+                    <div style={{
+                      position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                      width: '20px', height: '20px', borderRadius: '4px', background: '#FF0000',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <Play size={12} color="#fff" fill="#fff" />
+                    </div>
+                  )}
+                  {form.video_provider === 'vimeo' && (
+                    <div style={{
+                      position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                      width: '20px', height: '20px', borderRadius: '4px', background: '#1ab7ea',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <Play size={12} color="#fff" fill="#fff" />
+                    </div>
+                  )}
+                </div>
+                {form.video_url && (
+                  <p style={{ margin: '8px 0 0', fontSize: '12px', color: form.video_provider === 'youtube' ? '#FF0000' : form.video_provider === 'vimeo' ? '#1ab7ea' : colors.text.muted }}>
+                    {form.video_provider === 'youtube' ? 'YouTube détecté' :
+                     form.video_provider === 'vimeo' ? 'Vimeo détecté' :
+                     'Autre provider vidéo'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PDF Upload */}
+        {form.content_type === 'pdf' && (
+          <div>
+            <label style={styles.label}>Document PDF</label>
+            {form.pdf_url ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fef3c7', borderRadius: '10px' }}>
+                <FileText size={20} color={colors.warning} />
+                <span style={{ flex: 1, fontSize: '13px' }}>{form.pdf_url}</span>
+                <button onClick={() => setForm({ ...form, pdf_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : uploading && uploadingType === 'pdf' ? (
+              <div style={{
+                padding: '24px', borderRadius: '10px', border: `2px solid ${colors.warning}`,
+                background: isDark ? '#1e293b' : '#fffbeb'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <Loader size={24} color={colors.warning} style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                      Upload en cours...
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {uploadFileName}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: '600', color: colors.warning }}>{uploadProgress}%</span>
+                </div>
+                <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${uploadProgress}%`,
+                    background: colors.warning,
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.5 : 1
+              }} onClick={() => !uploading && document.getElementById('lesson-pdf-input').click()}>
+                <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Cliquer pour uploader un PDF (max 50MB)
+                </p>
+              </div>
+            )}
+            <input type="file" id="lesson-pdf-input" accept="application/pdf" onChange={handlePdfUpload} style={{ display: 'none' }} disabled={uploading} />
+          </div>
+        )}
+
+        {/* PowerPoint Upload/URL */}
+        {form.content_type === 'powerpoint' && (
+          <div>
+            <label style={styles.label}>Présentation PowerPoint</label>
+
+            {/* Toggle between upload and URL */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, pptx_source_type: 'upload', pptx_url: '' })}
+                style={{
+                  ...styles.btnSecondary,
+                  flex: 1,
+                  background: form.pptx_source_type === 'upload' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                  color: form.pptx_source_type === 'upload' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                  border: 'none'
+                }}
+              >
+                <Upload size={16} style={{ marginRight: '8px' }} />
+                Uploader un fichier
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, pptx_source_type: 'url', pptx_url: '' })}
+                style={{
+                  ...styles.btnSecondary,
+                  flex: 1,
+                  background: form.pptx_source_type === 'url' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
+                  color: form.pptx_source_type === 'url' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
+                  border: 'none'
+                }}
+              >
+                <Link size={16} style={{ marginRight: '8px' }} />
+                URL externe
+              </button>
+            </div>
+
+            {/* Upload mode */}
+            {form.pptx_source_type === 'upload' ? (
+              <>
+                {form.pptx_url ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fff7ed', borderRadius: '10px' }}>
+                    <FileText size={20} color="#ea580c" />
+                    <span style={{ flex: 1, fontSize: '13px' }}>{form.pptx_url}</span>
+                    <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : uploading && uploadingType === 'powerpoint' ? (
+                  <div style={{
+                    padding: '24px', borderRadius: '10px', border: `2px solid #ea580c`,
+                    background: isDark ? '#1e293b' : '#fff7ed'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <Loader size={24} color="#ea580c" style={{ animation: 'spin 1s linear infinite' }} />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                          Upload en cours...
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                          {uploadFileName}
+                        </p>
+                      </div>
+                      <span style={{ fontSize: '16px', fontWeight: '600', color: '#ea580c' }}>{uploadProgress}%</span>
+                    </div>
+                    <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${uploadProgress}%`,
+                        background: 'linear-gradient(90deg, #ea580c, #f97316)',
+                        borderRadius: '4px',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                    textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                    opacity: uploading ? 0.5 : 1
+                  }} onClick={() => !uploading && document.getElementById('lesson-pptx-input').click()}>
+                    <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                    <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Cliquer pour uploader un PowerPoint (max 100MB)
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
+                      Formats acceptés : .ppt, .pptx
+                    </p>
+                  </div>
+                )}
+                <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} disabled={uploading} />
+              </>
+            ) : (
+              <input
+                type="url"
+                value={form.pptx_url}
+                onChange={e => setForm({ ...form, pptx_url: e.target.value })}
+                placeholder="https://example.com/presentation.pptx"
+                style={styles.input}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Word Upload */}
+        {form.content_type === 'word' && (
+          <div>
+            <label style={styles.label}>Document Word (.docx)</label>
+            {form.docx_url ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#eff6ff', borderRadius: '10px' }}>
+                <FileText size={20} color="#2563eb" />
+                <span style={{ flex: 1, fontSize: '13px' }}>{form.docx_url}</span>
+                <button onClick={() => setForm({ ...form, docx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : uploading && uploadingType === 'word' ? (
+              <div style={{
+                padding: '24px', borderRadius: '10px', border: `2px solid #2563eb`,
+                background: isDark ? '#1e293b' : '#eff6ff'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <Loader size={24} color="#2563eb" style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                      Upload en cours...
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {uploadFileName}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: '600', color: '#2563eb' }}>{uploadProgress}%</span>
+                </div>
+                <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${uploadProgress}%`,
+                    background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.5 : 1
+              }} onClick={() => !uploading && document.getElementById('lesson-word-input').click()}>
+                <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Cliquer pour uploader un document Word (max 50MB)
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
+                  Formats acceptés : .doc, .docx
+                </p>
+              </div>
+            )}
+            <input type="file" id="lesson-word-input" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleWordUpload} style={{ display: 'none' }} disabled={uploading} />
+          </div>
+        )}
+
+        {/* Excel Upload */}
+        {form.content_type === 'excel' && (
+          <div>
+            <label style={styles.label}>Fichier Excel (.xlsx)</label>
+            {form.xlsx_url ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
+                <FileText size={20} color="#16a34a" />
+                <span style={{ flex: 1, fontSize: '13px' }}>{form.xlsx_url}</span>
+                <button onClick={() => setForm({ ...form, xlsx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : uploading && uploadingType === 'excel' ? (
+              <div style={{
+                padding: '24px', borderRadius: '10px', border: `2px solid #16a34a`,
+                background: isDark ? '#1e293b' : '#f0fdf4'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <Loader size={24} color="#16a34a" style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
+                      Upload en cours...
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {uploadFileName}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: '600', color: '#16a34a' }}>{uploadProgress}%</span>
+                </div>
+                <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${uploadProgress}%`,
+                    background: 'linear-gradient(90deg, #16a34a, #22c55e)',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.5 : 1
+              }} onClick={() => !uploading && document.getElementById('lesson-excel-input').click()}>
+                <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Cliquer pour uploader un fichier Excel (max 50MB)
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
+                  Formats acceptés : .xls, .xlsx
+                </p>
+              </div>
+            )}
+            <input type="file" id="lesson-excel-input" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleExcelUpload} style={{ display: 'none' }} disabled={uploading} />
+          </div>
+        )}
+
+        {/* Multi-content lesson: ordered blocks */}
+        {form.content_type === 'mixed' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <label style={styles.label}>Contenu de la leçon</label>
+              {(form.content_blocks || []).length > 0 && estimateBlocksMinutes(form.content_blocks) !== form.duration_minutes && (
+                <button type="button" onClick={() => setForm(prev => ({ ...prev, duration_minutes: estimateBlocksMinutes(prev.content_blocks) }))}
+                  style={{ background: 'none', border: 'none', color: colors.primary, cursor: 'pointer', fontSize: '12px', fontWeight: 600, padding: 0 }}>
+                  Utiliser la durée estimée ({estimateBlocksMinutes(form.content_blocks)} min)
+                </button>
+              )}
+            </div>
+            <p style={{ margin: '0 0 12px', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Combinez autant de ressources que nécessaire (vidéo, PowerPoint, PDF, Word, Excel, texte, image, audio…) et ordonnez-les selon le déroulement pédagogique.
+            </p>
+            <LessonBlocksEditor
+              blocks={form.content_blocks || []}
+              onChange={(next) => setForm(prev => ({ ...prev, content_blocks: next }))}
+              token={token}
+              isDark={isDark}
+              colors={colors}
+              styles={styles}
+              RichTextEditor={RichTextEditor}
+            />
+          </div>
+        )}
+
+        {/* Text Content */}
+        {form.content_type === 'text' && (
+          <div>
+            <label style={styles.label}>Contenu texte</label>
+            <RichTextEditor value={form.content_fr} onChange={v => setForm(f => ({ ...f, content_fr: v }))} placeholder="Contenu de la leçon..." height={350} isDark={isDark} />
+          </div>
+        )}
+
+        {/* Interactive Content Builder */}
+        {form.content_type === 'interactive' && (() => {
+          const BLOCK_TYPES = [
+            { type: 'flashcards', icon: '\u{1F0CF}', label: 'Cartes M\u00e9moire' },
+            { type: 'matching', icon: '\u{1F517}', label: 'Associations' },
+            { type: 'mcq_cards', icon: '\u2753', label: 'QCM Interactif' },
+            { type: 'ordering', icon: '\u{1F4CA}', label: 'Classement' },
+            { type: 'fill_gaps', icon: '\u{1F4DD}', label: 'Texte \u00e0 Trous' }
+          ];
+          const getDefaultConfig = (type) => {
+            switch (type) {
+              case 'flashcards': return { cards: [{ front: '', back: '' }] };
+              case 'matching': return { pairs: [{ left: '', right: '' }] };
+              case 'mcq_cards': return { question: '', options: [{ text: '', is_correct: false, explanation: '' }] };
+              case 'ordering': return { items: [{ text: '' }], correct_order: [0] };
+              case 'fill_gaps': return { text: '', blanks: [] };
+              default: return {};
+            }
+          };
+
+          let blocks = [];
+          try {
+            const parsed = JSON.parse(form.content_fr);
+            if (parsed && Array.isArray(parsed.blocks)) blocks = parsed.blocks;
+          } catch (e) { /* not valid JSON yet */ }
+
+          const updateBlocks = (newBlocks) => {
+            setForm(prev => ({ ...prev, content_fr: JSON.stringify({ blocks: newBlocks }) }));
+          };
+          const addBlock = (type) => {
+            const newBlock = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type, title: '', config: getDefaultConfig(type) };
+            updateBlocks([...blocks, newBlock]);
+          };
+          const removeBlock = (idx) => { const nb = [...blocks]; nb.splice(idx, 1); updateBlocks(nb); };
+          const moveBlock = (idx, dir) => {
+            const nb = [...blocks]; const ti = idx + dir;
+            if (ti < 0 || ti >= nb.length) return;
+            [nb[idx], nb[ti]] = [nb[ti], nb[idx]]; updateBlocks(nb);
+          };
+          const updateBlock = (idx, updates) => {
+            const nb = [...blocks]; nb[idx] = { ...nb[idx], ...updates }; updateBlocks(nb);
+          };
+          const updateConfig = (idx, configUpdates) => {
+            const nb = [...blocks]; nb[idx] = { ...nb[idx], config: { ...nb[idx].config, ...configUpdates } }; updateBlocks(nb);
+          };
+
+          const blockTypeInfo = (type) => BLOCK_TYPES.find(b => b.type === type) || { icon: '?', label: type };
+
+          const ibStyles = {
+            blockCard: { background: isDark ? '#0f172a' : '#f8fafc', border: `2px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '16px', marginBottom: '12px' },
+            blockHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingBottom: '10px', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` },
+            miniBtn: { background: isDark ? '#334155' : '#e2e8f0', color: isDark ? '#e2e8f0' : '#475569', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' },
+            dangerBtn: { background: colors.error + '20', color: colors.error, border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' },
+            addItemBtn: { background: 'transparent', color: colors.primary, border: `1px dashed ${colors.primary}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '8px' },
+            pairRow: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' },
+            smallInput: { ...styles.input, padding: '8px 12px', fontSize: '13px' },
+            smallTextarea: { ...styles.input, padding: '8px 12px', fontSize: '13px', minHeight: '60px', resize: 'vertical' },
+            typeTag: (color) => ({ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: color + '20', color })
+          };
+
+          const renderBlockEditor = (block, idx) => {
+            const cfg = block.config;
+            switch (block.type) {
+              case 'flashcards':
+                return (
+                  <div>
+                    {cfg.cards.map((card, ci) => (
+                      <div key={ci} style={ibStyles.pairRow}>
+                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Recto (question)" value={card.front}
+                          onChange={e => { const nc = [...cfg.cards]; nc[ci] = { ...nc[ci], front: e.target.value }; updateConfig(idx, { cards: nc }); }} />
+                        <span style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '18px' }}>\u2192</span>
+                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Verso (r\u00e9ponse)" value={card.back}
+                          onChange={e => { const nc = [...cfg.cards]; nc[ci] = { ...nc[ci], back: e.target.value }; updateConfig(idx, { cards: nc }); }} />
+                        {cfg.cards.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const nc = cfg.cards.filter((_, i) => i !== ci); updateConfig(idx, { cards: nc }); }}>\u2715</button>}
+                      </div>
+                    ))}
+                    <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { cards: [...cfg.cards, { front: '', back: '' }] })}>+ Ajouter une carte</button>
+                  </div>
+                );
+              case 'matching':
+                return (
+                  <div>
+                    {cfg.pairs.map((pair, pi) => (
+                      <div key={pi} style={ibStyles.pairRow}>
+                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Terme" value={pair.left}
+                          onChange={e => { const np = [...cfg.pairs]; np[pi] = { ...np[pi], left: e.target.value }; updateConfig(idx, { pairs: np }); }} />
+                        <span style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '18px' }}>\u2194</span>
+                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="D\u00e9finition" value={pair.right}
+                          onChange={e => { const np = [...cfg.pairs]; np[pi] = { ...np[pi], right: e.target.value }; updateConfig(idx, { pairs: np }); }} />
+                        {cfg.pairs.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const np = cfg.pairs.filter((_, i) => i !== pi); updateConfig(idx, { pairs: np }); }}>\u2715</button>}
+                      </div>
+                    ))}
+                    <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { pairs: [...cfg.pairs, { left: '', right: '' }] })}>+ Ajouter une paire</button>
+                  </div>
+                );
+              case 'mcq_cards':
+                return (
+                  <div>
+                    <textarea style={{ ...ibStyles.smallTextarea, marginBottom: '10px' }} placeholder="Question..." value={cfg.question}
+                      onChange={e => updateConfig(idx, { question: e.target.value })} />
+                    <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>Options :</label>
+                    {cfg.options.map((opt, oi) => (
+                      <div key={oi} style={{ ...ibStyles.pairRow, flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', minWidth: '24px' }}>
+                          <input type="checkbox" checked={opt.is_correct}
+                            onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], is_correct: e.target.checked }; updateConfig(idx, { options: no }); }} />
+                        </label>
+                        <input style={{ ...ibStyles.smallInput, flex: 2 }} placeholder="Texte de l'option" value={opt.text}
+                          onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], text: e.target.value }; updateConfig(idx, { options: no }); }} />
+                        <input style={{ ...ibStyles.smallInput, flex: 2 }} placeholder="Explication (optionnel)" value={opt.explanation}
+                          onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], explanation: e.target.value }; updateConfig(idx, { options: no }); }} />
+                        {cfg.options.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const no = cfg.options.filter((_, i) => i !== oi); updateConfig(idx, { options: no }); }}>\u2715</button>}
+                      </div>
+                    ))}
+                    <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { options: [...cfg.options, { text: '', is_correct: false, explanation: '' }] })}>+ Ajouter une option</button>
+                  </div>
+                );
+              case 'ordering':
+                return (
+                  <div>
+                    <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 0 8px' }}>Ajoutez les \u00e9l\u00e9ments dans l'ordre correct. L'apprenant devra les remettre en ordre.</p>
+                    {cfg.items.map((item, ii) => (
+                      <div key={ii} style={ibStyles.pairRow}>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: isDark ? '#64748b' : '#94a3b8', minWidth: '20px' }}>{ii + 1}.</span>
+                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder={`\u00c9l\u00e9ment ${ii + 1}`} value={item.text}
+                          onChange={e => { const ni = [...cfg.items]; ni[ii] = { text: e.target.value }; const co = ni.map((_, i) => i); updateConfig(idx, { items: ni, correct_order: co }); }} />
+                        {cfg.items.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const ni = cfg.items.filter((_, i) => i !== ii); const co = ni.map((_, i) => i); updateConfig(idx, { items: ni, correct_order: co }); }}>\u2715</button>}
+                      </div>
+                    ))}
+                    <button style={ibStyles.addItemBtn} onClick={() => { const ni = [...cfg.items, { text: '' }]; updateConfig(idx, { items: ni, correct_order: ni.map((_, i) => i) }); }}>+ Ajouter un \u00e9l\u00e9ment</button>
+                  </div>
+                );
+              case 'fill_gaps': {
+                const detectedBlanks = (cfg.text || '').match(/\{blank\}/g) || [];
+                const blanksArr = cfg.blanks || [];
+                const syncedBlanks = detectedBlanks.map((_, bi) => blanksArr[bi] || { answer: '', hint: '' });
+                return (
+                  <div>
+                    <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 0 6px' }}>Utilisez <code style={{ background: isDark ? '#334155' : '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>{'{blank}'}</code> pour marquer les trous.</p>
+                    <textarea style={{ ...ibStyles.smallTextarea, marginBottom: '10px' }} placeholder="Le {blank} est un animal {blank}." value={cfg.text}
+                      onChange={e => {
+                        const newText = e.target.value;
+                        const newDetected = (newText.match(/\{blank\}/g) || []);
+                        const newBlanks = newDetected.map((_, bi) => (cfg.blanks || [])[bi] || { answer: '', hint: '' });
+                        updateConfig(idx, { text: newText, blanks: newBlanks });
+                      }} />
+                    {syncedBlanks.length > 0 && (
+                      <div>
+                        <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>R\u00e9ponses des trous :</label>
+                        {syncedBlanks.map((blank, bi) => (
+                          <div key={bi} style={ibStyles.pairRow}>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: colors.primary, minWidth: '60px' }}>Trou {bi + 1}</span>
+                            <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="R\u00e9ponse" value={blank.answer}
+                              onChange={e => { const nb = [...syncedBlanks]; nb[bi] = { ...nb[bi], answer: e.target.value }; updateConfig(idx, { blanks: nb }); }} />
+                            <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Indice (optionnel)" value={blank.hint}
+                              onChange={e => { const nb = [...syncedBlanks]; nb[bi] = { ...nb[bi], hint: e.target.value }; updateConfig(idx, { blanks: nb }); }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              default: return null;
+            }
+          };
+
+          return (
+            <div>
+              <label style={styles.label}>Contenu Interactif</label>
+
+              {/* Block list */}
+              {blocks.map((block, idx) => {
+                const info = blockTypeInfo(block.type);
+                return (
+                  <div key={block.id} style={ibStyles.blockCard}>
+                    <div style={ibStyles.blockHeader}>
+                      <span style={{ fontSize: '20px' }}>{info.icon}</span>
+                      <span style={ibStyles.typeTag(colors.primary)}>{info.label}</span>
+                      <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Titre du bloc" value={block.title}
+                        onChange={e => updateBlock(idx, { title: e.target.value })} />
+                      <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+                        <button style={ibStyles.miniBtn} onClick={() => moveBlock(idx, -1)} disabled={idx === 0} title="Monter">\u2191</button>
+                        <button style={ibStyles.miniBtn} onClick={() => moveBlock(idx, 1)} disabled={idx === blocks.length - 1} title="Descendre">\u2193</button>
+                        <button style={ibStyles.dangerBtn} onClick={() => removeBlock(idx)} title="Supprimer">\u2715</button>
+                      </div>
+                    </div>
+                    {renderBlockEditor(block, idx)}
+                  </div>
+                );
+              })}
+
+              {/* Add block selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select id="ib-add-block-select" style={{ ...styles.select, width: 'auto', padding: '10px 14px', fontSize: '13px' }} defaultValue="">
+                  <option value="" disabled>+ Ajouter un bloc interactif...</option>
+                  {BLOCK_TYPES.map(bt => (
+                    <option key={bt.type} value={bt.type}>{bt.icon} {bt.label}</option>
+                  ))}
+                </select>
+                <button style={{ ...styles.btnPrimary, fontSize: '13px', padding: '10px 18px' }} onClick={() => {
+                  const sel = document.getElementById('ib-add-block-select');
+                  if (sel && sel.value) { addBlock(sel.value); sel.value = ''; }
+                }}>Ajouter</button>
+              </div>
+
+              {blocks.length === 0 && (
+                <p style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px', marginTop: '8px' }}>
+                  Aucun bloc interactif. Cliquez sur le bouton ci-dessus pour commencer.
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Statut</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
+              <option value="draft">Brouillon</option>
+              <option value="published">Publié</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', paddingTop: '28px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.is_preview} onChange={e => setForm({ ...form, is_preview: e.target.checked })} />
+              <span style={{ fontSize: '14px' }}>Aperçu gratuit</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Quiz association */}
+        <div style={{
+          background: isDark ? '#0f172a' : '#f8fafc',
+          borderRadius: '10px',
+          padding: '16px',
+          border: `1px solid ${form.has_quiz ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`
+        }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+            marginBottom: form.has_quiz ? '16px' : '0'
+          }}>
+            <input type="checkbox" checked={form.has_quiz}
+              onChange={e => setForm({ ...form, has_quiz: e.target.checked, quiz_id: e.target.checked ? form.quiz_id : null })}
+              style={{ accentColor: colors.primary }} />
+            <FileQuestion size={18} color={form.has_quiz ? colors.primary : (isDark ? '#64748b' : '#94a3b8')} />
+            <span style={{ fontSize: '14px', fontWeight: '600' }}>Cette leçon a un quiz</span>
+          </label>
+
+          {form.has_quiz && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={styles.label}>Quiz associé</label>
+                <select
+                  value={form.quiz_id || ''}
+                  onChange={e => setForm({ ...form, quiz_id: e.target.value ? parseInt(e.target.value) : null })}
+                  style={styles.select}
+                >
+                  <option value="">-- Sélectionner un quiz --</option>
+                  {quizzes.map(quiz => (
+                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Position du quiz</label>
+                <select value={form.quiz_position} onChange={e => setForm({ ...form, quiz_position: e.target.value })} style={styles.select}>
+                  <option value="start">Début de leçon</option>
+                  <option value="middle">Milieu de leçon</option>
+                  <option value="end">Fin de leçon</option>
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Poids du quiz</label>
+                <input type="number" value={form.quiz_weight} onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
+                  style={styles.input} min="0.1" max="10" step="0.1" />
+                <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Coefficient dans la note du module
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Upload progress overlay message */}
+        {uploading && (
+          <div style={{
+            padding: '12px 16px',
+            background: isDark ? '#1e3a5f' : '#dbeafe',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Loader size={18} color={colors.primary} style={{ animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: '13px', color: isDark ? '#93c5fd' : '#1e40af' }}>
+              Veuillez patienter, upload en cours ({uploadProgress}%)...
+            </span>
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'flex-end',
+          paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <button onClick={() => setShowLessonForm(false)} style={styles.btnSecondary} disabled={uploading}>Annuler</button>
+          <button
+            onClick={() => handleSaveLesson(form)}
+            style={{
+              ...styles.btnPrimary,
+              opacity: (!form.title_fr || uploading) ? 0.5 : 1,
+              cursor: (!form.title_fr || uploading) ? 'not-allowed' : 'pointer'
+            }}
+            disabled={!form.title_fr || uploading}
+          >
+            {uploading ? (
+              <>
+                <Loader size={16} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                Upload en cours...
+              </>
+            ) : (
+              editingLesson ? 'Enregistrer les modifications' : 'Créer la leçon'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Composants de OHELearningPage définis au niveau du module : définis dans la page,
+// ils étaient recréés à chaque rendu et React réinitialisait leur état (saisie perdue).
+const CategoryForm = ({ categoryIconOptions, editingCategory, handleSaveCategory, isDark, setEditingCategory, setShowCategoryForm, styles }) => {
+  const [form, setForm] = useState({
+    name_fr: editingCategory?.name_fr || '',
+    name_en: editingCategory?.name_en || '',
+    description_fr: editingCategory?.description_fr || '',
+    description_en: editingCategory?.description_en || '',
+    color: editingCategory?.color || '#2196F3',
+    icon: editingCategory?.icon || 'Tag'
+  });
+  const [iconSearch, setIconSearch] = useState('');
+  const [showIconDropdown, setShowIconDropdown] = useState(false);
+
+  const filteredIcons = categoryIconOptions.filter(opt =>
+    opt.label.toLowerCase().includes(iconSearch.toLowerCase()) ||
+    opt.value.toLowerCase().includes(iconSearch.toLowerCase())
+  );
+
+  const selectedIconOption = categoryIconOptions.find(opt => opt.value === form.icon);
+  const SelectedIcon = selectedIconOption?.icon || Tag;
+
+  const handleSubmit = async () => {
+    await handleSaveCategory(form);
+    setShowCategoryForm(false);
+  };
+
+  return (
+    <div>
+      {/* Header with Back button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>
+            {editingCategory ? 'Modifier la Catégorie' : 'Nouvelle Catégorie'}
+          </h2>
+          <p style={{ margin: '4px 0 0', ...styles.textMuted }}>
+            {editingCategory ? `Modification de "${editingCategory.name_fr}"` : 'Créez une nouvelle catégorie pour organiser vos cours'}
+          </p>
+        </div>
+        <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} style={styles.btnSecondary}>
+          <ArrowLeft size={18} /> Retour
+        </button>
+      </div>
+
+      {/* Form Card - Full Width */}
+      <div style={{ ...styles.card }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          {/* Left Column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Names */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={styles.label}>Nom (Français) *</label>
+                <input
+                  type="text"
+                  value={form.name_fr}
+                  onChange={e => setForm({ ...form, name_fr: e.target.value })}
+                  style={styles.input}
+                  placeholder="Santé Humaine"
+                />
+              </div>
+              <div>
+                <label style={styles.label}>Nom (Anglais)</label>
+                <input
+                  type="text"
+                  value={form.name_en}
+                  onChange={e => setForm({ ...form, name_en: e.target.value })}
+                  style={styles.input}
+                  placeholder="Human Health"
+                />
+              </div>
+            </div>
+
+            {/* Descriptions */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={styles.label}>Description (Français)</label>
+                <textarea
+                  value={form.description_fr}
+                  onChange={e => setForm({ ...form, description_fr: e.target.value })}
+                  style={{ ...styles.input, minHeight: '100px' }}
+                  placeholder="Description de la catégorie..."
+                />
+              </div>
+              <div>
+                <label style={styles.label}>Description (Anglais)</label>
+                <textarea
+                  value={form.description_en}
+                  onChange={e => setForm({ ...form, description_en: e.target.value })}
+                  style={{ ...styles.input, minHeight: '100px' }}
+                  placeholder="Category description..."
+                />
+              </div>
+            </div>
+
+            {/* Color and Icon */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Color Picker */}
+            <div>
+              <label style={styles.label}>Couleur</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  type="color"
+                  value={form.color}
+                  onChange={e => setForm({ ...form, color: e.target.value })}
+                  style={{ width: '50px', height: '44px', padding: '4px', borderRadius: '8px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  value={form.color}
+                  onChange={e => setForm({ ...form, color: e.target.value })}
+                  style={{ ...styles.input, flex: 1, fontFamily: 'monospace' }}
+                  placeholder="#2196F3"
+                />
+              </div>
+            </div>
+
+            {/* Icon Selector with Search */}
+            <div style={{ position: 'relative' }}>
+              <label style={styles.label}>Icône</label>
+              <div
+                onClick={() => setShowIconDropdown(!showIconDropdown)}
+                style={{
+                  ...styles.input,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  background: isDark ? '#1e293b' : '#f8fafc'
+                }}
+              >
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  background: `${form.color}20`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: form.color
+                }}>
+                  <SelectedIcon size={18} />
+                </div>
+                <span style={{ flex: 1 }}>{selectedIconOption?.label || 'Sélectionner une icône'}</span>
+                <ChevronDown size={18} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
+              </div>
+
+              {/* Icon Dropdown */}
+              {showIconDropdown && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                  background: isDark ? '#1e293b' : 'white',
+                  border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                  marginTop: '4px',
+                  maxHeight: '350px',
+                  overflow: 'hidden'
+                }}>
+                  {/* Search Input */}
+                  <div style={{ padding: '12px', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+                      <input
+                        type="text"
+                        placeholder="Rechercher une icône..."
+                        value={iconSearch}
+                        onChange={e => setIconSearch(e.target.value)}
+                        style={{ ...styles.input, paddingLeft: '36px', fontSize: '13px' }}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {/* Icons Grid */}
+                  <div style={{ padding: '12px', maxHeight: '280px', overflowY: 'auto' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {filteredIcons.map(opt => {
+                        const IconComp = opt.icon;
+                        const isSelected = form.icon === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => {
+                              setForm({ ...form, icon: opt.value });
+                              setShowIconDropdown(false);
+                              setIconSearch('');
+                            }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                              padding: '10px 12px', borderRadius: '8px',
+                              border: isSelected ? `2px solid ${colors.primary}` : `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+                              background: isSelected ? `${colors.primary}10` : 'transparent',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{
+                              width: '28px', height: '28px', borderRadius: '6px',
+                              background: `${form.color}20`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: form.color
+                            }}>
+                              <IconComp size={16} />
+                            </div>
+                            <span style={{ fontSize: '12px', fontWeight: isSelected ? '600' : '400', color: isDark ? '#e2e8f0' : '#334155' }}>
+                              {opt.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {filteredIcons.length === 0 && (
+                      <p style={{ textAlign: 'center', padding: '20px', color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px' }}>
+                        Aucune icône trouvée
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          </div>
+
+          {/* Right Column - Preview & Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Preview */}
+            <div>
+              <label style={styles.label}>Aperçu de la carte</label>
+              <div style={{
+                ...styles.card,
+                borderLeft: `4px solid ${form.color}`,
+                background: isDark ? '#0f172a' : '#f8fafc'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{
+                    width: '56px', height: '56px', borderRadius: '14px',
+                    background: `${form.color}15`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: form.color
+                  }}>
+                    <SelectedIcon size={28} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '17px', fontWeight: '600' }}>
+                      {form.name_fr || 'Nom de la catégorie'}
+                    </h4>
+                    {form.name_en && (
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic' }}>
+                        {form.name_en}
+                      </p>
+                    )}
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>
+                      0 cours
+                    </p>
+                  </div>
+                </div>
+                {form.description_fr && (
+                  <p style={{ margin: '14px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', lineHeight: '1.5' }}>
+                    {form.description_fr.length > 150 ? form.description_fr.substring(0, 150) + '...' : form.description_fr}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Color Preview */}
+            <div>
+              <label style={styles.label}>Palette de couleurs</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#3F51B5'].map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setForm({ ...form, color: c })}
+                    style={{
+                      width: '36px', height: '36px', borderRadius: '10px',
+                      background: c, border: form.color === c ? '3px solid white' : 'none',
+                      boxShadow: form.color === c ? `0 0 0 2px ${c}` : '0 2px 4px rgba(0,0,0,0.1)',
+                      cursor: 'pointer', transition: 'all 0.15s ease'
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} style={{ ...styles.btnSecondary, flex: 1 }}>
+                  Annuler
+                </button>
+                <button onClick={handleSubmit} style={{ ...styles.btnPrimary, flex: 2 }} disabled={!form.name_fr}>
+                  <Save size={18} /> {editingCategory ? 'Enregistrer' : 'Créer la catégorie'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CourseFormInline = ({ categories, editingCourse, handleSaveCourse, isDark, quizzes, setShowCourseForm, styles, token }) => {
+  const parseJsonArray = (val) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') { try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; } }
+    return [];
+  };
+  const [form, setForm] = useState({
+    title_fr: editingCourse?.title_fr || '',
+    title_en: editingCourse?.title_en || '',
+    description_fr: editingCourse?.description_fr || '',
+    description_en: editingCourse?.description_en || '',
+    short_description_fr: editingCourse?.short_description_fr || '',
+    short_description_en: editingCourse?.short_description_en || '',
+    thumbnail: editingCourse?.thumbnail || '',
+    level: editingCourse?.level || 'beginner',
+    duration_hours: editingCourse?.duration_hours || 0,
+    category_id: editingCourse?.category_id || '',
+    status: editingCourse?.status || 'draft',
+    is_featured: editingCourse?.is_featured || false,
+    sequential_modules: editingCourse?.sequential_modules !== false,
+    require_quiz_pass: editingCourse?.require_quiz_pass || false,
+    free_navigation: editingCourse?.free_navigation || false,
+    learning_objectives: parseJsonArray(editingCourse?.learning_objectives),
+    prerequisites: parseJsonArray(editingCourse?.prerequisites),
+    target_audience: parseJsonArray(editingCourse?.target_audience),
+    min_passing_score: editingCourse?.min_passing_score || 70,
+    final_quiz_id: editingCourse?.final_quiz_id || null,
+    final_quiz_weight: editingCourse?.final_quiz_weight || 1.00,
+    module_quizzes_weight: editingCourse?.module_quizzes_weight || 1.00
+  });
+
+  const [uploading, setUploading] = useState(false);
+
+  const handleThumbnailUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/upload/elearning/thumbnail', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const text = await response.text();
+      const res = text ? JSON.parse(text) : { success: false };
+      if (res.success) {
+        setForm(prev => ({ ...prev, thumbnail: res.data.url }));
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header with title and Retour button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `${colors.primary}15`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <BookOpen size={20} color={colors.primary} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+              {editingCourse ? 'Modifier le Cours' : 'Nouveau Cours'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Configurez les paramètres du cours
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowCourseForm(false)}
+          style={{
+            ...styles.btnSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ArrowLeft size={16} />
+          Retour
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Thumbnail */}
+        <div>
+          <label style={styles.label}>Image du cours</label>
+          <div style={{
+            width: '100%', height: '180px', borderRadius: '12px',
+            border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+            background: form.thumbnail ? `url(${form.thumbnail}) center/cover` : (isDark ? '#0f172a' : '#f8fafc'),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', position: 'relative', overflow: 'hidden'
+          }} onClick={() => document.getElementById('course-thumbnail-input').click()}>
+            {!form.thumbnail && (
+              <div style={{ textAlign: 'center' }}>
+                <Image size={32} color={isDark ? '#475569' : '#94a3b8'} />
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  {uploading ? 'Upload en cours...' : 'Cliquer pour uploader'}
+                </p>
+              </div>
+            )}
+            {form.thumbnail && (
+              <button onClick={(e) => { e.stopPropagation(); setForm(prev => ({ ...prev, thumbnail: '' })); }}
+                style={{ position: 'absolute', top: '8px', right: '8px', ...styles.btnIcon, background: 'rgba(0,0,0,0.5)', color: 'white' }}>
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <input type="file" id="course-thumbnail-input" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
+        </div>
+
+        {/* Title FR/EN side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Titre (Français) *</label>
+            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+              style={styles.input} placeholder="Introduction à One Health" />
+          </div>
+          <div>
+            <label style={styles.label}>Titre (Anglais)</label>
+            <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
+              style={styles.input} placeholder="Introduction to One Health" />
+          </div>
+        </div>
+
+        {/* Short Description FR/EN */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Description courte (Français)</label>
+            <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
+              style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+              placeholder="Brève description du cours..." />
+          </div>
+          <div>
+            <label style={styles.label}>Description courte (Anglais)</label>
+            <textarea value={form.short_description_en} onChange={e => setForm({ ...form, short_description_en: e.target.value })}
+              style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+              placeholder="Short course description..." />
+          </div>
+        </div>
+
+        {/* Description complète */}
+        <div>
+          <label style={styles.label}>Description complète (Français)</label>
+          <RichTextEditor value={form.description_fr} onChange={v => setForm(f => ({ ...f, description_fr: v }))} placeholder="Description détaillée du cours..." isDark={isDark} />
+        </div>
+        <div>
+          <label style={styles.label}>Description complète (Anglais)</label>
+          <RichTextEditor value={form.description_en} onChange={v => setForm(f => ({ ...f, description_en: v }))} placeholder="Full course description..." isDark={isDark} />
+        </div>
+
+        {/* Objectifs, Prérequis, Public cible */}
+        <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+          <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Target size={16} color={colors.primary} />
+              Objectifs d'apprentissage
+            </span>
+          </label>
+          {form.learning_objectives.map((obj, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+              <span style={{ color: colors.primary, fontWeight: '700', fontSize: '12px', minWidth: '20px' }}>{idx + 1}.</span>
+              <input value={obj} onChange={e => { const n = [...form.learning_objectives]; n[idx] = e.target.value; setForm({ ...form, learning_objectives: n }); }}
+                style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Objectif..." />
+              <button onClick={() => { const n = form.learning_objectives.filter((_, i) => i !== idx); setForm({ ...form, learning_objectives: n }); }}
+                style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error, flexShrink: 0 }}>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <button onClick={() => setForm({ ...form, learning_objectives: [...form.learning_objectives, ''] })}
+            style={{ background: 'transparent', color: colors.primary, border: `1px dashed ${colors.primary}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
+            + Ajouter un objectif
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          {/* Prérequis */}
+          <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileText size={16} color={colors.teal} />
+                Prérequis
+              </span>
+            </label>
+            {form.prerequisites.map((pre, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                <input value={pre} onChange={e => { const n = [...form.prerequisites]; n[idx] = e.target.value; setForm({ ...form, prerequisites: n }); }}
+                  style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Prérequis..." />
+                <button onClick={() => setForm({ ...form, prerequisites: form.prerequisites.filter((_, i) => i !== idx) })}
+                  style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            <button onClick={() => setForm({ ...form, prerequisites: [...form.prerequisites, ''] })}
+              style={{ background: 'transparent', color: colors.teal, border: `1px dashed ${colors.teal}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
+              + Ajouter
+            </button>
+          </div>
+
+          {/* Public cible */}
+          <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} color={colors.purple} />
+                Public cible
+              </span>
+            </label>
+            {form.target_audience.map((aud, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                <input value={aud} onChange={e => { const n = [...form.target_audience]; n[idx] = e.target.value; setForm({ ...form, target_audience: n }); }}
+                  style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Public cible..." />
+                <button onClick={() => setForm({ ...form, target_audience: form.target_audience.filter((_, i) => i !== idx) })}
+                  style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            <button onClick={() => setForm({ ...form, target_audience: [...form.target_audience, ''] })}
+              style={{ background: 'transparent', color: colors.purple, border: `1px dashed ${colors.purple}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
+              + Ajouter
+            </button>
+          </div>
+        </div>
+
+        {/* Row: Level, Duration, Category, Status */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Niveau</label>
+            <select value={form.level} onChange={e => setForm({ ...form, level: e.target.value })} style={styles.select}>
+              <option value="beginner">Débutant</option>
+              <option value="intermediate">Intermédiaire</option>
+              <option value="advanced">Avancé</option>
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Durée (heures)</label>
+            <input type="number" value={form.duration_hours} onChange={e => setForm({ ...form, duration_hours: parseInt(e.target.value) || 0 })}
+              style={styles.input} min="0" />
+          </div>
+          <div>
+            <label style={styles.label}>Catégorie</label>
+            <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })} style={styles.select}>
+              <option value="">-- Sélectionner --</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name_fr}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Statut</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
+              <option value="draft">Brouillon</option>
+              <option value="published">Publié</option>
+              <option value="archived">Archivé</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Featured checkbox */}
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+          padding: '12px', borderRadius: '10px',
+          background: form.is_featured ? `${colors.warning}10` : (isDark ? '#1e293b' : 'white'),
+          border: `1px solid ${form.is_featured ? colors.warning : (isDark ? '#334155' : '#e2e8f0')}`
+        }}>
+          <input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} style={{ accentColor: colors.warning }} />
+          <Star size={16} color={form.is_featured ? colors.warning : (isDark ? '#64748b' : '#94a3b8')} />
+          <span style={{ fontSize: '13px' }}>Mettre en vedette</span>
+        </label>
+
+        {/* Progression settings */}
+        <div style={{
+          background: isDark ? '#0f172a' : '#f8fafc',
+          borderRadius: '10px',
+          padding: '16px',
+          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <label style={{ ...styles.label, marginBottom: '14px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Lock size={16} color={colors.primary} />
+              Règles de progression
+            </span>
+          </label>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Free navigation */}
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
+              padding: '12px', borderRadius: '10px',
+              background: form.free_navigation ? `${colors.success}10` : 'transparent',
+              border: `1px solid ${form.free_navigation ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input type="checkbox" checked={form.free_navigation}
+                onChange={e => setForm({ ...form, free_navigation: e.target.checked, sequential_modules: e.target.checked ? false : form.sequential_modules })}
+                style={{ accentColor: colors.success, marginTop: '2px' }} />
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Navigation libre</span>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  L'apprenant peut commencer par n'importe quel module et leçon
+                </p>
+              </div>
+            </label>
+
+            {/* Sequential modules */}
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
+              padding: '12px', borderRadius: '10px',
+              background: !form.free_navigation && form.sequential_modules ? `${colors.primary}10` : 'transparent',
+              border: `1px solid ${!form.free_navigation && form.sequential_modules ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
+              opacity: form.free_navigation ? 0.5 : 1
+            }}>
+              <input type="checkbox" checked={form.sequential_modules} disabled={form.free_navigation}
+                onChange={e => setForm({ ...form, sequential_modules: e.target.checked })}
+                style={{ accentColor: colors.primary, marginTop: '2px' }} />
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Progression séquentielle</span>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  L'apprenant doit terminer chaque module/leçon avant de passer au suivant
+                </p>
+              </div>
+            </label>
+
+            {/* Require quiz pass */}
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
+              padding: '12px', borderRadius: '10px',
+              background: form.require_quiz_pass ? `${colors.warning}10` : 'transparent',
+              border: `1px solid ${form.require_quiz_pass ? colors.warning : (isDark ? '#334155' : '#e2e8f0')}`,
+              opacity: form.free_navigation ? 0.5 : 1
+            }}>
+              <input type="checkbox" checked={form.require_quiz_pass} disabled={form.free_navigation}
+                onChange={e => setForm({ ...form, require_quiz_pass: e.target.checked })}
+                style={{ accentColor: colors.warning, marginTop: '2px' }} />
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Validation quiz obligatoire</span>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  L'apprenant doit réussir le quiz d'une leçon/module avant de passer au suivant (score minimum requis)
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* Grade settings */}
+        <div style={{
+          background: isDark ? '#0f172a' : '#f8fafc',
+          borderRadius: '10px',
+          padding: '16px',
+          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={16} color={colors.warning} />
+              Paramètres de notation
+            </span>
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={styles.label}>Score minimum pour réussir (%)</label>
+              <input
+                type="number"
+                value={form.min_passing_score}
+                onChange={e => setForm({ ...form, min_passing_score: parseInt(e.target.value) || 70 })}
+                style={styles.input}
+                min="0"
+                max="100"
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Quiz final du cours</label>
+              <select
+                value={form.final_quiz_id || ''}
+                onChange={e => setForm({ ...form, final_quiz_id: e.target.value ? parseInt(e.target.value) : null })}
+                style={styles.select}
+              >
+                <option value="">Aucun quiz final</option>
+                {quizzes.filter(q => q.status === 'published').map(quiz => (
+                  <option key={quiz.id} value={quiz.id}>{quiz.title_fr} ({quiz.quiz_type === 'final_exam' ? 'Examen final' : quiz.quiz_type === 'chapter_quiz' ? 'Quiz chapitre' : 'Quiz'})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={styles.label}>Poids quiz final</label>
+              <input
+                type="number"
+                value={form.final_quiz_weight}
+                onChange={e => setForm({ ...form, final_quiz_weight: parseFloat(e.target.value) || 1 })}
+                style={styles.input}
+                min="0.1"
+                max="10"
+                step="0.1"
+                disabled={!form.final_quiz_id}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Coefficient du quiz final dans la note
+              </p>
+            </div>
+            <div>
+              <label style={styles.label}>Poids quiz des modules</label>
+              <input
+                type="number"
+                value={form.module_quizzes_weight}
+                onChange={e => setForm({ ...form, module_quizzes_weight: parseFloat(e.target.value) || 1 })}
+                style={styles.input}
+                min="0.1"
+                max="10"
+                step="0.1"
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Coefficient de la moyenne des modules
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'flex-end',
+          paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <button onClick={() => setShowCourseForm(false)} style={styles.btnSecondary}>
+            Annuler
+          </button>
+          <button onClick={() => handleSaveCourse(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
+            {editingCourse ? 'Enregistrer les modifications' : 'Créer le cours'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ModuleFormInline = ({ editingModule, handleSaveModule, isDark, quizzes, selectedCourse, setShowModuleForm, styles }) => {
+  const [form, setForm] = useState({
+    title_fr: editingModule?.title_fr || '',
+    title_en: editingModule?.title_en || '',
+    description_fr: editingModule?.description_fr || '',
+    duration_minutes: editingModule?.duration_minutes || 0,
+    status: editingModule?.status || 'draft',
+    has_quiz: editingModule?.has_quiz || false,
+    quiz_id: editingModule?.quiz_id || null,
+    quiz_weight: editingModule?.quiz_weight || 1.00,
+    min_quiz_score: editingModule?.min_quiz_score || 70
+  });
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header with title and Retour button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `${colors.success}15`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Layers size={20} color={colors.success} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+              {editingModule ? 'Modifier le Module' : 'Nouveau Module'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              {selectedCourse ? `Cours: ${selectedCourse.title_fr}` : 'Configurez le module'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowModuleForm(false)}
+          style={{
+            ...styles.btnSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ArrowLeft size={16} />
+          Retour
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Title FR/EN side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Titre (Français) *</label>
+            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+              style={styles.input} placeholder="Module 1: Introduction" />
+          </div>
+          <div>
+            <label style={styles.label}>Titre (Anglais)</label>
+            <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
+              style={styles.input} placeholder="Module 1: Introduction" />
+          </div>
+        </div>
+
+        <div>
+          <label style={styles.label}>Description</label>
+          <RichTextEditor value={form.description_fr} onChange={v => setForm(f => ({ ...f, description_fr: v }))} placeholder="Description du module..." height={180} isDark={isDark} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Durée (minutes)</label>
+            <input type="number" value={form.duration_minutes} onChange={e => setForm({ ...form, duration_minutes: parseInt(e.target.value) || 0 })}
+              style={styles.input} min="0" />
+          </div>
+          <div>
+            <label style={styles.label}>Statut</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
+              <option value="draft">Brouillon</option>
+              <option value="published">Publié</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Quiz settings for module */}
+        <div style={{
+          background: isDark ? '#0f172a' : '#f8fafc',
+          borderRadius: '10px',
+          padding: '16px',
+          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+            marginBottom: form.has_quiz ? '16px' : '0'
+          }}>
+            <input
+              type="checkbox"
+              checked={form.has_quiz}
+              onChange={e => setForm({ ...form, has_quiz: e.target.checked, quiz_id: e.target.checked ? form.quiz_id : null })}
+              style={{ accentColor: colors.primary }}
+            />
+            <span style={{ fontWeight: '600', fontSize: '14px' }}>
+              <FileQuestion size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+              Ce module a un quiz
+            </span>
+          </label>
+
+          {form.has_quiz && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={styles.label}>Quiz</label>
+                <select
+                  value={form.quiz_id || ''}
+                  onChange={e => setForm({ ...form, quiz_id: e.target.value ? parseInt(e.target.value) : null })}
+                  style={styles.select}
+                >
+                  <option value="">Sélectionner un quiz</option>
+                  {quizzes.filter(q => q.status === 'published').map(quiz => (
+                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Score min. (%)</label>
+                <input
+                  type="number"
+                  value={form.min_quiz_score}
+                  onChange={e => setForm({ ...form, min_quiz_score: parseInt(e.target.value) || 70 })}
+                  style={styles.input}
+                  min="0"
+                  max="100"
+                />
+              </div>
+              <div>
+                <label style={styles.label}>Poids du quiz</label>
+                <input
+                  type="number"
+                  value={form.quiz_weight}
+                  onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
+                  style={styles.input}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Coefficient pour la note du cours
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'flex-end',
+          paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <button onClick={() => setShowModuleForm(false)} style={styles.btnSecondary}>Annuler</button>
+          <button onClick={() => handleSaveModule(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
+            {editingModule ? 'Enregistrer les modifications' : 'Créer le module'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PathFormInline = ({ certificateTemplates, editingPath, handleSavePath, isDark, quizzes, setShowPathForm, styles }) => {
+  const [form, setForm] = useState({
+    title_fr: editingPath?.title_fr || '',
+    title_en: editingPath?.title_en || '',
+    description_fr: editingPath?.description_fr || '',
+    short_description_fr: editingPath?.short_description_fr || '',
+    level: editingPath?.level || 'beginner',
+    duration_hours: editingPath?.duration_hours || 0,
+    min_passing_score: editingPath?.min_passing_score || 70,
+    certificate_enabled: editingPath?.certificate_enabled !== false,
+    certificate_template: editingPath?.certificate_template || 'default',
+    status: editingPath?.status || 'draft',
+    require_final_exam: editingPath?.require_final_exam || false,
+    final_exam_id: editingPath?.final_exam_id || null,
+    final_quiz_weight: editingPath?.final_quiz_weight || 1.00,
+    courses_quizzes_weight: editingPath?.courses_quizzes_weight || 1.00
+  });
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header with title and Retour button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `${colors.warning}15`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Award size={20} color={colors.warning} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+              {editingPath ? 'Modifier le Parcours' : 'Nouveau Parcours'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Configurez le parcours d'apprentissage
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowPathForm(false)}
+          style={{
+            ...styles.btnSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ArrowLeft size={16} />
+          Retour
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Titre (Français) *</label>
+            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
+              style={styles.input} placeholder="One Health Leadership" />
+          </div>
+          <div>
+            <label style={styles.label}>Titre (Anglais)</label>
+            <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
+              style={styles.input} />
+          </div>
+        </div>
+
+        <div>
+          <label style={styles.label}>Description courte</label>
+          <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
+            style={{ ...styles.input, minHeight: '80px' }} placeholder="Description du parcours..." />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Niveau</label>
+            <select value={form.level} onChange={e => setForm({ ...form, level: e.target.value })} style={styles.select}>
+              <option value="beginner">Débutant</option>
+              <option value="intermediate">Intermédiaire</option>
+              <option value="advanced">Avancé</option>
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Durée (heures)</label>
+            <input type="number" value={form.duration_hours} onChange={e => setForm({ ...form, duration_hours: parseInt(e.target.value) || 0 })}
+              style={styles.input} min="0" />
+          </div>
+          <div>
+            <label style={styles.label}>Score min. (%)</label>
+            <input type="number" value={form.min_passing_score} onChange={e => setForm({ ...form, min_passing_score: parseInt(e.target.value) || 70 })}
+              style={styles.input} min="0" max="100" />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Statut</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
+              <option value="draft">Brouillon</option>
+              <option value="published">Publié</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', paddingTop: '28px' }}>
+              <input type="checkbox" checked={form.certificate_enabled} onChange={e => setForm({ ...form, certificate_enabled: e.target.checked })} />
+              <span style={{ fontSize: '14px' }}>Certificat activé</span>
+            </label>
+            {form.certificate_enabled && (
+              <div>
+                <label style={styles.label}>Template de certificat</label>
+                <select
+                  value={form.certificate_template}
+                  onChange={e => setForm({ ...form, certificate_template: e.target.value })}
+                  style={styles.select}
+                >
+                  <option value="default">Par défaut</option>
+                  {certificateTemplates.map(template => (
+                    <option key={template.id} value={template.slug}>
+                      {template.name} {template.is_default ? '(Défaut)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Grade settings for path */}
+        <div style={{
+          background: isDark ? '#0f172a' : '#f8fafc',
+          borderRadius: '10px',
+          padding: '16px',
+          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={16} color={colors.warning} />
+              Pondération des notes
+            </span>
+          </label>
+
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+            marginBottom: form.require_final_exam ? '16px' : '0'
+          }}>
+            <input
+              type="checkbox"
+              checked={form.require_final_exam}
+              onChange={e => setForm({ ...form, require_final_exam: e.target.checked, final_exam_id: e.target.checked ? form.final_exam_id : null })}
+              style={{ accentColor: colors.primary }}
+            />
+            <span style={{ fontWeight: '600', fontSize: '13px' }}>Quiz final obligatoire pour le parcours</span>
+          </label>
+
+          {form.require_final_exam && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={styles.label}>Quiz final du parcours</label>
+                <select
+                  value={form.final_exam_id || ''}
+                  onChange={e => setForm({ ...form, final_exam_id: e.target.value ? parseInt(e.target.value) : null })}
+                  style={styles.select}
+                >
+                  <option value="">Sélectionner un quiz</option>
+                  {quizzes.filter(q => q.status === 'published').map(quiz => (
+                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr} ({quiz.quiz_type === 'final_exam' ? 'Examen final' : quiz.quiz_type === 'chapter_quiz' ? 'Quiz chapitre' : 'Quiz'})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Poids quiz final</label>
+                <input
+                  type="number"
+                  value={form.final_quiz_weight}
+                  onChange={e => setForm({ ...form, final_quiz_weight: parseFloat(e.target.value) || 1 })}
+                  style={styles.input}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                  disabled={!form.final_exam_id}
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={styles.label}>Poids moyenne des cours</label>
+            <input
+              type="number"
+              value={form.courses_quizzes_weight}
+              onChange={e => setForm({ ...form, courses_quizzes_weight: parseFloat(e.target.value) || 1 })}
+              style={styles.input}
+              min="0.1"
+              max="10"
+              step="0.1"
+            />
+            <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Coefficient de la moyenne des notes de cours dans la note finale du parcours
+            </p>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'flex-end',
+          paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <button onClick={() => setShowPathForm(false)} style={styles.btnSecondary}>Annuler</button>
+          <button onClick={() => handleSavePath(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
+            {editingPath ? 'Enregistrer les modifications' : 'Créer le parcours'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const QuestionFormInline = ({ editingQuestion, handleSaveQuestion, isDark, setShowQuestionForm, styles }) => {
+  // Parser les options si c'est une chaîne JSON
+  const parseOptions = (opts, type) => {
+    if (!opts) {
+      if (type === 'matching') return [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
+      if (type === 'ordering') return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+      return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+    }
+    if (Array.isArray(opts)) return opts;
+    try { return JSON.parse(opts); } catch { return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }]; }
+  };
+  const parseCorrectAnswer = (ans, type) => {
+    if (ans === null || ans === undefined) {
+      if (type === 'multiple_select' || type === 'fill_blank') return [];
+      if (type === 'true_false') return true;
+      if (type === 'ordering') return [];
+      return 0;
+    }
+    if (typeof ans === 'number' || typeof ans === 'boolean' || Array.isArray(ans)) return ans;
+    try { return JSON.parse(ans); } catch { return type === 'fill_blank' || type === 'multiple_select' ? [] : 0; }
+  };
+
+  const [form, setForm] = useState({
+    question_text_fr: editingQuestion?.question_text_fr || '',
+    question_text_en: editingQuestion?.question_text_en || '',
+    question_type: editingQuestion?.question_type || 'mcq',
+    explanation_fr: editingQuestion?.explanation_fr || '',
+    explanation_en: editingQuestion?.explanation_en || '',
+    options: parseOptions(editingQuestion?.options, editingQuestion?.question_type),
+    correct_answer: parseCorrectAnswer(editingQuestion?.correct_answer, editingQuestion?.question_type),
+    points: editingQuestion?.points || 1,
+    difficulty: editingQuestion?.difficulty || 'medium',
+    is_active: editingQuestion?.is_active !== false
+  });
+
+  const handleOptionChange = (index, field, value) => {
+    const newOptions = [...form.options];
+    newOptions[index] = { ...newOptions[index], [field]: value };
+    setForm({ ...form, options: newOptions });
+  };
+
+  const addOption = () => {
+    if (form.question_type === 'matching') {
+      setForm({ ...form, options: [...form.options, { left_fr: '', left_en: '', right_fr: '', right_en: '' }] });
+    } else {
+      setForm({ ...form, options: [...form.options, { text_fr: '', text_en: '' }] });
+    }
+  };
+
+  const removeOption = (index) => {
+    const newOptions = form.options.filter((_, i) => i !== index);
+    setForm({
+      ...form,
+      options: newOptions,
+      correct_answer: form.correct_answer >= newOptions.length ? 0 : form.correct_answer
+    });
+  };
+
+  const toggleMultipleAnswer = (index) => {
+    if (form.question_type !== 'multiple_select') return;
+    const currentAnswers = Array.isArray(form.correct_answer) ? form.correct_answer : [];
+    if (currentAnswers.includes(index)) {
+      setForm({ ...form, correct_answer: currentAnswers.filter(i => i !== index) });
+    } else {
+      setForm({ ...form, correct_answer: [...currentAnswers, index] });
+    }
+  };
+
+  // Handle fill_blank answer change
+  const handleFillBlankAnswer = (index, value) => {
+    const newAnswers = [...(Array.isArray(form.correct_answer) ? form.correct_answer : [])];
+    newAnswers[index] = value;
+    setForm({ ...form, correct_answer: newAnswers });
+  };
+
+  const addFillBlankSlot = () => {
+    const newAnswers = [...(Array.isArray(form.correct_answer) ? form.correct_answer : []), ''];
+    setForm({ ...form, correct_answer: newAnswers });
+  };
+
+  const removeFillBlankSlot = (index) => {
+    const newAnswers = (Array.isArray(form.correct_answer) ? form.correct_answer : []).filter((_, i) => i !== index);
+    setForm({ ...form, correct_answer: newAnswers });
+  };
+
+  // Count blanks in question text for fill_blank type
+  const countBlanks = (text) => {
+    const matches = text.match(/_{3,}|\[___\]|\{\{blank\}\}/g);
+    return matches ? matches.length : 0;
+  };
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header with title and Retour button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `${colors.primary}15`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <HelpCircle size={20} color={colors.primary} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+              {editingQuestion ? 'Modifier la Question' : 'Nouvelle Question'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Remplissez les informations pour créer une question
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowQuestionForm(false)}
+          style={{
+            ...styles.btnSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ArrowLeft size={16} />
+          Retour
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Question Type */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Type de question *</label>
+            <select
+              value={form.question_type}
+              onChange={e => {
+                const type = e.target.value;
+                let newOptions = form.options;
+                let newAnswer = form.correct_answer;
+
+                if (type === 'matching') {
+                  newOptions = [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
+                  newAnswer = null; // Matching uses options order as answer
+                } else if (type === 'ordering') {
+                  newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+                  newAnswer = [0, 1, 2];
+                } else if (type === 'fill_blank') {
+                  newOptions = [];
+                  newAnswer = [''];
+                } else if (type === 'multiple_select') {
+                  newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+                  newAnswer = [];
+                } else if (type === 'true_false') {
+                  newOptions = [];
+                  newAnswer = true;
+                } else if (type === 'short_answer') {
+                  newOptions = [];
+                  newAnswer = [];
+                } else {
+                  newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
+                  newAnswer = 0;
+                }
+
+                setForm({ ...form, question_type: type, options: newOptions, correct_answer: newAnswer });
+              }}
+              style={styles.select}
+            >
+              <option value="mcq">QCM (choix unique)</option>
+              <option value="multiple_select">Sélection multiple</option>
+              <option value="true_false">Vrai/Faux</option>
+              <option value="short_answer">Réponse courte</option>
+              <option value="matching">Association (paires)</option>
+              <option value="fill_blank">Texte à trous</option>
+              <option value="ordering">Ordre / Classement</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={styles.label}>Difficulté</label>
+              <select value={form.difficulty} onChange={e => setForm({ ...form, difficulty: e.target.value })} style={styles.select}>
+                <option value="easy">Facile</option>
+                <option value="medium">Moyen</option>
+                <option value="hard">Difficile</option>
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Points</label>
+              <input
+                type="number"
+                value={form.points}
+                onChange={e => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
+                style={styles.input}
+                min="1"
+                max="10"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Question Text */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>
+              Question (Français) *
+              {form.question_type === 'fill_blank' && (
+                <span style={{ fontSize: '11px', color: colors.primary, marginLeft: '8px' }}>
+                  Utilisez ___ ou [___] pour les trous
+                </span>
+              )}
+            </label>
+            <textarea
+              value={form.question_text_fr}
+              onChange={e => setForm({ ...form, question_text_fr: e.target.value })}
+              style={{ ...styles.input, minHeight: '120px' }}
+              placeholder={form.question_type === 'fill_blank'
+                ? "Ex: Le capital de France est ___. La monnaie est ___."
+                : "Entrez la question..."
+              }
+            />
+            {form.question_type === 'fill_blank' && (
+              <p style={{ margin: '6px 0 0', fontSize: '12px', color: colors.primary }}>
+                {countBlanks(form.question_text_fr)} trou(s) détecté(s)
+              </p>
+            )}
+          </div>
+          <div>
+            <label style={styles.label}>Question (Anglais)</label>
+            <textarea
+              value={form.question_text_en}
+              onChange={e => setForm({ ...form, question_text_en: e.target.value })}
+              style={{ ...styles.input, minHeight: '120px' }}
+              placeholder="Enter question in English..."
+            />
+          </div>
+        </div>
+
+        {/* Options for MCQ/Multiple Select */}
+        {(form.question_type === 'mcq' || form.question_type === 'multiple_select') && (
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ListChecks size={16} color={colors.primary} />
+                Options {form.question_type === 'multiple_select' ? '(cochez les bonnes réponses)' : '(sélectionnez la bonne réponse)'}
+              </span>
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {form.options.map((option, idx) => (
+                <div key={idx} style={{
+                  display: 'flex', gap: '12px', alignItems: 'center',
+                  padding: '12px', borderRadius: '10px',
+                  background: isDark ? '#1e293b' : 'white',
+                  border: `1px solid ${
+                    (form.question_type === 'mcq' && form.correct_answer === idx) ||
+                    (form.question_type === 'multiple_select' && Array.isArray(form.correct_answer) && form.correct_answer.includes(idx))
+                      ? colors.success : (isDark ? '#334155' : '#e2e8f0')
+                  }`
+                }}>
+                  {form.question_type === 'mcq' ? (
+                    <input
+                      type="radio"
+                      name="correct_answer"
+                      checked={form.correct_answer === idx}
+                      onChange={() => setForm({ ...form, correct_answer: idx })}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: colors.success }}
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={Array.isArray(form.correct_answer) && form.correct_answer.includes(idx)}
+                      onChange={() => toggleMultipleAnswer(idx)}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: colors.success }}
+                    />
+                  )}
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', minWidth: '20px' }}>
+                    {String.fromCharCode(65 + idx)}.
+                  </span>
+                  <input
+                    type="text"
+                    value={option.text_fr || ''}
+                    onChange={e => handleOptionChange(idx, 'text_fr', e.target.value)}
+                    style={{ ...styles.input, flex: 1 }}
+                    placeholder={`Option ${idx + 1} (FR)`}
+                  />
+                  <input
+                    type="text"
+                    value={option.text_en || ''}
+                    onChange={e => handleOptionChange(idx, 'text_en', e.target.value)}
+                    style={{ ...styles.input, flex: 1 }}
+                    placeholder={`Option ${idx + 1} (EN)`}
+                  />
+                  {form.options.length > 2 && (
+                    <button onClick={() => removeOption(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {form.options.length < 6 && (
+              <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
+                <Plus size={14} /> Ajouter une option
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* True/False */}
+        {form.question_type === 'true_false' && (
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ToggleLeft size={16} color={colors.teal} />
+                Bonne réponse
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <label style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                cursor: 'pointer', padding: '20px', borderRadius: '12px',
+                background: form.correct_answer === true ? `${colors.success}15` : (isDark ? '#1e293b' : 'white'),
+                border: form.correct_answer === true ? `2px solid ${colors.success}` : `2px solid ${isDark ? '#334155' : '#e2e8f0'}`
+              }}>
+                <input type="radio" name="tf_answer" checked={form.correct_answer === true} onChange={() => setForm({ ...form, correct_answer: true })} style={{ display: 'none' }} />
+                <CheckCircle2 size={24} color={form.correct_answer === true ? colors.success : '#94a3b8'} />
+                <span style={{ fontSize: '16px', fontWeight: '600' }}>Vrai</span>
+              </label>
+              <label style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                cursor: 'pointer', padding: '20px', borderRadius: '12px',
+                background: form.correct_answer === false ? `${colors.error}15` : (isDark ? '#1e293b' : 'white'),
+                border: form.correct_answer === false ? `2px solid ${colors.error}` : `2px solid ${isDark ? '#334155' : '#e2e8f0'}`
+              }}>
+                <input type="radio" name="tf_answer" checked={form.correct_answer === false} onChange={() => setForm({ ...form, correct_answer: false })} style={{ display: 'none' }} />
+                <XCircle size={24} color={form.correct_answer === false ? colors.error : '#94a3b8'} />
+                <span style={{ fontSize: '16px', fontWeight: '600' }}>Faux</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Short Answer */}
+        {form.question_type === 'short_answer' && (
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Type size={16} color={colors.warning} />
+                Réponse(s) acceptée(s)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={Array.isArray(form.correct_answer) ? form.correct_answer.join(', ') : (form.correct_answer || '')}
+              onChange={e => setForm({ ...form, correct_answer: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+              style={styles.input}
+              placeholder="réponse1, réponse2, réponse3..."
+            />
+            <p style={{ margin: '8px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Séparez les réponses alternatives par des virgules. La comparaison est insensible à la casse.
+            </p>
+          </div>
+        )}
+
+        {/* Matching - Association de paires */}
+        {form.question_type === 'matching' && (
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ArrowRightLeft size={16} color={colors.success} />
+                Paires à associer
+              </span>
+            </label>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Créez les paires correctes. Les éléments de droite seront mélangés lors du quiz.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {form.options.map((pair, idx) => (
+                <div key={idx} style={{
+                  display: 'grid', gridTemplateColumns: '1fr auto 1fr auto', gap: '12px', alignItems: 'center',
+                  padding: '12px', borderRadius: '10px',
+                  background: isDark ? '#1e293b' : 'white',
+                  border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      type="text"
+                      value={pair.left_fr || ''}
+                      onChange={e => handleOptionChange(idx, 'left_fr', e.target.value)}
+                      style={styles.input}
+                      placeholder={`Élément gauche ${idx + 1} (FR)`}
+                    />
+                    <input
+                      type="text"
+                      value={pair.left_en || ''}
+                      onChange={e => handleOptionChange(idx, 'left_en', e.target.value)}
+                      style={{ ...styles.input, fontSize: '12px' }}
+                      placeholder="(EN)"
+                    />
+                  </div>
+                  <ArrowRightLeft size={20} color={colors.success} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      type="text"
+                      value={pair.right_fr || ''}
+                      onChange={e => handleOptionChange(idx, 'right_fr', e.target.value)}
+                      style={styles.input}
+                      placeholder={`Élément droit ${idx + 1} (FR)`}
+                    />
+                    <input
+                      type="text"
+                      value={pair.right_en || ''}
+                      onChange={e => handleOptionChange(idx, 'right_en', e.target.value)}
+                      style={{ ...styles.input, fontSize: '12px' }}
+                      placeholder="(EN)"
+                    />
+                  </div>
+                  {form.options.length > 2 && (
+                    <button onClick={() => removeOption(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {form.options.length < 8 && (
+              <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
+                <Plus size={14} /> Ajouter une paire
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Ordering - Classement */}
+        {form.question_type === 'ordering' && (
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ListChecks size={16} color={colors.info || '#3b82f6'} />
+                Éléments à ordonner (dans l'ordre correct)
+              </span>
+            </label>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Ajoutez les éléments dans l'ordre correct. L'apprenant devra les remettre dans cet ordre.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(form.options || []).map((opt, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{
+                    background: colors.info || '#3b82f6', color: '#fff', borderRadius: '50%',
+                    width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 'bold', flexShrink: 0
+                  }}>{idx + 1}</span>
+                  <input
+                    value={opt.text_fr || ''}
+                    onChange={e => {
+                      const newOpts = [...form.options];
+                      newOpts[idx] = { ...newOpts[idx], text_fr: e.target.value };
+                      setForm({ ...form, options: newOpts });
+                    }}
+                    placeholder={`Élément ${idx + 1} (FR)`}
+                    style={{ ...styles.input, flex: 1 }}
+                  />
+                  <input
+                    value={opt.text_en || ''}
+                    onChange={e => {
+                      const newOpts = [...form.options];
+                      newOpts[idx] = { ...newOpts[idx], text_en: e.target.value };
+                      setForm({ ...form, options: newOpts });
+                    }}
+                    placeholder="(EN)"
+                    style={{ ...styles.input, flex: 1, fontSize: '12px' }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (idx > 0) {
+                        const newOpts = [...form.options];
+                        [newOpts[idx-1], newOpts[idx]] = [newOpts[idx], newOpts[idx-1]];
+                        setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                      }
+                    }}
+                    disabled={idx === 0}
+                    style={{ ...styles.btnIcon, opacity: idx === 0 ? 0.3 : 1 }}
+                    title="Monter"
+                  >&#8593;</button>
+                  <button
+                    onClick={() => {
+                      if (idx < form.options.length - 1) {
+                        const newOpts = [...form.options];
+                        [newOpts[idx], newOpts[idx+1]] = [newOpts[idx+1], newOpts[idx]];
+                        setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                      }
+                    }}
+                    disabled={idx === form.options.length - 1}
+                    style={{ ...styles.btnIcon, opacity: idx === form.options.length - 1 ? 0.3 : 1 }}
+                    title="Descendre"
+                  >&#8595;</button>
+                  {form.options.length > 2 && (
+                    <button
+                      onClick={() => {
+                        const newOpts = form.options.filter((_, i) => i !== idx);
+                        setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                      }}
+                      style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
+                      title="Supprimer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {form.options.length < 10 && (
+              <button
+                onClick={() => {
+                  const newOpts = [...(form.options || []), { text_fr: '', text_en: '' }];
+                  setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
+                }}
+                style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}
+              >
+                <Plus size={14} /> Ajouter un élément
+              </button>
+            )}
+            <p style={{ margin: '8px 0 0', fontSize: '11px', color: isDark ? '#6b7280' : '#9ca3af' }}>
+              L'ordre actuel sera considéré comme l'ordre correct.
+            </p>
+          </div>
+        )}
+
+        {/* Fill Blank - Texte à trous */}
+        {form.question_type === 'fill_blank' && (
+          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <TextCursorInput size={16} color={colors.error} />
+                Réponses pour chaque trou
+              </span>
+            </label>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Entrez la réponse attendue pour chaque trou dans l'ordre d'apparition dans le texte.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(Array.isArray(form.correct_answer) ? form.correct_answer : ['']).map((answer, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '8px',
+                    background: colors.primary, color: 'white', fontSize: '12px', fontWeight: '700'
+                  }}>
+                    {idx + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={answer || ''}
+                    onChange={e => handleFillBlankAnswer(idx, e.target.value)}
+                    style={{ ...styles.input, flex: 1 }}
+                    placeholder={`Réponse pour le trou ${idx + 1}`}
+                  />
+                  {(Array.isArray(form.correct_answer) ? form.correct_answer : []).length > 1 && (
+                    <button onClick={() => removeFillBlankSlot(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button onClick={addFillBlankSlot} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
+              <Plus size={14} /> Ajouter un trou
+            </button>
+          </div>
+        )}
+
+        {/* Explanation */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Explication (FR) - Affichée après la réponse</label>
+            <textarea
+              value={form.explanation_fr}
+              onChange={e => setForm({ ...form, explanation_fr: e.target.value })}
+              style={{ ...styles.input, minHeight: '100px' }}
+              placeholder="Explication de la bonne réponse..."
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Explication (EN)</label>
+            <textarea
+              value={form.explanation_en}
+              onChange={e => setForm({ ...form, explanation_en: e.target.value })}
+              style={{ ...styles.input, minHeight: '100px' }}
+              placeholder="Explanation in English..."
+            />
+          </div>
+        </div>
+
+        {/* Active checkbox */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} style={{ width: '18px', height: '18px' }} />
+            <span style={{ fontSize: '14px' }}>Question active (visible dans les quiz)</span>
+          </label>
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'flex-end',
+          paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <button onClick={() => setShowQuestionForm(false)} style={styles.btnSecondary}>
+            Annuler
+          </button>
+          <button onClick={() => handleSaveQuestion(form)} style={styles.btnPrimary} disabled={!form.question_text_fr}>
+            {editingQuestion ? 'Enregistrer les modifications' : 'Créer la question'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const QuizFormInline = ({ editingQuiz, handleSaveQuiz, isDark, setShowQuizForm, styles }) => {
+  const [form, setForm] = useState({
+    title_fr: editingQuiz?.title_fr || '',
+    title_en: editingQuiz?.title_en || '',
+    description_fr: editingQuiz?.description_fr || '',
+    description_en: editingQuiz?.description_en || '',
+    quiz_type: editingQuiz?.quiz_type || 'graded',
+    time_limit_minutes: editingQuiz?.time_limit_minutes || null,
+    passing_score: editingQuiz?.passing_score || 70,
+    max_attempts: editingQuiz?.max_attempts || 3,
+    shuffle_questions: editingQuiz?.shuffle_questions !== false,
+    shuffle_options: editingQuiz?.shuffle_options !== false,
+    show_correct_answers: editingQuiz?.show_correct_answers !== false,
+    show_explanation: editingQuiz?.show_explanation !== false,
+    allow_retake: editingQuiz?.allow_retake !== false,
+    status: editingQuiz?.status || 'draft',
+    contributes_to_grade: editingQuiz?.contributes_to_grade !== false,
+    grade_weight: editingQuiz?.grade_weight || 1.00,
+    random_selection: editingQuiz?.random_selection || false,
+    question_count: editingQuiz?.question_count || null
+  });
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header with title and Retour button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `${colors.purple}15`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <FileQuestion size={20} color={colors.purple} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+              {editingQuiz ? 'Modifier le Quiz' : 'Nouveau Quiz'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Configurez les paramètres du quiz
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowQuizForm(false)}
+          style={{
+            ...styles.btnSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ArrowLeft size={16} />
+          Retour
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Title FR/EN side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Titre (Français) *</label>
+            <input
+              type="text"
+              value={form.title_fr}
+              onChange={e => setForm({ ...form, title_fr: e.target.value })}
+              style={styles.input}
+              placeholder="Quiz Module 1"
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Titre (Anglais)</label>
+            <input
+              type="text"
+              value={form.title_en}
+              onChange={e => setForm({ ...form, title_en: e.target.value })}
+              style={styles.input}
+              placeholder="Module 1 Quiz"
+            />
+          </div>
+        </div>
+
+        {/* Description FR/EN side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Description (Français)</label>
+            <textarea
+              value={form.description_fr}
+              onChange={e => setForm({ ...form, description_fr: e.target.value })}
+              style={{ ...styles.input, minHeight: '100px' }}
+              placeholder="Description du quiz..."
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Description (Anglais)</label>
+            <textarea
+              value={form.description_en}
+              onChange={e => setForm({ ...form, description_en: e.target.value })}
+              style={{ ...styles.input, minHeight: '100px' }}
+              placeholder="Quiz description..."
+            />
+          </div>
+        </div>
+
+        {/* Type, Status, and Settings all on same row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Type de quiz</label>
+            <select value={form.quiz_type} onChange={e => setForm({ ...form, quiz_type: e.target.value })} style={styles.select}>
+              <option value="practice">Pratique (non noté)</option>
+              <option value="graded">Noté</option>
+              <option value="final_exam">Examen Final</option>
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Statut</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
+              <option value="draft">Brouillon</option>
+              <option value="published">Publié</option>
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Seuil réussite (%)</label>
+            <input
+              type="number"
+              value={form.passing_score}
+              onChange={e => setForm({ ...form, passing_score: parseInt(e.target.value) || 70 })}
+              style={styles.input}
+              min="0"
+              max="100"
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Limite temps (min)</label>
+            <input
+              type="number"
+              value={form.time_limit_minutes || ''}
+              onChange={e => setForm({ ...form, time_limit_minutes: e.target.value ? parseInt(e.target.value) : null })}
+              style={styles.input}
+              min="1"
+              placeholder="∞"
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Tentatives max</label>
+            <input
+              type="number"
+              value={form.max_attempts}
+              onChange={e => setForm({ ...form, max_attempts: parseInt(e.target.value) || 1 })}
+              style={styles.input}
+              min="1"
+              max="10"
+            />
+          </div>
+        </div>
+
+        {/* Grade weighting settings */}
+        <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc', padding: '16px' }}>
+          <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={16} color={colors.warning} />
+              Pondération de la Note
+            </span>
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.contributes_to_grade ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.contributes_to_grade ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input
+                type="checkbox"
+                checked={form.contributes_to_grade}
+                onChange={e => setForm({ ...form, contributes_to_grade: e.target.checked })}
+                style={{ accentColor: colors.success }}
+              />
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Compte dans la note finale</span>
+                <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Ce quiz sera inclus dans le calcul de la moyenne
+                </p>
+              </div>
+            </label>
+            <div>
+              <label style={styles.label}>Coefficient (poids)</label>
+              <input
+                type="number"
+                value={form.grade_weight}
+                onChange={e => setForm({ ...form, grade_weight: parseFloat(e.target.value) || 1 })}
+                style={styles.input}
+                min="0.1"
+                max="10"
+                step="0.1"
+                disabled={!form.contributes_to_grade}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                Ex: 2.0 = compte double dans la moyenne
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Banque de Questions */}
+        <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc', padding: '16px' }}>
+          <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Shuffle size={16} color={colors.info} />
+              Banque de Questions (Sélection Aléatoire)
+            </span>
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.random_selection ? `${colors.info}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.random_selection ? colors.info : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input
+                type="checkbox"
+                checked={form.random_selection}
+                onChange={e => setForm({ ...form, random_selection: e.target.checked })}
+                style={{ accentColor: colors.info }}
+              />
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Activer la banque de questions</span>
+                <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Sélectionne aléatoirement un nombre limité de questions
+                </p>
+              </div>
+            </label>
+            <div>
+              <label style={styles.label}>Nombre de questions à afficher</label>
+              <input
+                type="number"
+                value={form.question_count || ''}
+                onChange={e => setForm({ ...form, question_count: e.target.value ? parseInt(e.target.value) : null })}
+                style={styles.input}
+                min="1"
+                placeholder={editingQuiz?.total_questions ? `Max: ${editingQuiz.total_questions}` : 'Ex: 20'}
+                disabled={!form.random_selection}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                {editingQuiz?.total_questions
+                  ? `${form.question_count || editingQuiz.total_questions} questions sur ${editingQuiz.total_questions} dans la banque`
+                  : 'Ajoutez des questions au quiz pour définir la banque'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Options */}
+        <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+          <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Settings size={16} color={colors.primary} />
+              Options du Quiz
+            </span>
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.shuffle_questions ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.shuffle_questions ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input type="checkbox" checked={form.shuffle_questions} onChange={e => setForm({ ...form, shuffle_questions: e.target.checked })} style={{ accentColor: colors.success }} />
+              <span style={{ fontSize: '13px' }}>Mélanger les questions</span>
+            </label>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.shuffle_options ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.shuffle_options ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input type="checkbox" checked={form.shuffle_options} onChange={e => setForm({ ...form, shuffle_options: e.target.checked })} style={{ accentColor: colors.success }} />
+              <span style={{ fontSize: '13px' }}>Mélanger les options</span>
+            </label>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.show_correct_answers ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.show_correct_answers ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input type="checkbox" checked={form.show_correct_answers} onChange={e => setForm({ ...form, show_correct_answers: e.target.checked })} style={{ accentColor: colors.success }} />
+              <span style={{ fontSize: '13px' }}>Afficher bonnes réponses</span>
+            </label>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.show_explanation ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.show_explanation ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input type="checkbox" checked={form.show_explanation} onChange={e => setForm({ ...form, show_explanation: e.target.checked })} style={{ accentColor: colors.success }} />
+              <span style={{ fontSize: '13px' }}>Afficher explications</span>
+            </label>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+              padding: '14px', borderRadius: '10px',
+              background: form.allow_retake ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+              border: `1px solid ${form.allow_retake ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+            }}>
+              <input type="checkbox" checked={form.allow_retake} onChange={e => setForm({ ...form, allow_retake: e.target.checked })} style={{ accentColor: colors.success }} />
+              <span style={{ fontSize: '13px' }}>Permettre les reprises</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'flex-end',
+          paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+        }}>
+          <button onClick={() => setShowQuizForm(false)} style={styles.btnSecondary}>
+            Annuler
+          </button>
+          <button onClick={() => handleSaveQuiz(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
+            {editingQuiz ? 'Enregistrer les modifications' : 'Créer le quiz'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CertificateTemplateEditor = ({ certificateTemplates, editingTemplate, fetchCertificateTemplates, isDark, setShowTemplateEditor, setToast, styles, token }) => {
+  const [activeTab, setActiveTab] = useState('templates'); // templates, design, preview
+  const [selectedTemplate, setSelectedTemplate] = useState(editingTemplate || certificateTemplates.find(t => t.is_default) || null);
+
+  // Parse logos and signatories from template
+  const parseLogos = (template) => {
+    if (template?.logos) {
+      try { return JSON.parse(template.logos); } catch (e) { return []; }
+    }
+    // Fallback to legacy single logo
+    if (template?.logo_url) {
+      return [{ url: template.logo_url, position: template.logo_position || 'top-center', width: template.logo_width || 100 }];
+    }
+    return [];
+  };
+
+  const parseSignatories = (template) => {
+    if (template?.signatories) {
+      try { return JSON.parse(template.signatories); } catch (e) { return []; }
+    }
+    // Fallback to legacy single signatory
+    if (template?.signatory_name) {
+      return [{ name: template.signatory_name, title: template.signatory_title || '', position: 'center' }];
+    }
+    return [];
+  };
+
+  const [form, setForm] = useState({
+    name: selectedTemplate?.name || '',
+    description: selectedTemplate?.description || '',
+    background_image: selectedTemplate?.background_image || '',
+    background_color: selectedTemplate?.background_color || '#ffffff',
+    logos: parseLogos(selectedTemplate),
+    title_text: selectedTemplate?.title_text || 'CERTIFICAT DE RÉUSSITE',
+    title_font: selectedTemplate?.title_font || 'serif',
+    title_size: selectedTemplate?.title_size || 36,
+    title_color: selectedTemplate?.title_color || '#1a365d',
+    body_font: selectedTemplate?.body_font || 'sans-serif',
+    body_color: selectedTemplate?.body_color || '#2d3748',
+    border_style: selectedTemplate?.border_style || 'ornate',
+    border_color: selectedTemplate?.border_color || '#c5a572',
+    border_width: selectedTemplate?.border_width || 10,
+    signatories: parseSignatories(selectedTemplate),
+    show_signature: selectedTemplate?.show_signature !== false,
+    show_qr_code: selectedTemplate?.show_qr_code !== false,
+    qr_position: selectedTemplate?.qr_position || 'bottom-right',
+    show_score: selectedTemplate?.show_score !== false,
+    show_date: selectedTemplate?.show_date !== false,
+    show_hours: selectedTemplate?.show_hours !== false,
+    is_default: selectedTemplate?.is_default || false
+  });
+
+  const [uploading, setUploading] = useState(false);
+
+  const handleBackgroundUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await api.upload('/elearning/certificate-templates/upload-background', formData, token);
+      if (res.success) {
+        setForm({ ...form, background_image: res.data.url });
+        setToast({ message: 'Image uploadée', type: 'success' });
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur upload', type: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e, logoIndex = null) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await api.upload('/elearning/certificate-templates/upload-background', formData, token);
+      if (res.success) {
+        const newLogos = [...form.logos];
+        if (logoIndex !== null && logoIndex < newLogos.length) {
+          newLogos[logoIndex] = { ...newLogos[logoIndex], url: res.data.url };
+        } else {
+          // Add new logo
+          const positions = ['top-left', 'top-center', 'top-right'];
+          const usedPositions = newLogos.map(l => l.position);
+          const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'top-center';
+          newLogos.push({ url: res.data.url, position: availablePosition, width: 90 });
+        }
+        setForm({ ...form, logos: newLogos });
+        setToast({ message: 'Logo uploadé', type: 'success' });
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur upload', type: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeLogo = (index) => {
+    const newLogos = form.logos.filter((_, i) => i !== index);
+    setForm({ ...form, logos: newLogos });
+  };
+
+  const updateLogo = (index, field, value) => {
+    const newLogos = [...form.logos];
+    newLogos[index] = { ...newLogos[index], [field]: value };
+    setForm({ ...form, logos: newLogos });
+  };
+
+  const addSignatory = () => {
+    if (form.signatories.length >= 3) return;
+    const positions = ['left', 'center', 'right'];
+    const usedPositions = form.signatories.map(s => s.position);
+    const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'center';
+    setForm({
+      ...form,
+      signatories: [...form.signatories, { name: '', title: '', position: availablePosition }]
+    });
+  };
+
+  const removeSignatory = (index) => {
+    const newSignatories = form.signatories.filter((_, i) => i !== index);
+    setForm({ ...form, signatories: newSignatories });
+  };
+
+  const updateSignatory = (index, field, value) => {
+    const newSignatories = [...form.signatories];
+    newSignatories[index] = { ...newSignatories[index], [field]: value };
+    setForm({ ...form, signatories: newSignatories });
+  };
+
+  const handleSaveTemplate = async () => {
+    try {
+      const endpoint = selectedTemplate?.id
+        ? `/elearning/certificate-templates/${selectedTemplate.id}`
+        : '/elearning/certificate-templates';
+      const method = selectedTemplate?.id ? 'put' : 'post';
+
+      // Prepare data with JSON stringified logos and signatories
+      const saveData = {
+        ...form,
+        logos: JSON.stringify(form.logos),
+        signatories: JSON.stringify(form.signatories),
+        // Legacy fields for backward compatibility
+        logo_url: form.logos[0]?.url || '',
+        logo_position: form.logos[0]?.position || 'top-center',
+        logo_width: form.logos[0]?.width || 100,
+        signatory_name: form.signatories[0]?.name || '',
+        signatory_title: form.signatories[0]?.title || ''
+      };
+
+      const res = await api[method](endpoint, saveData, token);
+      if (res.success) {
+        setToast({ message: 'Template sauvegardé', type: 'success' });
+        fetchCertificateTemplates();
+        if (!selectedTemplate?.id) {
+          setSelectedTemplate({ ...form, id: res.data?.id });
+        }
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur de sauvegarde', type: 'error' });
+    }
+  };
+
+  const handleSetDefault = async (templateId) => {
+    try {
+      await api.put(`/elearning/certificate-templates/${templateId}`, { is_default: true }, token);
+      setToast({ message: 'Template par défaut mis à jour', type: 'success' });
+      fetchCertificateTemplates();
+    } catch (error) {
+      setToast({ message: 'Erreur', type: 'error' });
+    }
+  };
+
+  const borderStyles = [
+    { value: 'none', label: 'Aucune', preview: 'transparent' },
+    { value: 'simple', label: 'Simple', preview: '#e2e8f0' },
+    { value: 'double', label: 'Double', preview: '#94a3b8' },
+    { value: 'ornate', label: 'Ornée', preview: '#c5a572' },
+    { value: 'gold', label: 'Dorée', preview: '#d4af37' }
+  ];
+
+  return (
+    <div style={{ ...styles.card, padding: '0' }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: isDark ? '#1e293b' : '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: `linear-gradient(135deg, ${colors.purple}20 0%, ${colors.primary}20 100%)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Award size={20} color={colors.purple} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Personnaliser le Diplôme</h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+              Configurez l'apparence de vos certificats
+            </p>
+          </div>
+        </div>
+        <button onClick={() => setShowTemplateEditor(false)} style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ArrowLeft size={16} /> Retour
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+        {[
+          { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+          { id: 'design', label: 'Design', icon: Palette },
+          { id: 'preview', label: 'Aperçu', icon: Eye }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '14px 24px', border: 'none', cursor: 'pointer',
+              background: 'transparent', fontSize: '14px', fontWeight: '500',
+              color: activeTab === tab.id ? colors.primary : (isDark ? '#94a3b8' : '#64748b'),
+              borderBottom: activeTab === tab.id ? `2px solid ${colors.primary}` : '2px solid transparent',
+              marginBottom: '-1px', transition: 'all 0.2s'
+            }}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: '24px' }}>
+        {/* Templates Tab */}
+        {activeTab === 'templates' && (
+          <div>
+            <p style={{ margin: '0 0 20px', color: isDark ? '#94a3b8' : '#64748b' }}>
+              Sélectionnez un template prédéfini ou créez le vôtre
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+              {certificateTemplates.map(template => (
+                <div
+                  key={template.id}
+                  onClick={() => {
+                    setSelectedTemplate(template);
+                    setForm({
+                      ...form,
+                      name: template.name,
+                      description: template.description,
+                      background_image: template.background_image,
+                      background_color: template.background_color,
+                      logos: parseLogos(template),
+                      border_style: template.border_style,
+                      border_color: template.border_color,
+                      title_text: template.title_text,
+                      title_color: template.title_color,
+                      signatories: parseSignatories(template),
+                      is_default: template.is_default
+                    });
+                  }}
+                  style={{
+                    padding: '20px', borderRadius: '12px', cursor: 'pointer',
+                    border: `2px solid ${selectedTemplate?.id === template.id ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
+                    background: selectedTemplate?.id === template.id ? `${colors.primary}10` : (isDark ? '#1e293b' : 'white'),
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {/* Mini Preview */}
+                  <div style={{
+                    height: '120px', borderRadius: '8px', marginBottom: '12px',
+                    background: template.background_image ? `url(${template.background_image}) center/cover` : template.background_color || '#f8fafc',
+                    border: template.border_style !== 'none' ? `3px ${template.border_style === 'double' ? 'double' : 'solid'} ${template.border_color || '#c5a572'}` : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    position: 'relative'
+                  }}>
+                    <Award size={32} color={template.title_color || '#1a365d'} style={{ opacity: 0.3 }} />
+                    {template.is_default && (
+                      <span style={{
+                        position: 'absolute', top: '8px', right: '8px',
+                        padding: '2px 8px', borderRadius: '10px', fontSize: '10px',
+                        background: colors.success, color: 'white', fontWeight: '600'
+                      }}>
+                        Défaut
+                      </span>
+                    )}
+                  </div>
+                  <h4 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: '600' }}>{template.name}</h4>
+                  <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                    {template.description || 'Aucune description'}
+                  </p>
+                  {!template.is_default && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleSetDefault(template.id); }}
+                      style={{ ...styles.btnSecondary, marginTop: '12px', width: '100%', fontSize: '12px', padding: '8px' }}
+                    >
+                      Définir par défaut
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* New Template Card */}
+              <div
+                onClick={() => {
+                  setSelectedTemplate(null);
+                  setForm({
+                    name: 'Nouveau Template',
+                    description: '',
+                    background_image: '',
+                    background_color: '#ffffff',
+                    logos: [],
+                    title_text: 'CERTIFICAT DE RÉUSSITE',
+                    title_font: 'serif',
+                    title_size: 36,
+                    title_color: '#1a365d',
+                    body_font: 'sans-serif',
+                    body_color: '#2d3748',
+                    border_style: 'ornate',
+                    border_color: '#c5a572',
+                    border_width: 10,
+                    signatories: [],
+                    show_signature: true,
+                    show_qr_code: true,
+                    qr_position: 'bottom-right',
+                    show_score: true,
+                    show_date: true,
+                    show_hours: true,
+                    is_default: false
+                  });
+                  setActiveTab('design');
+                }}
+                style={{
+                  padding: '20px', borderRadius: '12px', cursor: 'pointer',
+                  border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
+                  background: isDark ? '#0f172a' : '#f8fafc',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  minHeight: '200px', transition: 'all 0.2s'
+                }}
+              >
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '50%',
+                  background: `${colors.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <Plus size={24} color={colors.primary} />
+                </div>
+                <span style={{ fontWeight: '500', color: colors.primary }}>Créer un Template</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Design Tab */}
+        {activeTab === 'design' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            {/* Left Column - Settings */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Basic Info */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={16} color={colors.primary} /> Informations
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={styles.label}>Nom du template</label>
+                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={styles.input} />
+                  </div>
+                  <div>
+                    <label style={styles.label}>Titre du certificat</label>
+                    <input type="text" value={form.title_text} onChange={e => setForm({ ...form, title_text: e.target.value })} style={styles.input} placeholder="CERTIFICAT DE RÉUSSITE" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Background */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ImageIcon size={16} color={colors.primary} /> Arrière-plan
+                </h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.label}>Couleur</label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input type="color" value={form.background_color} onChange={e => setForm({ ...form, background_color: e.target.value })} style={{ width: '50px', height: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
+                      <input type="text" value={form.background_color} onChange={e => setForm({ ...form, background_color: e.target.value })} style={{ ...styles.input, flex: 1 }} />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.label}>Image (optionnel)</label>
+                    <input type="file" accept="image/*" onChange={handleBackgroundUpload} style={{ display: 'none' }} id="bg-upload" />
+                    <label htmlFor="bg-upload" style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', justifyContent: 'center' }}>
+                      {uploading ? <Loader size={14} className="spin" /> : <Upload size={14} />}
+                      {form.background_image ? 'Changer' : 'Uploader'}
+                    </label>
+                  </div>
+                </div>
+                {form.background_image && (
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img src={form.background_image} alt="bg" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
+                    <button onClick={() => setForm({ ...form, background_image: '' })} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Border */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Square size={16} color={colors.primary} /> Bordure
+                </h4>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {borderStyles.map(style => (
+                    <button
+                      key={style.value}
+                      onClick={() => setForm({ ...form, border_style: style.value })}
+                      style={{
+                        padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                        border: `2px solid ${form.border_style === style.value ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
+                        background: form.border_style === style.value ? `${colors.primary}15` : 'transparent',
+                        color: form.border_style === style.value ? colors.primary : (isDark ? '#e2e8f0' : '#1e293b'),
+                        fontSize: '13px', fontWeight: '500'
+                      }}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+                {form.border_style !== 'none' && (
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>Couleur:</label>
+                    <input type="color" value={form.border_color} onChange={e => setForm({ ...form, border_color: e.target.value })} style={{ width: '40px', height: '30px', border: 'none', borderRadius: '6px', cursor: 'pointer' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Logos (Multiple) */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ImageIcon size={16} color={colors.primary} /> Logos ({form.logos.length}/3)
+                </h4>
+
+                {/* Logos ajoutés */}
+                {form.logos.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                    {form.logos.map((logo, index) => (
+                      <div key={index} style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '10px', borderRadius: '8px',
+                        background: isDark ? '#1e293b' : 'white',
+                        border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                      }}>
+                        <div style={{ width: '50px', height: '35px', background: '#f1f5f9', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                          <img src={logo.url.startsWith('/') ? `http://localhost:3003${logo.url}` : logo.url} alt={`Logo ${index + 1}`} style={{ maxHeight: '32px', maxWidth: '48px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                        </div>
+                        <select
+                          value={logo.position}
+                          onChange={(e) => updateLogo(index, 'position', e.target.value)}
+                          style={{ ...styles.select, width: '90px', fontSize: '11px', padding: '6px 8px' }}
+                        >
+                          <option value="top-left">Gauche</option>
+                          <option value="top-center">Centre</option>
+                          <option value="top-right">Droite</option>
+                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>Taille:</span>
+                          <input
+                            type="number"
+                            value={logo.width}
+                            onChange={(e) => updateLogo(index, 'width', parseInt(e.target.value) || 80)}
+                            style={{ ...styles.input, width: '55px', fontSize: '11px', padding: '6px 8px' }}
+                            min="40"
+                            max="200"
+                          />
+                        </div>
+                        <button onClick={() => removeLogo(index)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error, padding: '6px' }}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Sélection de logos prédéfinis */}
+                {form.logos.length < 3 && (
+                  <div>
+                    <p style={{ margin: '0 0 10px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                      Sélectionnez un logo :
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                      {[
+                        { url: '/uploads/images/Logo_Programme_Zoonoses.png', name: 'Programme Zoonoses' },
+                        { url: '/uploads/images/partners/minsante.png', name: 'MINSANTE' },
+                        { url: '/uploads/images/partners/minepia.png', name: 'MINEPIA' },
+                        { url: '/uploads/images/partners/oms.png', name: 'OMS' },
+                        { url: '/uploads/images/partners/fao.png', name: 'FAO' },
+                        { url: '/uploads/images/partners/cdc100.png', name: 'CDC' },
+                        { url: '/uploads/images/partners/usaid.jpg', name: 'USAID' },
+                        { url: '/uploads/images/partners/afrohun100.png', name: 'AFROHUN' }
+                      ].map((preset, idx) => {
+                        const isSelected = form.logos.some(l => l.url === preset.url);
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              if (isSelected) return;
+                              const positions = ['top-left', 'top-center', 'top-right'];
+                              const usedPositions = form.logos.map(l => l.position);
+                              const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'top-center';
+                              setForm({ ...form, logos: [...form.logos, { url: preset.url, position: availablePosition, width: 90 }] });
+                            }}
+                            disabled={isSelected}
+                            style={{
+                              padding: '8px', borderRadius: '8px', cursor: isSelected ? 'not-allowed' : 'pointer',
+                              border: `2px solid ${isSelected ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`,
+                              background: isSelected ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                              opacity: isSelected ? 0.6 : 1,
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+                            }}
+                            title={preset.name}
+                          >
+                            <div style={{ width: '40px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <img
+                                src={`http://localhost:3003${preset.url}`}
+                                alt={preset.name}
+                                style={{ maxWidth: '38px', maxHeight: '28px', objectFit: 'contain' }}
+                                onError={(e) => { e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="gray" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'; }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '9px', color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center', lineHeight: 1.1 }}>{preset.name}</span>
+                            {isSelected && <Check size={10} color={colors.success} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Upload personnalisé */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '8px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+                      <span style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Ou :</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleLogoUpload(e)} style={{ display: 'none' }} id="add-logo-upload" />
+                      <label htmlFor="add-logo-upload" style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', padding: '6px 12px' }}>
+                        {uploading ? <Loader size={12} className="spin" /> : <Upload size={12} />}
+                        Uploader un logo
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Signatories (Multiple) */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Edit3 size={16} color={colors.primary} /> Signataires ({form.signatories.length}/3)
+                  </h4>
+                  {form.signatories.length < 3 && (
+                    <button onClick={addSignatory} style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}>
+                      <Plus size={12} /> Ajouter
+                    </button>
+                  )}
+                </div>
+
+                {form.signatories.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px', background: isDark ? '#1e293b' : '#f1f5f9', borderRadius: '8px' }}>
+                    <Edit3 size={24} color={isDark ? '#64748b' : '#94a3b8'} style={{ marginBottom: '8px' }} />
+                    <p style={{ margin: 0, fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Aucun signataire. Cliquez sur "Ajouter".
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {form.signatories.map((sig, index) => (
+                      <div key={index} style={{
+                        padding: '12px', borderRadius: '8px',
+                        background: isDark ? '#1e293b' : 'white',
+                        border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                      }}>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            <input
+                              type="text"
+                              value={sig.name}
+                              onChange={(e) => updateSignatory(index, 'name', e.target.value)}
+                              style={{ ...styles.input, fontSize: '13px' }}
+                              placeholder="Nom du signataire"
+                            />
+                          </div>
+                          <select
+                            value={sig.position}
+                            onChange={(e) => updateSignatory(index, 'position', e.target.value)}
+                            style={{ ...styles.select, width: '100px', fontSize: '12px' }}
+                          >
+                            <option value="left">Gauche</option>
+                            <option value="center">Centre</option>
+                            <option value="right">Droite</option>
+                          </select>
+                          <button onClick={() => removeSignatory(index)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={sig.title}
+                          onChange={(e) => updateSignatory(index, 'title', e.target.value)}
+                          style={{ ...styles.input, fontSize: '12px' }}
+                          placeholder="Titre/Fonction"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column - Options & Preview */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Display Options */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Settings size={16} color={colors.primary} /> Options d'affichage
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {[
+                    { key: 'show_score', label: 'Afficher le score' },
+                    { key: 'show_date', label: 'Afficher la date' },
+                    { key: 'show_hours', label: 'Afficher les heures' },
+                    { key: 'show_qr_code', label: 'Afficher QR Code' },
+                    { key: 'show_signature', label: 'Afficher signature' }
+                  ].map(opt => (
+                    <label key={opt.key} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                      padding: '12px', borderRadius: '8px',
+                      background: form[opt.key] ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
+                      border: `1px solid ${form[opt.key] ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
+                    }}>
+                      <input type="checkbox" checked={form[opt.key]} onChange={e => setForm({ ...form, [opt.key]: e.target.checked })} style={{ accentColor: colors.success }} />
+                      <span style={{ fontSize: '13px' }}>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mini Preview */}
+              <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Eye size={16} color={colors.primary} /> Aperçu
+                </h4>
+                <div style={{
+                  aspectRatio: '1.4/1', borderRadius: '12px',
+                  background: form.background_image ? `url(${form.background_image}) center/cover` : form.background_color,
+                  border: form.border_style !== 'none' ? `${Math.max(form.border_width / 3, 3)}px ${form.border_style === 'double' ? 'double' : 'solid'} ${form.border_color}` : 'none',
+                  padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  position: 'relative', textAlign: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                }}>
+                  {/* Multiple Logos */}
+                  {form.logos.map((logo, idx) => (
+                    <img key={idx} src={logo.url} alt={`logo-${idx}`} style={{
+                      position: 'absolute',
+                      top: '8px',
+                      [logo.position === 'top-left' ? 'left' : logo.position === 'top-right' ? 'right' : 'left']: logo.position === 'top-center' ? '50%' : '8px',
+                      transform: logo.position === 'top-center' ? 'translateX(-50%)' : 'none',
+                      height: `${Math.min(logo.width / 3, 25)}px`, objectFit: 'contain'
+                    }} />
+                  ))}
+                  <Award size={20} color={form.title_color} style={{ marginBottom: '6px', opacity: 0.5, marginTop: form.logos.length > 0 ? '20px' : 0 }} />
+                  <h3 style={{ margin: 0, fontSize: '11px', fontFamily: form.title_font, color: form.title_color, fontWeight: '700' }}>
+                    {form.title_text}
+                  </h3>
+                  <p style={{ margin: '4px 0', fontSize: '8px', color: form.body_color }}>
+                    Décerné à <strong>Jean Exemple</strong>
+                  </p>
+                  {form.show_score && <p style={{ margin: '2px 0', fontSize: '7px', color: form.body_color }}>Score: 95%</p>}
+                  {/* Multiple Signatories */}
+                  {form.signatories.length > 0 && (
+                    <div style={{
+                      position: 'absolute', bottom: '8px', left: 0, right: 0,
+                      display: 'flex', justifyContent: form.signatories.length === 1 ? 'center' : 'space-around',
+                      padding: '0 10px'
+                    }}>
+                      {form.signatories.slice(0, 3).map((sig, idx) => (
+                        <div key={idx} style={{ textAlign: 'center', maxWidth: '60px' }}>
+                          <p style={{ margin: 0, fontSize: '6px', fontWeight: '600', color: form.body_color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sig.name}</p>
+                          <p style={{ margin: 0, fontSize: '5px', color: form.body_color, opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sig.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {form.show_qr_code && (
+                    <div style={{
+                      position: 'absolute', bottom: '8px',
+                      [form.qr_position === 'bottom-left' ? 'left' : 'right']: '8px',
+                      width: '20px', height: '20px',
+                      background: '#f0f0f0', borderRadius: '3px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <QrCode size={12} color="#333" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button onClick={handleSaveTemplate} style={{ ...styles.btnPrimary, width: '100%', padding: '14px', fontSize: '15px' }}>
+                <Save size={18} />
+                Sauvegarder le Template
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Preview Tab */}
+        {activeTab === 'preview' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
+            <p style={{ color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center' }}>
+              Aperçu du certificat avec le template "{form.name || 'sélectionné'}"
+            </p>
+            {/* Full Preview */}
+            <div style={{
+              width: '100%', maxWidth: '700px', aspectRatio: '1.414/1',
+              background: form.background_image ? `url(${form.background_image}) center/cover` : form.background_color,
+              border: form.border_style !== 'none' ? `${form.border_width}px ${form.border_style === 'double' ? 'double' : 'solid'} ${form.border_color}` : 'none',
+              borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+              padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+              position: 'relative', textAlign: 'center',
+              overflow: 'hidden'
+            }}>
+              {/* Decorative background bubbles */}
+              <div style={{ position: 'absolute', top: '-50px', left: '-50px', width: '200px', height: '200px', borderRadius: '50%', background: `${form.border_color}10`, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', bottom: '-80px', right: '-80px', width: '250px', height: '250px', borderRadius: '50%', background: `${form.title_color}08`, pointerEvents: 'none' }} />
+
+              {/* Multiple Logos */}
+              {form.logos.map((logo, idx) => (
+                <img key={idx} src={logo.url} alt={`logo-${idx}`} style={{
+                  position: 'absolute', top: '25px',
+                  [logo.position === 'top-left' ? 'left' : logo.position === 'top-right' ? 'right' : 'left']: logo.position === 'top-center' ? '50%' : '25px',
+                  transform: logo.position === 'top-center' ? 'translateX(-50%)' : 'none',
+                  height: `${logo.width / 2}px`, maxHeight: '60px', objectFit: 'contain'
+                }} />
+              ))}
+              <div style={{ marginTop: form.logos.length > 0 ? '50px' : '20px' }}>
+                <Award size={40} color={form.title_color} style={{ marginBottom: '12px', opacity: 0.6 }} />
+              </div>
+              <h1 style={{ margin: 0, fontSize: `${form.title_size / 1.5}px`, fontFamily: form.title_font, color: form.title_color, fontWeight: '700', letterSpacing: '2px' }}>
+                {form.title_text}
+              </h1>
+              <p style={{ margin: '16px 0 6px', fontSize: '13px', color: form.body_color, fontFamily: form.body_font }}>
+                Ce certificat est décerné à
+              </p>
+              <h2 style={{ margin: '0 0 16px', fontSize: '26px', color: form.title_color, fontFamily: form.body_font, fontWeight: '700' }}>
+                Jean-Pierre Exemple
+              </h2>
+              <div style={{ width: '120px', height: '2px', background: form.border_color, margin: '0 auto 16px', borderRadius: '1px' }} />
+              <p style={{ margin: 0, fontSize: '13px', color: form.body_color, fontFamily: form.body_font, maxWidth: '80%' }}>
+                Pour avoir complété avec succès la formation<br />
+                <strong style={{ color: form.title_color }}>"Introduction à l'Approche One Health"</strong>
+              </p>
+              {form.show_score && (
+                <div style={{ marginTop: '14px', padding: '8px 20px', background: `${colors.success}10`, borderRadius: '20px', display: 'inline-block' }}>
+                  <span style={{ fontSize: '14px', color: form.body_color, fontFamily: form.body_font }}>
+                    Score final: <strong style={{ color: colors.success }}>95%</strong>
+                  </span>
+                </div>
+              )}
+              {form.show_date && (
+                <p style={{ margin: '10px 0 0', fontSize: '11px', color: form.body_color, fontFamily: form.body_font, opacity: 0.7 }}>
+                  Délivré le {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              )}
+              {/* Multiple Signatories */}
+              {form.signatories.length > 0 && form.show_signature && (
+                <div style={{
+                  position: 'absolute', bottom: '35px', left: 0, right: 0,
+                  display: 'flex',
+                  justifyContent: form.signatories.length === 1 ? 'center' :
+                                 form.signatories.length === 2 ? 'space-around' : 'space-between',
+                  padding: '0 50px'
+                }}>
+                  {form.signatories.slice(0, 3).map((sig, idx) => (
+                    <div key={idx} style={{ textAlign: 'center', minWidth: '120px' }}>
+                      <div style={{ width: '80px', height: '1px', background: form.body_color, opacity: 0.3, margin: '0 auto 6px' }} />
+                      <p style={{ margin: 0, fontSize: '12px', fontWeight: '600', color: form.body_color }}>{sig.name || 'Signataire'}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: '10px', color: form.body_color, opacity: 0.7 }}>{sig.title}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {form.show_qr_code && (
+                <div style={{
+                  position: 'absolute', bottom: '25px',
+                  [form.qr_position === 'bottom-left' ? 'left' : 'right']: '25px',
+                  width: '55px', height: '55px',
+                  background: 'white', borderRadius: '8px', padding: '4px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <QrCode size={47} color="#333" />
+                </div>
+              )}
+            </div>
+            <button onClick={handleSaveTemplate} style={{ ...styles.btnPrimary, padding: '14px 32px', fontSize: '15px' }}>
+              <Save size={18} />
+              Sauvegarder ce Template
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const QuizQuestionsModal = ({ getDifficultyBadge, getQuestionTypeBadge, handleAddQuizQuestions, handleRemoveQuizQuestion, isDark, questions, selectedQuiz, setSelectedQuiz, setShowQuizQuestionsModal, showQuizQuestionsModal, styles }) => {
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  // Get questions already in quiz
+  const quizQuestionIds = selectedQuiz?.questions?.map(q => q.id) || [];
+
+  // Filter available questions
+  const availableQuestions = questions.filter(q => {
+    if (!q.is_active) return false;
+    if (quizQuestionIds.includes(q.id)) return false;
+    if (searchQuery && !q.question_text_fr?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (typeFilter !== 'all' && q.question_type !== typeFilter) return false;
+    return true;
+  });
+
+  const toggleQuestion = (questionId) => {
+    if (selectedQuestionIds.includes(questionId)) {
+      setSelectedQuestionIds(selectedQuestionIds.filter(id => id !== questionId));
+    } else {
+      setSelectedQuestionIds([...selectedQuestionIds, questionId]);
+    }
+  };
+
+  const handleAdd = () => {
+    if (selectedQuestionIds.length > 0 && selectedQuiz) {
+      handleAddQuizQuestions(selectedQuiz.id, selectedQuestionIds);
+      setSelectedQuestionIds([]);
+    }
+  };
+
+  return (
+    <Modal isOpen={showQuizQuestionsModal} onClose={() => { setShowQuizQuestionsModal(false); setSelectedQuiz(null); }} title={`Gérer les questions - ${selectedQuiz?.title_fr || ''}`} isDark={isDark} width="900px">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxHeight: '70vh' }}>
+        {/* Left: Questions in Quiz */}
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: colors.primary }}>
+            Questions dans le quiz ({selectedQuiz?.questions?.length || 0})
+          </h4>
+          <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px' }}>
+            {selectedQuiz?.questions?.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {selectedQuiz.questions.map((q, idx) => (
+                  <div key={q.id} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px',
+                    borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc'
+                  }}>
+                    <span style={{
+                      width: '24px', height: '24px', borderRadius: '6px', background: colors.primary,
+                      color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '12px', fontWeight: '700', flexShrink: 0
+                    }}>
+                      {idx + 1}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '500' }}>
+                        {q.question_text_fr?.substring(0, 80)}...
+                      </p>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {getQuestionTypeBadge(q.question_type)}
+                        <span style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                          {q.points} pt{q.points > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveQuizQuestion(selectedQuiz.id, q.id)}
+                      style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}
+                      title="Retirer"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                <FileQuestion size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                <p style={{ margin: 0, fontSize: '13px' }}>Aucune question dans ce quiz</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Available Questions */}
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: colors.success }}>
+            Banque de questions ({availableQuestions.length})
+          </h4>
+          {/* Search & Filter */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Rechercher..."
+                style={{ ...styles.input, paddingLeft: '36px', fontSize: '13px' }}
+              />
+            </div>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ ...styles.select, width: '140px', fontSize: '13px' }}>
+              <option value="all">Tous types</option>
+              <option value="mcq">QCM</option>
+              <option value="multiple_select">Multiple</option>
+              <option value="true_false">Vrai/Faux</option>
+              <option value="short_answer">Courte</option>
+              <option value="matching">Association</option>
+              <option value="fill_blank">Texte à trous</option>
+              <option value="ordering">Classement</option>
+            </select>
+          </div>
+          {/* Questions List */}
+          <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px' }}>
+            {availableQuestions.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {availableQuestions.slice(0, 50).map(q => (
+                  <label
+                    key={q.id}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px',
+                      borderRadius: '10px', cursor: 'pointer',
+                      background: selectedQuestionIds.includes(q.id)
+                        ? `${colors.success}15`
+                        : (isDark ? '#1e293b' : '#f8fafc'),
+                      border: `2px solid ${selectedQuestionIds.includes(q.id) ? colors.success : 'transparent'}`,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedQuestionIds.includes(q.id)}
+                      onChange={() => toggleQuestion(q.id)}
+                      style={{ width: '18px', height: '18px', marginTop: '2px' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '500' }}>
+                        {q.question_text_fr?.substring(0, 80)}...
+                      </p>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {getQuestionTypeBadge(q.question_type)}
+                        {getDifficultyBadge(q.difficulty)}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
+                <p style={{ margin: 0, fontSize: '13px' }}>Aucune question disponible</p>
+              </div>
+            )}
+          </div>
+          {/* Add Button */}
+          {selectedQuestionIds.length > 0 && (
+            <button onClick={handleAdd} style={{ ...styles.btnPrimary, marginTop: '12px', background: colors.success }}>
+              <Plus size={18} /> Ajouter {selectedQuestionIds.length} question{selectedQuestionIds.length > 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const CategoryModal = ({ editingCategory, handleSaveCategory, isDark, setShowCategoryModal, showCategoryModal, styles }) => {
+  const [form, setForm] = useState({
+    name_fr: editingCategory?.name_fr || '',
+    name_en: editingCategory?.name_en || '',
+    description_fr: editingCategory?.description_fr || '',
+    color: editingCategory?.color || '#2196F3',
+    icon: editingCategory?.icon || ''
+  });
+
+  return (
+    <Modal isOpen={showCategoryModal} onClose={() => setShowCategoryModal(false)} title={editingCategory ? 'Modifier la Catégorie' : 'Nouvelle Catégorie'} isDark={isDark} width="500px">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div>
+          <label style={styles.label}>Nom (Français) *</label>
+          <input type="text" value={form.name_fr} onChange={e => setForm({ ...form, name_fr: e.target.value })}
+            style={styles.input} placeholder="Santé Humaine" />
+        </div>
+        <div>
+          <label style={styles.label}>Nom (Anglais)</label>
+          <input type="text" value={form.name_en} onChange={e => setForm({ ...form, name_en: e.target.value })}
+            style={styles.input} placeholder="Human Health" />
+        </div>
+        <div>
+          <label style={styles.label}>Description</label>
+          <textarea value={form.description_fr} onChange={e => setForm({ ...form, description_fr: e.target.value })}
+            style={{ ...styles.input, minHeight: '80px' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={styles.label}>Couleur</label>
+            <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}
+              style={{ ...styles.input, padding: '4px', height: '44px' }} />
+          </div>
+          <div>
+            <label style={styles.label}>Icône (emoji)</label>
+            <input type="text" value={form.icon} onChange={e => setForm({ ...form, icon: e.target.value })}
+              style={styles.input} placeholder="🏥" maxLength={2} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+          <button onClick={() => setShowCategoryModal(false)} style={styles.btnSecondary}>Annuler</button>
+          <button onClick={() => handleSaveCategory(form)} style={styles.btnPrimary} disabled={!form.name_fr}>
+            {editingCategory ? 'Enregistrer' : 'Créer'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const OHELearningPage = ({ isDark, token }) => {
   const styles = createStyles(isDark);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14945,6 +19098,96 @@ const OHELearningPage = ({ isDark, token }) => {
     } catch (error) {
       setToast({ message: 'Erreur de connexion', type: 'error' });
     }
+  };
+
+  // Lesson ordering (drag & drop, arrows) and duplication
+  const [lessonDrag, setLessonDrag] = useState(null); // { lessonId, moduleId }
+  const [lessonDragOver, setLessonDragOver] = useState(null);
+  const [lessonDragArmed, setLessonDragArmed] = useState(null);
+
+  const refreshCurriculum = async () => {
+    const currRes = await api.get(`/elearning/courses/${selectedCourse.id}/curriculum`, token);
+    if (currRes.success) {
+      setSelectedCourse(prev => ({ ...prev, modules: currRes.data.modules }));
+    }
+  };
+
+  // Applique un nouvel ordre localement (affichage immédiat) puis l'enregistre
+  const saveLessonOrder = async (modulesNext, payload) => {
+    setSelectedCourse(prev => ({ ...prev, modules: modulesNext }));
+    try {
+      const res = await api.put('/elearning/lessons/reorder', { lessons: payload }, token);
+      if (!res.success) {
+        setToast({ message: res.message || 'Erreur lors du réordonnancement', type: 'error' });
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur de connexion', type: 'error' });
+    }
+    refreshCurriculum();
+  };
+
+  const handleMoveLesson = (module, index, dir) => {
+    const lessons = [...(module.lessons || [])];
+    const target = index + dir;
+    if (target < 0 || target >= lessons.length) return;
+    [lessons[index], lessons[target]] = [lessons[target], lessons[index]];
+    const modulesNext = selectedCourse.modules.map(m => (m.id === module.id ? { ...m, lessons } : m));
+    saveLessonOrder(modulesNext, lessons.map((l, i) => ({ id: l.id, sort_order: i + 1, module_id: module.id })));
+  };
+
+  const handleLessonDrop = (targetModule, targetIndex) => {
+    const drag = lessonDrag;
+    setLessonDrag(null);
+    setLessonDragOver(null);
+    setLessonDragArmed(null);
+    if (!drag) return;
+    const sourceModule = selectedCourse.modules.find(m => m.id === drag.moduleId);
+    const moving = sourceModule?.lessons?.find(l => l.id === drag.lessonId);
+    if (!moving) return;
+
+    const sourceLessons = sourceModule.lessons.filter(l => l.id !== drag.lessonId);
+    const targetLessons = targetModule.id === sourceModule.id
+      ? [...sourceLessons]
+      : [...(targetModule.lessons || [])];
+    const fromIndex = sourceModule.lessons.findIndex(l => l.id === drag.lessonId);
+    if (targetModule.id === sourceModule.id && fromIndex === targetIndex) return;
+    targetLessons.splice(Math.min(targetIndex, targetLessons.length), 0, { ...moving, module_id: targetModule.id });
+
+    const modulesNext = selectedCourse.modules.map(m => {
+      if (m.id === targetModule.id) return { ...m, lessons: targetLessons };
+      if (m.id === sourceModule.id) return { ...m, lessons: sourceLessons };
+      return m;
+    });
+    const payload = targetLessons.map((l, i) => ({ id: l.id, sort_order: i + 1, module_id: targetModule.id }));
+    if (targetModule.id !== sourceModule.id) {
+      sourceLessons.forEach((l, i) => payload.push({ id: l.id, sort_order: i + 1, module_id: sourceModule.id }));
+    }
+    saveLessonOrder(modulesNext, payload);
+  };
+
+  const handleDuplicateLesson = async (module, lesson) => {
+    try {
+      const res = await api.post(`/elearning/lessons/${lesson.id}/duplicate`, {}, token);
+      if (res.success) {
+        setToast({ message: 'Leçon dupliquée (en brouillon)', type: 'success' });
+        refreshCurriculum();
+      } else {
+        setToast({ message: res.message || 'Erreur', type: 'error' });
+      }
+    } catch (error) {
+      setToast({ message: 'Erreur de connexion', type: 'error' });
+    }
+  };
+
+  const getLessonTypeLabel = (lesson) => {
+    if (lesson.content_type === 'mixed') {
+      let blocks = lesson.content_blocks;
+      if (typeof blocks === 'string') { try { blocks = JSON.parse(blocks); } catch (e) { blocks = []; } }
+      const n = Array.isArray(blocks) ? blocks.length : 0;
+      return n ? `Multi-contenus · ${n} bloc${n > 1 ? 's' : ''}` : 'Multi-contenus';
+    }
+    const labels = { video: 'Vidéo', pdf: 'PDF', quiz: 'Quiz', interactive: 'Interactif', powerpoint: 'PowerPoint', word: 'Word', excel: 'Excel', text: 'Texte' };
+    return labels[lesson.content_type] || 'Texte';
   };
 
   const handleDeleteLesson = async (lesson) => {
@@ -15340,6 +19583,7 @@ const OHELearningPage = ({ isDark, token }) => {
       case 'quiz': return <Check size={16} />;
       case 'text': return <FileText size={16} />;
       case 'interactive': return <Layers size={16} />;
+      case 'mixed': return <LayoutTemplate size={16} />;
       default: return <File size={16} />;
     }
   };
@@ -15443,7 +19687,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const renderCourses = () => {
     // Show inline form when editing/creating course
     if (showCourseForm) {
-      return <CourseFormInline />;
+      return <CourseFormInline key={editingCourse?.id || 'new'} categories={categories} editingCourse={editingCourse} handleSaveCourse={handleSaveCourse} isDark={isDark} quizzes={quizzes} setShowCourseForm={setShowCourseForm} styles={styles} token={token} />;
     }
 
     return (
@@ -15601,8 +19845,21 @@ const OHELearningPage = ({ isDark, token }) => {
                 <X size={18} />
               </button>
             </div>
-            {showModuleForm && <ModuleFormInline />}
-            {showLessonForm && <LessonFormInline />}
+            {showModuleForm && <ModuleFormInline key={editingModule?.id || 'new'} editingModule={editingModule} handleSaveModule={handleSaveModule} isDark={isDark} quizzes={quizzes} selectedCourse={selectedCourse} setShowModuleForm={setShowModuleForm} styles={styles} />}
+            {showLessonForm && (
+              <LessonFormInline
+                key={editingLesson?.id || 'new'}
+                editingLesson={editingLesson}
+                setShowLessonForm={setShowLessonForm}
+                handleSaveLesson={handleSaveLesson}
+                quizzes={quizzes}
+                styles={styles}
+                token={token}
+                isDark={isDark}
+                detectVideoProvider={detectVideoProvider}
+                parseLessonBlocks={parseLessonBlocks}
+              />
+            )}
           </div>
         </div>
       );
@@ -15730,6 +19987,14 @@ const OHELearningPage = ({ isDark, token }) => {
                   </div>
                 </div>
 
+                {/* Empty module: drop zone for lessons dragged from another module */}
+                {!(module.lessons?.length > 0) && lessonDrag && (
+                  <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleLessonDrop(module, 0); }}
+                    style={{ padding: '16px', borderRadius: '12px', border: `2px dashed ${colors.primary}`, textAlign: 'center', fontSize: '13px', color: colors.primary }}>
+                    Déposer la leçon ici
+                  </div>
+                )}
+
                 {/* Lessons */}
                 {module.lessons?.length > 0 && (
                   <div style={{
@@ -15738,12 +20003,26 @@ const OHELearningPage = ({ isDark, token }) => {
                     overflow: 'hidden'
                   }}>
                     {module.lessons.map((lesson, lessonIndex) => (
-                      <div key={lesson.id} style={{
+                      <div key={lesson.id}
+                        draggable={lessonDragArmed === lesson.id}
+                        onDragStart={(e) => { setLessonDrag({ lessonId: lesson.id, moduleId: module.id }); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(lesson.id)); }}
+                        onDragOver={(e) => { if (!lessonDrag) return; e.preventDefault(); if (lessonDragOver !== lesson.id) setLessonDragOver(lesson.id); }}
+                        onDrop={(e) => { e.preventDefault(); handleLessonDrop(module, lessonIndex); }}
+                        onDragEnd={() => { setLessonDrag(null); setLessonDragOver(null); setLessonDragArmed(null); }}
+                        style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         padding: '12px 16px',
+                        opacity: lessonDrag?.lessonId === lesson.id ? 0.45 : 1,
+                        boxShadow: lessonDragOver === lesson.id && lessonDrag && lessonDrag.lessonId !== lesson.id ? `inset 0 3px 0 ${colors.primary}` : 'none',
                         borderBottom: lessonIndex < module.lessons.length - 1 ? `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}` : 'none'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span title="Glisser pour réordonner (aussi vers un autre module)"
+                            onMouseDown={() => setLessonDragArmed(lesson.id)}
+                            onMouseUp={() => setLessonDragArmed(null)}
+                            style={{ cursor: 'grab', color: isDark ? '#475569' : '#94a3b8', display: 'flex' }}>
+                            <GripVertical size={16} />
+                          </span>
                           <div style={{
                             width: '28px', height: '28px', borderRadius: '8px',
                             background: isDark ? '#1e293b' : '#e2e8f0',
@@ -15755,7 +20034,7 @@ const OHELearningPage = ({ isDark, token }) => {
                           <div>
                             <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>{lesson.title_fr}</p>
                             <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                              {lesson.content_type === 'video' ? 'Vidéo' : lesson.content_type === 'pdf' ? 'PDF' : lesson.content_type === 'quiz' ? 'Quiz' : lesson.content_type === 'interactive' ? 'Interactif' : 'Texte'}
+                              {getLessonTypeLabel(lesson)}
                               {lesson.duration_minutes > 0 && ` • ${lesson.duration_minutes} min`}
                               {lesson.is_preview && ' • Aperçu gratuit'}
                               {lesson.has_quiz && ' • 📝 Quiz'}
@@ -15763,7 +20042,19 @@ const OHELearningPage = ({ isDark, token }) => {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => { setSelectedModule(module); setEditingLesson(lesson); setShowLessonForm(true); }}
+                          <button onClick={() => handleMoveLesson(module, lessonIndex, -1)} disabled={lessonIndex === 0} title="Monter"
+                            style={{ ...styles.btnIcon, width: '28px', height: '28px', opacity: lessonIndex === 0 ? 0.4 : 1 }}>
+                            <ChevronUp size={12} />
+                          </button>
+                          <button onClick={() => handleMoveLesson(module, lessonIndex, 1)} disabled={lessonIndex === module.lessons.length - 1} title="Descendre"
+                            style={{ ...styles.btnIcon, width: '28px', height: '28px', opacity: lessonIndex === module.lessons.length - 1 ? 0.4 : 1 }}>
+                            <ChevronDown size={12} />
+                          </button>
+                          <button onClick={() => handleDuplicateLesson(module, lesson)} title="Dupliquer"
+                            style={{ ...styles.btnIcon, width: '28px', height: '28px' }}>
+                            <Copy size={12} />
+                          </button>
+                          <button onClick={() => { setSelectedModule(module); setEditingLesson(lesson); setShowLessonForm(true); }} title="Modifier"
                             style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.primary}15`, color: colors.primary }}>
                             <Edit3 size={12} />
                           </button>
@@ -15790,7 +20081,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const renderPaths = () => {
     // Show inline form when editing/creating path
     if (showPathForm) {
-      return <PathFormInline />;
+      return <PathFormInline key={editingPath?.id || 'new'} certificateTemplates={certificateTemplates} editingPath={editingPath} handleSavePath={handleSavePath} isDark={isDark} quizzes={quizzes} setShowPathForm={setShowPathForm} styles={styles} />;
     }
 
     return (
@@ -15945,7 +20236,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const renderQuestions = () => {
     // If showing the form, render the inline question form
     if (showQuestionForm) {
-      return <QuestionFormInline />;
+      return <QuestionFormInline key={editingQuestion?.id || 'new'} editingQuestion={editingQuestion} handleSaveQuestion={handleSaveQuestion} isDark={isDark} setShowQuestionForm={setShowQuestionForm} styles={styles} />;
     }
 
     // Otherwise show the questions list
@@ -16154,7 +20445,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const renderQuizzes = () => {
     // If showing the form, render the inline quiz form
     if (showQuizForm) {
-      return <QuizFormInline />;
+      return <QuizFormInline key={editingQuiz?.id || 'new'} editingQuiz={editingQuiz} handleSaveQuiz={handleSaveQuiz} isDark={isDark} setShowQuizForm={setShowQuizForm} styles={styles} />;
     }
 
     return (
@@ -16347,306 +20638,10 @@ const OHELearningPage = ({ isDark, token }) => {
   };
 
   // Category Form Component (inline)
-  const CategoryForm = () => {
-    const [form, setForm] = useState({
-      name_fr: editingCategory?.name_fr || '',
-      name_en: editingCategory?.name_en || '',
-      description_fr: editingCategory?.description_fr || '',
-      description_en: editingCategory?.description_en || '',
-      color: editingCategory?.color || '#2196F3',
-      icon: editingCategory?.icon || 'Tag'
-    });
-    const [iconSearch, setIconSearch] = useState('');
-    const [showIconDropdown, setShowIconDropdown] = useState(false);
-
-    const filteredIcons = categoryIconOptions.filter(opt =>
-      opt.label.toLowerCase().includes(iconSearch.toLowerCase()) ||
-      opt.value.toLowerCase().includes(iconSearch.toLowerCase())
-    );
-
-    const selectedIconOption = categoryIconOptions.find(opt => opt.value === form.icon);
-    const SelectedIcon = selectedIconOption?.icon || Tag;
-
-    const handleSubmit = async () => {
-      await handleSaveCategory(form);
-      setShowCategoryForm(false);
-    };
-
-    return (
-      <div>
-        {/* Header with Back button */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>
-              {editingCategory ? 'Modifier la Catégorie' : 'Nouvelle Catégorie'}
-            </h2>
-            <p style={{ margin: '4px 0 0', ...styles.textMuted }}>
-              {editingCategory ? `Modification de "${editingCategory.name_fr}"` : 'Créez une nouvelle catégorie pour organiser vos cours'}
-            </p>
-          </div>
-          <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} style={styles.btnSecondary}>
-            <ArrowLeft size={18} /> Retour
-          </button>
-        </div>
-
-        {/* Form Card - Full Width */}
-        <div style={{ ...styles.card }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            {/* Left Column */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Names */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={styles.label}>Nom (Français) *</label>
-                  <input
-                    type="text"
-                    value={form.name_fr}
-                    onChange={e => setForm({ ...form, name_fr: e.target.value })}
-                    style={styles.input}
-                    placeholder="Santé Humaine"
-                  />
-                </div>
-                <div>
-                  <label style={styles.label}>Nom (Anglais)</label>
-                  <input
-                    type="text"
-                    value={form.name_en}
-                    onChange={e => setForm({ ...form, name_en: e.target.value })}
-                    style={styles.input}
-                    placeholder="Human Health"
-                  />
-                </div>
-              </div>
-
-              {/* Descriptions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={styles.label}>Description (Français)</label>
-                  <textarea
-                    value={form.description_fr}
-                    onChange={e => setForm({ ...form, description_fr: e.target.value })}
-                    style={{ ...styles.input, minHeight: '100px' }}
-                    placeholder="Description de la catégorie..."
-                  />
-                </div>
-                <div>
-                  <label style={styles.label}>Description (Anglais)</label>
-                  <textarea
-                    value={form.description_en}
-                    onChange={e => setForm({ ...form, description_en: e.target.value })}
-                    style={{ ...styles.input, minHeight: '100px' }}
-                    placeholder="Category description..."
-                  />
-                </div>
-              </div>
-
-              {/* Color and Icon */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {/* Color Picker */}
-              <div>
-                <label style={styles.label}>Couleur</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <input
-                    type="color"
-                    value={form.color}
-                    onChange={e => setForm({ ...form, color: e.target.value })}
-                    style={{ width: '50px', height: '44px', padding: '4px', borderRadius: '8px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, cursor: 'pointer' }}
-                  />
-                  <input
-                    type="text"
-                    value={form.color}
-                    onChange={e => setForm({ ...form, color: e.target.value })}
-                    style={{ ...styles.input, flex: 1, fontFamily: 'monospace' }}
-                    placeholder="#2196F3"
-                  />
-                </div>
-              </div>
-
-              {/* Icon Selector with Search */}
-              <div style={{ position: 'relative' }}>
-                <label style={styles.label}>Icône</label>
-                <div
-                  onClick={() => setShowIconDropdown(!showIconDropdown)}
-                  style={{
-                    ...styles.input,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    cursor: 'pointer',
-                    background: isDark ? '#1e293b' : '#f8fafc'
-                  }}
-                >
-                  <div style={{
-                    width: '32px', height: '32px', borderRadius: '8px',
-                    background: `${form.color}20`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: form.color
-                  }}>
-                    <SelectedIcon size={18} />
-                  </div>
-                  <span style={{ flex: 1 }}>{selectedIconOption?.label || 'Sélectionner une icône'}</span>
-                  <ChevronDown size={18} style={{ color: isDark ? '#64748b' : '#94a3b8' }} />
-                </div>
-
-                {/* Icon Dropdown */}
-                {showIconDropdown && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-                    background: isDark ? '#1e293b' : 'white',
-                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                    marginTop: '4px',
-                    maxHeight: '350px',
-                    overflow: 'hidden'
-                  }}>
-                    {/* Search Input */}
-                    <div style={{ padding: '12px', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-                      <div style={{ position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
-                        <input
-                          type="text"
-                          placeholder="Rechercher une icône..."
-                          value={iconSearch}
-                          onChange={e => setIconSearch(e.target.value)}
-                          style={{ ...styles.input, paddingLeft: '36px', fontSize: '13px' }}
-                          autoFocus
-                        />
-                      </div>
-                    </div>
-
-                    {/* Icons Grid */}
-                    <div style={{ padding: '12px', maxHeight: '280px', overflowY: 'auto' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                        {filteredIcons.map(opt => {
-                          const IconComp = opt.icon;
-                          const isSelected = form.icon === opt.value;
-                          return (
-                            <button
-                              key={opt.value}
-                              onClick={() => {
-                                setForm({ ...form, icon: opt.value });
-                                setShowIconDropdown(false);
-                                setIconSearch('');
-                              }}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                padding: '10px 12px', borderRadius: '8px',
-                                border: isSelected ? `2px solid ${colors.primary}` : `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-                                background: isSelected ? `${colors.primary}10` : 'transparent',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <div style={{
-                                width: '28px', height: '28px', borderRadius: '6px',
-                                background: `${form.color}20`,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                color: form.color
-                              }}>
-                                <IconComp size={16} />
-                              </div>
-                              <span style={{ fontSize: '12px', fontWeight: isSelected ? '600' : '400', color: isDark ? '#e2e8f0' : '#334155' }}>
-                                {opt.label}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {filteredIcons.length === 0 && (
-                        <p style={{ textAlign: 'center', padding: '20px', color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px' }}>
-                          Aucune icône trouvée
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            </div>
-
-            {/* Right Column - Preview & Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Preview */}
-              <div>
-                <label style={styles.label}>Aperçu de la carte</label>
-                <div style={{
-                  ...styles.card,
-                  borderLeft: `4px solid ${form.color}`,
-                  background: isDark ? '#0f172a' : '#f8fafc'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{
-                      width: '56px', height: '56px', borderRadius: '14px',
-                      background: `${form.color}15`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: form.color
-                    }}>
-                      <SelectedIcon size={28} />
-                    </div>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '17px', fontWeight: '600' }}>
-                        {form.name_fr || 'Nom de la catégorie'}
-                      </h4>
-                      {form.name_en && (
-                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic' }}>
-                          {form.name_en}
-                        </p>
-                      )}
-                      <p style={{ margin: '4px 0 0', fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: '500' }}>
-                        0 cours
-                      </p>
-                    </div>
-                  </div>
-                  {form.description_fr && (
-                    <p style={{ margin: '14px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', lineHeight: '1.5' }}>
-                      {form.description_fr.length > 150 ? form.description_fr.substring(0, 150) + '...' : form.description_fr}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Color Preview */}
-              <div>
-                <label style={styles.label}>Palette de couleurs</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {['#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#3F51B5'].map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setForm({ ...form, color: c })}
-                      style={{
-                        width: '36px', height: '36px', borderRadius: '10px',
-                        background: c, border: form.color === c ? '3px solid white' : 'none',
-                        boxShadow: form.color === c ? `0 0 0 2px ${c}` : '0 2px 4px rgba(0,0,0,0.1)',
-                        cursor: 'pointer', transition: 'all 0.15s ease'
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} style={{ ...styles.btnSecondary, flex: 1 }}>
-                    Annuler
-                  </button>
-                  <button onClick={handleSubmit} style={{ ...styles.btnPrimary, flex: 2 }} disabled={!form.name_fr}>
-                    <Save size={18} /> {editingCategory ? 'Enregistrer' : 'Créer la catégorie'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const renderCategories = () => {
     // Show form if active
     if (showCategoryForm) {
-      return <CategoryForm />;
+      return <CategoryForm key={editingCategory?.id || 'new'} categoryIconOptions={categoryIconOptions} editingCategory={editingCategory} handleSaveCategory={handleSaveCategory} isDark={isDark} setEditingCategory={setEditingCategory} setShowCategoryForm={setShowCategoryForm} styles={styles} />;
     }
 
     return (
@@ -16715,11 +20710,15 @@ const OHELearningPage = ({ isDark, token }) => {
                           type: 'danger',
                           onConfirm: async () => {
                             try {
-                              await api.delete(`/elearning/categories/${cat.id}`, token);
-                              setCategories(prev => prev.filter(c => c.id !== cat.id));
-                              showToast('Catégorie supprimée', 'success');
+                              const res = await api.delete(`/elearning/categories/${cat.id}`, token);
+                              if (res.success) {
+                                setCategories(prev => prev.filter(c => c.id !== cat.id));
+                                setToast({ message: 'Catégorie supprimée', type: 'success' });
+                              } else {
+                                setToast({ message: res.message || 'Erreur lors de la suppression', type: 'error' });
+                              }
                             } catch (err) {
-                              showToast('Erreur lors de la suppression', 'error');
+                              setToast({ message: 'Erreur lors de la suppression', type: 'error' });
                             }
                             setConfirmDialog(null);
                           }
@@ -16763,7 +20762,7 @@ const OHELearningPage = ({ isDark, token }) => {
   const renderCertificates = () => {
     // Show template editor if active
     if (showTemplateEditor) {
-      return <CertificateTemplateEditor />;
+      return <CertificateTemplateEditor key={editingTemplate?.id || 'new'} certificateTemplates={certificateTemplates} editingTemplate={editingTemplate} fetchCertificateTemplates={fetchCertificateTemplates} isDark={isDark} setShowTemplateEditor={setShowTemplateEditor} setToast={setToast} styles={styles} token={token} />;
     }
 
     const getCertStatusBadge = (status) => {
@@ -17327,639 +21326,8 @@ const OHELearningPage = ({ isDark, token }) => {
 
   // ============ COURSE MODAL ============
   // ============ COURSE FORM INLINE ============
-  const CourseFormInline = () => {
-    const parseJsonArray = (val) => {
-      if (Array.isArray(val)) return val;
-      if (typeof val === 'string') { try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; } }
-      return [];
-    };
-    const [form, setForm] = useState({
-      title_fr: editingCourse?.title_fr || '',
-      title_en: editingCourse?.title_en || '',
-      description_fr: editingCourse?.description_fr || '',
-      description_en: editingCourse?.description_en || '',
-      short_description_fr: editingCourse?.short_description_fr || '',
-      short_description_en: editingCourse?.short_description_en || '',
-      thumbnail: editingCourse?.thumbnail || '',
-      level: editingCourse?.level || 'beginner',
-      duration_hours: editingCourse?.duration_hours || 0,
-      category_id: editingCourse?.category_id || '',
-      status: editingCourse?.status || 'draft',
-      is_featured: editingCourse?.is_featured || false,
-      sequential_modules: editingCourse?.sequential_modules !== false,
-      require_quiz_pass: editingCourse?.require_quiz_pass || false,
-      free_navigation: editingCourse?.free_navigation || false,
-      learning_objectives: parseJsonArray(editingCourse?.learning_objectives),
-      prerequisites: parseJsonArray(editingCourse?.prerequisites),
-      target_audience: parseJsonArray(editingCourse?.target_audience),
-      min_passing_score: editingCourse?.min_passing_score || 70,
-      final_quiz_id: editingCourse?.final_quiz_id || null,
-      final_quiz_weight: editingCourse?.final_quiz_weight || 1.00,
-      module_quizzes_weight: editingCourse?.module_quizzes_weight || 1.00
-    });
-
-    const [uploading, setUploading] = useState(false);
-
-    const handleThumbnailUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        const response = await fetch('/api/upload/elearning/thumbnail', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        const text = await response.text();
-        const res = text ? JSON.parse(text) : { success: false };
-        if (res.success) {
-          setForm(prev => ({ ...prev, thumbnail: res.data.url }));
-        }
-      } catch (err) {
-        console.error('Upload error:', err);
-      }
-      setUploading(false);
-    };
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header with title and Retour button */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `${colors.primary}15`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <BookOpen size={20} color={colors.primary} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-                {editingCourse ? 'Modifier le Cours' : 'Nouveau Cours'}
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Configurez les paramètres du cours
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowCourseForm(false)}
-            style={{
-              ...styles.btnSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Retour
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Thumbnail */}
-          <div>
-            <label style={styles.label}>Image du cours</label>
-            <div style={{
-              width: '100%', height: '180px', borderRadius: '12px',
-              border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-              background: form.thumbnail ? `url(${form.thumbnail}) center/cover` : (isDark ? '#0f172a' : '#f8fafc'),
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', position: 'relative', overflow: 'hidden'
-            }} onClick={() => document.getElementById('course-thumbnail-input').click()}>
-              {!form.thumbnail && (
-                <div style={{ textAlign: 'center' }}>
-                  <Image size={32} color={isDark ? '#475569' : '#94a3b8'} />
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    {uploading ? 'Upload en cours...' : 'Cliquer pour uploader'}
-                  </p>
-                </div>
-              )}
-              {form.thumbnail && (
-                <button onClick={(e) => { e.stopPropagation(); setForm(prev => ({ ...prev, thumbnail: '' })); }}
-                  style={{ position: 'absolute', top: '8px', right: '8px', ...styles.btnIcon, background: 'rgba(0,0,0,0.5)', color: 'white' }}>
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <input type="file" id="course-thumbnail-input" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
-          </div>
-
-          {/* Title FR/EN side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Titre (Français) *</label>
-              <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-                style={styles.input} placeholder="Introduction à One Health" />
-            </div>
-            <div>
-              <label style={styles.label}>Titre (Anglais)</label>
-              <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
-                style={styles.input} placeholder="Introduction to One Health" />
-            </div>
-          </div>
-
-          {/* Short Description FR/EN */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Description courte (Français)</label>
-              <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
-                style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
-                placeholder="Brève description du cours..." />
-            </div>
-            <div>
-              <label style={styles.label}>Description courte (Anglais)</label>
-              <textarea value={form.short_description_en} onChange={e => setForm({ ...form, short_description_en: e.target.value })}
-                style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
-                placeholder="Short course description..." />
-            </div>
-          </div>
-
-          {/* Description complète */}
-          <div>
-            <label style={styles.label}>Description complète (Français)</label>
-            <RichTextEditor value={form.description_fr} onChange={v => setForm(f => ({ ...f, description_fr: v }))} placeholder="Description détaillée du cours..." isDark={isDark} />
-          </div>
-          <div>
-            <label style={styles.label}>Description complète (Anglais)</label>
-            <RichTextEditor value={form.description_en} onChange={v => setForm(f => ({ ...f, description_en: v }))} placeholder="Full course description..." isDark={isDark} />
-          </div>
-
-          {/* Objectifs, Prérequis, Public cible */}
-          <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Target size={16} color={colors.primary} />
-                Objectifs d'apprentissage
-              </span>
-            </label>
-            {form.learning_objectives.map((obj, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
-                <span style={{ color: colors.primary, fontWeight: '700', fontSize: '12px', minWidth: '20px' }}>{idx + 1}.</span>
-                <input value={obj} onChange={e => { const n = [...form.learning_objectives]; n[idx] = e.target.value; setForm({ ...form, learning_objectives: n }); }}
-                  style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Objectif..." />
-                <button onClick={() => { const n = form.learning_objectives.filter((_, i) => i !== idx); setForm({ ...form, learning_objectives: n }); }}
-                  style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error, flexShrink: 0 }}>
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            <button onClick={() => setForm({ ...form, learning_objectives: [...form.learning_objectives, ''] })}
-              style={{ background: 'transparent', color: colors.primary, border: `1px dashed ${colors.primary}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
-              + Ajouter un objectif
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {/* Prérequis */}
-            <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText size={16} color={colors.teal} />
-                  Prérequis
-                </span>
-              </label>
-              {form.prerequisites.map((pre, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                  <input value={pre} onChange={e => { const n = [...form.prerequisites]; n[idx] = e.target.value; setForm({ ...form, prerequisites: n }); }}
-                    style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Prérequis..." />
-                  <button onClick={() => setForm({ ...form, prerequisites: form.prerequisites.filter((_, i) => i !== idx) })}
-                    style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              <button onClick={() => setForm({ ...form, prerequisites: [...form.prerequisites, ''] })}
-                style={{ background: 'transparent', color: colors.teal, border: `1px dashed ${colors.teal}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
-                + Ajouter
-              </button>
-            </div>
-
-            {/* Public cible */}
-            <div style={{ background: isDark ? '#0f172a' : '#f8fafc', borderRadius: '10px', padding: '16px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={16} color={colors.purple} />
-                  Public cible
-                </span>
-              </label>
-              {form.target_audience.map((aud, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                  <input value={aud} onChange={e => { const n = [...form.target_audience]; n[idx] = e.target.value; setForm({ ...form, target_audience: n }); }}
-                    style={{ ...styles.input, flex: 1, padding: '8px 12px', fontSize: '13px' }} placeholder="Public cible..." />
-                  <button onClick={() => setForm({ ...form, target_audience: form.target_audience.filter((_, i) => i !== idx) })}
-                    style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              <button onClick={() => setForm({ ...form, target_audience: [...form.target_audience, ''] })}
-                style={{ background: 'transparent', color: colors.purple, border: `1px dashed ${colors.purple}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '4px' }}>
-                + Ajouter
-              </button>
-            </div>
-          </div>
-
-          {/* Row: Level, Duration, Category, Status */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Niveau</label>
-              <select value={form.level} onChange={e => setForm({ ...form, level: e.target.value })} style={styles.select}>
-                <option value="beginner">Débutant</option>
-                <option value="intermediate">Intermédiaire</option>
-                <option value="advanced">Avancé</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Durée (heures)</label>
-              <input type="number" value={form.duration_hours} onChange={e => setForm({ ...form, duration_hours: parseInt(e.target.value) || 0 })}
-                style={styles.input} min="0" />
-            </div>
-            <div>
-              <label style={styles.label}>Catégorie</label>
-              <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })} style={styles.select}>
-                <option value="">-- Sélectionner --</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name_fr}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Statut</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
-                <option value="draft">Brouillon</option>
-                <option value="published">Publié</option>
-                <option value="archived">Archivé</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Featured checkbox */}
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-            padding: '12px', borderRadius: '10px',
-            background: form.is_featured ? `${colors.warning}10` : (isDark ? '#1e293b' : 'white'),
-            border: `1px solid ${form.is_featured ? colors.warning : (isDark ? '#334155' : '#e2e8f0')}`
-          }}>
-            <input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} style={{ accentColor: colors.warning }} />
-            <Star size={16} color={form.is_featured ? colors.warning : (isDark ? '#64748b' : '#94a3b8')} />
-            <span style={{ fontSize: '13px' }}>Mettre en vedette</span>
-          </label>
-
-          {/* Progression settings */}
-          <div style={{
-            background: isDark ? '#0f172a' : '#f8fafc',
-            borderRadius: '10px',
-            padding: '16px',
-            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <label style={{ ...styles.label, marginBottom: '14px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Lock size={16} color={colors.primary} />
-                Règles de progression
-              </span>
-            </label>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Free navigation */}
-              <label style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
-                padding: '12px', borderRadius: '10px',
-                background: form.free_navigation ? `${colors.success}10` : 'transparent',
-                border: `1px solid ${form.free_navigation ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input type="checkbox" checked={form.free_navigation}
-                  onChange={e => setForm({ ...form, free_navigation: e.target.checked, sequential_modules: e.target.checked ? false : form.sequential_modules })}
-                  style={{ accentColor: colors.success, marginTop: '2px' }} />
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Navigation libre</span>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    L'apprenant peut commencer par n'importe quel module et leçon
-                  </p>
-                </div>
-              </label>
-
-              {/* Sequential modules */}
-              <label style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
-                padding: '12px', borderRadius: '10px',
-                background: !form.free_navigation && form.sequential_modules ? `${colors.primary}10` : 'transparent',
-                border: `1px solid ${!form.free_navigation && form.sequential_modules ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
-                opacity: form.free_navigation ? 0.5 : 1
-              }}>
-                <input type="checkbox" checked={form.sequential_modules} disabled={form.free_navigation}
-                  onChange={e => setForm({ ...form, sequential_modules: e.target.checked })}
-                  style={{ accentColor: colors.primary, marginTop: '2px' }} />
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Progression séquentielle</span>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    L'apprenant doit terminer chaque module/leçon avant de passer au suivant
-                  </p>
-                </div>
-              </label>
-
-              {/* Require quiz pass */}
-              <label style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer',
-                padding: '12px', borderRadius: '10px',
-                background: form.require_quiz_pass ? `${colors.warning}10` : 'transparent',
-                border: `1px solid ${form.require_quiz_pass ? colors.warning : (isDark ? '#334155' : '#e2e8f0')}`,
-                opacity: form.free_navigation ? 0.5 : 1
-              }}>
-                <input type="checkbox" checked={form.require_quiz_pass} disabled={form.free_navigation}
-                  onChange={e => setForm({ ...form, require_quiz_pass: e.target.checked })}
-                  style={{ accentColor: colors.warning, marginTop: '2px' }} />
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Validation quiz obligatoire</span>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    L'apprenant doit réussir le quiz d'une leçon/module avant de passer au suivant (score minimum requis)
-                  </p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Grade settings */}
-          <div style={{
-            background: isDark ? '#0f172a' : '#f8fafc',
-            borderRadius: '10px',
-            padding: '16px',
-            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={16} color={colors.warning} />
-                Paramètres de notation
-              </span>
-            </label>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-              <div>
-                <label style={styles.label}>Score minimum pour réussir (%)</label>
-                <input
-                  type="number"
-                  value={form.min_passing_score}
-                  onChange={e => setForm({ ...form, min_passing_score: parseInt(e.target.value) || 70 })}
-                  style={styles.input}
-                  min="0"
-                  max="100"
-                />
-              </div>
-              <div>
-                <label style={styles.label}>Quiz final du cours</label>
-                <select
-                  value={form.final_quiz_id || ''}
-                  onChange={e => setForm({ ...form, final_quiz_id: e.target.value ? parseInt(e.target.value) : null })}
-                  style={styles.select}
-                >
-                  <option value="">Aucun quiz final</option>
-                  {quizzes.filter(q => q.status === 'published').map(quiz => (
-                    <option key={quiz.id} value={quiz.id}>{quiz.title_fr} ({quiz.quiz_type === 'final_exam' ? 'Examen final' : quiz.quiz_type === 'chapter_quiz' ? 'Quiz chapitre' : 'Quiz'})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div>
-                <label style={styles.label}>Poids quiz final</label>
-                <input
-                  type="number"
-                  value={form.final_quiz_weight}
-                  onChange={e => setForm({ ...form, final_quiz_weight: parseFloat(e.target.value) || 1 })}
-                  style={styles.input}
-                  min="0.1"
-                  max="10"
-                  step="0.1"
-                  disabled={!form.final_quiz_id}
-                />
-                <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                  Coefficient du quiz final dans la note
-                </p>
-              </div>
-              <div>
-                <label style={styles.label}>Poids quiz des modules</label>
-                <input
-                  type="number"
-                  value={form.module_quizzes_weight}
-                  onChange={e => setForm({ ...form, module_quizzes_weight: parseFloat(e.target.value) || 1 })}
-                  style={styles.input}
-                  min="0.1"
-                  max="10"
-                  step="0.1"
-                />
-                <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                  Coefficient de la moyenne des modules
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{
-            display: 'flex', gap: '12px', justifyContent: 'flex-end',
-            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <button onClick={() => setShowCourseForm(false)} style={styles.btnSecondary}>
-              Annuler
-            </button>
-            <button onClick={() => handleSaveCourse(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingCourse ? 'Enregistrer les modifications' : 'Créer le cours'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ============ MODULE MODAL ============
   // ============ MODULE FORM INLINE ============
-  const ModuleFormInline = () => {
-    const [form, setForm] = useState({
-      title_fr: editingModule?.title_fr || '',
-      title_en: editingModule?.title_en || '',
-      description_fr: editingModule?.description_fr || '',
-      duration_minutes: editingModule?.duration_minutes || 0,
-      status: editingModule?.status || 'draft',
-      has_quiz: editingModule?.has_quiz || false,
-      quiz_id: editingModule?.quiz_id || null,
-      quiz_weight: editingModule?.quiz_weight || 1.00,
-      min_quiz_score: editingModule?.min_quiz_score || 70
-    });
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header with title and Retour button */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `${colors.success}15`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Layers size={20} color={colors.success} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-                {editingModule ? 'Modifier le Module' : 'Nouveau Module'}
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                {selectedCourse ? `Cours: ${selectedCourse.title_fr}` : 'Configurez le module'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowModuleForm(false)}
-            style={{
-              ...styles.btnSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Retour
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Title FR/EN side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Titre (Français) *</label>
-              <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-                style={styles.input} placeholder="Module 1: Introduction" />
-            </div>
-            <div>
-              <label style={styles.label}>Titre (Anglais)</label>
-              <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
-                style={styles.input} placeholder="Module 1: Introduction" />
-            </div>
-          </div>
-
-          <div>
-            <label style={styles.label}>Description</label>
-            <RichTextEditor value={form.description_fr} onChange={v => setForm(f => ({ ...f, description_fr: v }))} placeholder="Description du module..." height={180} isDark={isDark} />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Durée (minutes)</label>
-              <input type="number" value={form.duration_minutes} onChange={e => setForm({ ...form, duration_minutes: parseInt(e.target.value) || 0 })}
-                style={styles.input} min="0" />
-            </div>
-            <div>
-              <label style={styles.label}>Statut</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
-                <option value="draft">Brouillon</option>
-                <option value="published">Publié</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Quiz settings for module */}
-          <div style={{
-            background: isDark ? '#0f172a' : '#f8fafc',
-            borderRadius: '10px',
-            padding: '16px',
-            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-              marginBottom: form.has_quiz ? '16px' : '0'
-            }}>
-              <input
-                type="checkbox"
-                checked={form.has_quiz}
-                onChange={e => setForm({ ...form, has_quiz: e.target.checked, quiz_id: e.target.checked ? form.quiz_id : null })}
-                style={{ accentColor: colors.primary }}
-              />
-              <span style={{ fontWeight: '600', fontSize: '14px' }}>
-                <FileQuestion size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Ce module a un quiz
-              </span>
-            </label>
-
-            {form.has_quiz && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={styles.label}>Quiz</label>
-                  <select
-                    value={form.quiz_id || ''}
-                    onChange={e => setForm({ ...form, quiz_id: e.target.value ? parseInt(e.target.value) : null })}
-                    style={styles.select}
-                  >
-                    <option value="">Sélectionner un quiz</option>
-                    {quizzes.filter(q => q.status === 'published').map(quiz => (
-                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>Score min. (%)</label>
-                  <input
-                    type="number"
-                    value={form.min_quiz_score}
-                    onChange={e => setForm({ ...form, min_quiz_score: parseInt(e.target.value) || 70 })}
-                    style={styles.input}
-                    min="0"
-                    max="100"
-                  />
-                </div>
-                <div>
-                  <label style={styles.label}>Poids du quiz</label>
-                  <input
-                    type="number"
-                    value={form.quiz_weight}
-                    onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
-                    style={styles.input}
-                    min="0.1"
-                    max="10"
-                    step="0.1"
-                  />
-                  <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Coefficient pour la note du cours
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div style={{
-            display: 'flex', gap: '12px', justifyContent: 'flex-end',
-            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <button onClick={() => setShowModuleForm(false)} style={styles.btnSecondary}>Annuler</button>
-            <button onClick={() => handleSaveModule(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingModule ? 'Enregistrer les modifications' : 'Créer le module'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ============ LESSON FORM INLINE ============
   // Helper to detect video provider from URL
   const detectVideoProvider = (url) => {
@@ -17970,3193 +21338,24 @@ const OHELearningPage = ({ isDark, token }) => {
     return 'other';
   };
 
-  const LessonFormInline = () => {
-    const [form, setForm] = useState({
-      title_fr: editingLesson?.title_fr || '',
-      title_en: editingLesson?.title_en || '',
-      content_type: editingLesson?.content_type || 'text',
-      content_fr: editingLesson?.content_fr || '',
-      video_url: editingLesson?.video_url || '',
-      video_provider: editingLesson?.video_provider || 'upload',
-      video_source_type: editingLesson?.video_url && !editingLesson?.video_url.startsWith('/uploads') ? 'url' : 'upload',
-      pdf_url: editingLesson?.pdf_url || '',
-      pptx_url: editingLesson?.pptx_url || '',
-      pptx_source_type: editingLesson?.pptx_url && editingLesson?.pptx_url.startsWith('http') ? 'url' : 'upload',
-      docx_url: editingLesson?.docx_url || '',
-      xlsx_url: editingLesson?.xlsx_url || '',
-      duration_minutes: editingLesson?.duration_minutes || 0,
-      is_preview: editingLesson?.is_preview || false,
-      status: editingLesson?.status || 'draft',
-      has_quiz: editingLesson?.has_quiz || false,
-      quiz_id: editingLesson?.quiz_id || null,
-      quiz_position: editingLesson?.quiz_position || 'end',
-      quiz_weight: editingLesson?.quiz_weight || 1.00
-    });
-
-    const [uploading, setUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [uploadingType, setUploadingType] = useState(''); // 'video', 'pdf', 'powerpoint', 'word', 'excel'
-    const [uploadFileName, setUploadFileName] = useState('');
-
-    // Helper function for upload with progress
-    const uploadWithProgress = (url, file, onSuccess, type) => {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setUploading(true);
-        setUploadProgress(0);
-        setUploadingType(type);
-        setUploadFileName(file.name);
-
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const percent = Math.round((e.loaded / e.total) * 100);
-            setUploadProgress(percent);
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const res = JSON.parse(xhr.responseText);
-              if (res.success) {
-                onSuccess(res.data.url);
-              }
-            } catch (err) {
-              console.error('Parse error:', err);
-            }
-          }
-          setUploading(false);
-          setUploadProgress(0);
-          setUploadingType('');
-          setUploadFileName('');
-          resolve();
-        });
-
-        xhr.addEventListener('error', () => {
-          console.error(`${type} upload error`);
-          setUploading(false);
-          setUploadProgress(0);
-          setUploadingType('');
-          setUploadFileName('');
-          reject(new Error('Upload failed'));
-        });
-
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.send(formData);
-      });
-    };
-
-    const handleVideoUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      await uploadWithProgress(
-        '/api/upload/elearning/video',
-        file,
-        (url) => setForm(prev => ({ ...prev, video_url: url, video_provider: 'upload' })),
-        'video'
-      );
-    };
-
-    const handlePdfUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      await uploadWithProgress(
-        '/api/upload/elearning/pdf',
-        file,
-        (url) => setForm(prev => ({ ...prev, pdf_url: url })),
-        'pdf'
-      );
-    };
-
-    const handlePptxUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      await uploadWithProgress(
-        '/api/upload/elearning/powerpoint',
-        file,
-        (url) => setForm(prev => ({ ...prev, pptx_url: url })),
-        'powerpoint'
-      );
-    };
-
-    const handleWordUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      await uploadWithProgress(
-        '/api/upload/elearning/word',
-        file,
-        (url) => setForm(prev => ({ ...prev, docx_url: url })),
-        'word'
-      );
-    };
-
-    const handleExcelUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      await uploadWithProgress(
-        '/api/upload/elearning/excel',
-        file,
-        (url) => setForm(prev => ({ ...prev, xlsx_url: url })),
-        'excel'
-      );
-    };
-
-    const handleVideoUrlChange = (url) => {
-      const provider = detectVideoProvider(url);
-      setForm(prev => ({ ...prev, video_url: url, video_provider: provider }));
-    };
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header with title and Retour button */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `${colors.success}15`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <FileText size={20} color={colors.success} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-                {editingLesson ? 'Modifier la Leçon' : 'Nouvelle Leçon'}
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Configurez le contenu de la leçon
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowLessonForm(false)}
-            style={{
-              ...styles.btnSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Retour
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={styles.label}>Titre (Français) *</label>
-            <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-              style={styles.input} placeholder="Leçon 1: Introduction" />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Type de contenu</label>
-              <select value={form.content_type} onChange={e => setForm({ ...form, content_type: e.target.value })} style={styles.select}>
-                <option value="text">Texte</option>
-                <option value="video">Vidéo</option>
-                <option value="pdf">PDF</option>
-                <option value="powerpoint">PowerPoint</option>
-                <option value="word">Word</option>
-                <option value="excel">Excel</option>
-                <option value="mixed">Mixte</option>
-                <option value="interactive">Contenu Interactif</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Durée (minutes)</label>
-              <input type="number" value={form.duration_minutes} onChange={e => setForm({ ...form, duration_minutes: parseInt(e.target.value) || 0 })}
-                style={styles.input} min="0" />
-            </div>
-            <div>
-              <label style={styles.label}>Poids quiz</label>
-              <input type="number" value={form.quiz_weight} onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
-                style={styles.input} min="0.1" max="10" step="0.1" />
-            </div>
-          </div>
-
-          {/* Video Upload/URL */}
-          {(form.content_type === 'video' || form.content_type === 'mixed') && (
-            <div>
-              <label style={styles.label}>Vidéo</label>
-
-              {/* Toggle between upload and URL */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, video_source_type: 'upload', video_url: '', video_provider: 'upload' })}
-                  style={{
-                    ...styles.btnSecondary,
-                    flex: 1,
-                    background: form.video_source_type === 'upload' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
-                    color: form.video_source_type === 'upload' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
-                    border: 'none'
-                  }}
-                >
-                  <Upload size={16} style={{ marginRight: '8px' }} />
-                  Uploader un fichier
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, video_source_type: 'url', video_url: '', video_provider: 'other' })}
-                  style={{
-                    ...styles.btnSecondary,
-                    flex: 1,
-                    background: form.video_source_type === 'url' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
-                    color: form.video_source_type === 'url' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
-                    border: 'none'
-                  }}
-                >
-                  <Link size={16} style={{ marginRight: '8px' }} />
-                  URL externe
-                </button>
-              </div>
-
-              {/* Upload mode */}
-              {form.video_source_type === 'upload' && (
-                <>
-                  {form.video_url ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
-                      <Play size={20} color={colors.success} />
-                      <span style={{ flex: 1, fontSize: '13px' }}>{form.video_url}</span>
-                      <button onClick={() => setForm({ ...form, video_url: '', video_provider: 'upload' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : uploading && uploadingType === 'video' ? (
-                    <div style={{
-                      padding: '24px', borderRadius: '10px', border: `2px solid ${colors.primary}`,
-                      background: isDark ? '#1e293b' : '#f0f9ff'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                        <Loader size={24} color={colors.primary} style={{ animation: 'spin 1s linear infinite' }} />
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
-                            Upload en cours...
-                          </p>
-                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                            {uploadFileName}
-                          </p>
-                        </div>
-                        <span style={{ fontSize: '16px', fontWeight: '600', color: colors.primary }}>{uploadProgress}%</span>
-                      </div>
-                      <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${uploadProgress}%`,
-                          background: `linear-gradient(90deg, ${colors.primary}, ${colors.success})`,
-                          borderRadius: '4px',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                      textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
-                      opacity: uploading ? 0.5 : 1
-                    }} onClick={() => !uploading && document.getElementById('lesson-video-input').click()}>
-                      <Play size={28} color={isDark ? '#475569' : '#94a3b8'} />
-                      <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                        Cliquer pour uploader une vidéo (max 500MB)
-                      </p>
-                    </div>
-                  )}
-                  <input type="file" id="lesson-video-input" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} disabled={uploading} />
-                </>
-              )}
-
-              {/* URL mode */}
-              {form.video_source_type === 'url' && (
-                <div>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="url"
-                      value={form.video_url}
-                      onChange={e => handleVideoUrlChange(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=... ou https://vimeo.com/..."
-                      style={{
-                        ...styles.input,
-                        paddingLeft: form.video_provider && form.video_provider !== 'other' ? '40px' : '12px'
-                      }}
-                    />
-                    {form.video_provider === 'youtube' && (
-                      <div style={{
-                        position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-                        width: '20px', height: '20px', borderRadius: '4px', background: '#FF0000',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <Play size={12} color="#fff" fill="#fff" />
-                      </div>
-                    )}
-                    {form.video_provider === 'vimeo' && (
-                      <div style={{
-                        position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-                        width: '20px', height: '20px', borderRadius: '4px', background: '#1ab7ea',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <Play size={12} color="#fff" fill="#fff" />
-                      </div>
-                    )}
-                  </div>
-                  {form.video_url && (
-                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: form.video_provider === 'youtube' ? '#FF0000' : form.video_provider === 'vimeo' ? '#1ab7ea' : colors.text.muted }}>
-                      {form.video_provider === 'youtube' ? 'YouTube détecté' :
-                       form.video_provider === 'vimeo' ? 'Vimeo détecté' :
-                       'Autre provider vidéo'}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* PDF Upload */}
-          {(form.content_type === 'pdf' || form.content_type === 'mixed') && (
-            <div>
-              <label style={styles.label}>Document PDF</label>
-              {form.pdf_url ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fef3c7', borderRadius: '10px' }}>
-                  <FileText size={20} color={colors.warning} />
-                  <span style={{ flex: 1, fontSize: '13px' }}>{form.pdf_url}</span>
-                  <button onClick={() => setForm({ ...form, pdf_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : uploading && uploadingType === 'pdf' ? (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px solid ${colors.warning}`,
-                  background: isDark ? '#1e293b' : '#fffbeb'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <Loader size={24} color={colors.warning} style={{ animation: 'spin 1s linear infinite' }} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
-                        Upload en cours...
-                      </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                        {uploadFileName}
-                      </p>
-                    </div>
-                    <span style={{ fontSize: '16px', fontWeight: '600', color: colors.warning }}>{uploadProgress}%</span>
-                  </div>
-                  <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${uploadProgress}%`,
-                      background: colors.warning,
-                      borderRadius: '4px',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                  textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
-                  opacity: uploading ? 0.5 : 1
-                }} onClick={() => !uploading && document.getElementById('lesson-pdf-input').click()}>
-                  <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Cliquer pour uploader un PDF (max 50MB)
-                  </p>
-                </div>
-              )}
-              <input type="file" id="lesson-pdf-input" accept="application/pdf" onChange={handlePdfUpload} style={{ display: 'none' }} disabled={uploading} />
-            </div>
-          )}
-
-          {/* PowerPoint Upload/URL */}
-          {form.content_type === 'powerpoint' && (
-            <div>
-              <label style={styles.label}>Présentation PowerPoint</label>
-
-              {/* Toggle between upload and URL */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, pptx_source_type: 'upload', pptx_url: '' })}
-                  style={{
-                    ...styles.btnSecondary,
-                    flex: 1,
-                    background: form.pptx_source_type === 'upload' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
-                    color: form.pptx_source_type === 'upload' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
-                    border: 'none'
-                  }}
-                >
-                  <Upload size={16} style={{ marginRight: '8px' }} />
-                  Uploader un fichier
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, pptx_source_type: 'url', pptx_url: '' })}
-                  style={{
-                    ...styles.btnSecondary,
-                    flex: 1,
-                    background: form.pptx_source_type === 'url' ? colors.primary : (isDark ? '#334155' : '#e2e8f0'),
-                    color: form.pptx_source_type === 'url' ? '#fff' : (isDark ? '#94a3b8' : '#64748b'),
-                    border: 'none'
-                  }}
-                >
-                  <Link size={16} style={{ marginRight: '8px' }} />
-                  URL externe
-                </button>
-              </div>
-
-              {/* Upload mode */}
-              {form.pptx_source_type === 'upload' ? (
-                <>
-                  {form.pptx_url ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#fff7ed', borderRadius: '10px' }}>
-                      <FileText size={20} color="#ea580c" />
-                      <span style={{ flex: 1, fontSize: '13px' }}>{form.pptx_url}</span>
-                      <button onClick={() => setForm({ ...form, pptx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : uploading && uploadingType === 'powerpoint' ? (
-                    <div style={{
-                      padding: '24px', borderRadius: '10px', border: `2px solid #ea580c`,
-                      background: isDark ? '#1e293b' : '#fff7ed'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                        <Loader size={24} color="#ea580c" style={{ animation: 'spin 1s linear infinite' }} />
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
-                            Upload en cours...
-                          </p>
-                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                            {uploadFileName}
-                          </p>
-                        </div>
-                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#ea580c' }}>{uploadProgress}%</span>
-                      </div>
-                      <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${uploadProgress}%`,
-                          background: 'linear-gradient(90deg, #ea580c, #f97316)',
-                          borderRadius: '4px',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                      textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
-                      opacity: uploading ? 0.5 : 1
-                    }} onClick={() => !uploading && document.getElementById('lesson-pptx-input').click()}>
-                      <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
-                      <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                        Cliquer pour uploader un PowerPoint (max 100MB)
-                      </p>
-                      <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
-                        Formats acceptés : .ppt, .pptx
-                      </p>
-                    </div>
-                  )}
-                  <input type="file" id="lesson-pptx-input" accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={handlePptxUpload} style={{ display: 'none' }} disabled={uploading} />
-                </>
-              ) : (
-                <input
-                  type="url"
-                  value={form.pptx_url}
-                  onChange={e => setForm({ ...form, pptx_url: e.target.value })}
-                  placeholder="https://example.com/presentation.pptx"
-                  style={styles.input}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Word Upload */}
-          {(form.content_type === 'word' || form.content_type === 'mixed') && (
-            <div>
-              <label style={styles.label}>Document Word (.docx)</label>
-              {form.docx_url ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#eff6ff', borderRadius: '10px' }}>
-                  <FileText size={20} color="#2563eb" />
-                  <span style={{ flex: 1, fontSize: '13px' }}>{form.docx_url}</span>
-                  <button onClick={() => setForm({ ...form, docx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : uploading && uploadingType === 'word' ? (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px solid #2563eb`,
-                  background: isDark ? '#1e293b' : '#eff6ff'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <Loader size={24} color="#2563eb" style={{ animation: 'spin 1s linear infinite' }} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
-                        Upload en cours...
-                      </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                        {uploadFileName}
-                      </p>
-                    </div>
-                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#2563eb' }}>{uploadProgress}%</span>
-                  </div>
-                  <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${uploadProgress}%`,
-                      background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
-                      borderRadius: '4px',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                  textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
-                  opacity: uploading ? 0.5 : 1
-                }} onClick={() => !uploading && document.getElementById('lesson-word-input').click()}>
-                  <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Cliquer pour uploader un document Word (max 50MB)
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
-                    Formats acceptés : .doc, .docx
-                  </p>
-                </div>
-              )}
-              <input type="file" id="lesson-word-input" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleWordUpload} style={{ display: 'none' }} disabled={uploading} />
-            </div>
-          )}
-
-          {/* Excel Upload */}
-          {(form.content_type === 'excel' || form.content_type === 'mixed') && (
-            <div>
-              <label style={styles.label}>Fichier Excel (.xlsx)</label>
-              {form.xlsx_url ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isDark ? '#0f172a' : '#f0fdf4', borderRadius: '10px' }}>
-                  <FileText size={20} color="#16a34a" />
-                  <span style={{ flex: 1, fontSize: '13px' }}>{form.xlsx_url}</span>
-                  <button onClick={() => setForm({ ...form, xlsx_url: '' })} style={{ ...styles.btnIcon, width: '28px', height: '28px' }} disabled={uploading}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : uploading && uploadingType === 'excel' ? (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px solid #16a34a`,
-                  background: isDark ? '#1e293b' : '#f0fdf4'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <Loader size={24} color="#16a34a" style={{ animation: 'spin 1s linear infinite' }} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '500', color: isDark ? '#fff' : '#1e293b' }}>
-                        Upload en cours...
-                      </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                        {uploadFileName}
-                      </p>
-                    </div>
-                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#16a34a' }}>{uploadProgress}%</span>
-                  </div>
-                  <div style={{ height: '8px', background: isDark ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${uploadProgress}%`,
-                      background: 'linear-gradient(90deg, #16a34a, #22c55e)',
-                      borderRadius: '4px',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  padding: '24px', borderRadius: '10px', border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                  textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
-                  opacity: uploading ? 0.5 : 1
-                }} onClick={() => !uploading && document.getElementById('lesson-excel-input').click()}>
-                  <FileText size={28} color={isDark ? '#475569' : '#94a3b8'} />
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Cliquer pour uploader un fichier Excel (max 50MB)
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#475569' : '#94a3b8' }}>
-                    Formats acceptés : .xls, .xlsx
-                  </p>
-                </div>
-              )}
-              <input type="file" id="lesson-excel-input" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleExcelUpload} style={{ display: 'none' }} disabled={uploading} />
-            </div>
-          )}
-
-          {/* Text Content */}
-          {(form.content_type === 'text' || form.content_type === 'mixed') && (
-            <div>
-              <label style={styles.label}>Contenu texte</label>
-              <RichTextEditor value={form.content_fr} onChange={v => setForm(f => ({ ...f, content_fr: v }))} placeholder="Contenu de la leçon..." height={350} isDark={isDark} />
-            </div>
-          )}
-
-          {/* Interactive Content Builder */}
-          {form.content_type === 'interactive' && (() => {
-            const BLOCK_TYPES = [
-              { type: 'flashcards', icon: '\u{1F0CF}', label: 'Cartes M\u00e9moire' },
-              { type: 'matching', icon: '\u{1F517}', label: 'Associations' },
-              { type: 'mcq_cards', icon: '\u2753', label: 'QCM Interactif' },
-              { type: 'ordering', icon: '\u{1F4CA}', label: 'Classement' },
-              { type: 'fill_gaps', icon: '\u{1F4DD}', label: 'Texte \u00e0 Trous' }
-            ];
-            const getDefaultConfig = (type) => {
-              switch (type) {
-                case 'flashcards': return { cards: [{ front: '', back: '' }] };
-                case 'matching': return { pairs: [{ left: '', right: '' }] };
-                case 'mcq_cards': return { question: '', options: [{ text: '', is_correct: false, explanation: '' }] };
-                case 'ordering': return { items: [{ text: '' }], correct_order: [0] };
-                case 'fill_gaps': return { text: '', blanks: [] };
-                default: return {};
-              }
-            };
-
-            let blocks = [];
-            try {
-              const parsed = JSON.parse(form.content_fr);
-              if (parsed && Array.isArray(parsed.blocks)) blocks = parsed.blocks;
-            } catch (e) { /* not valid JSON yet */ }
-
-            const updateBlocks = (newBlocks) => {
-              setForm(prev => ({ ...prev, content_fr: JSON.stringify({ blocks: newBlocks }) }));
-            };
-            const addBlock = (type) => {
-              const newBlock = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type, title: '', config: getDefaultConfig(type) };
-              updateBlocks([...blocks, newBlock]);
-            };
-            const removeBlock = (idx) => { const nb = [...blocks]; nb.splice(idx, 1); updateBlocks(nb); };
-            const moveBlock = (idx, dir) => {
-              const nb = [...blocks]; const ti = idx + dir;
-              if (ti < 0 || ti >= nb.length) return;
-              [nb[idx], nb[ti]] = [nb[ti], nb[idx]]; updateBlocks(nb);
-            };
-            const updateBlock = (idx, updates) => {
-              const nb = [...blocks]; nb[idx] = { ...nb[idx], ...updates }; updateBlocks(nb);
-            };
-            const updateConfig = (idx, configUpdates) => {
-              const nb = [...blocks]; nb[idx] = { ...nb[idx], config: { ...nb[idx].config, ...configUpdates } }; updateBlocks(nb);
-            };
-
-            const blockTypeInfo = (type) => BLOCK_TYPES.find(b => b.type === type) || { icon: '?', label: type };
-
-            const ibStyles = {
-              blockCard: { background: isDark ? '#0f172a' : '#f8fafc', border: `2px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '16px', marginBottom: '12px' },
-              blockHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingBottom: '10px', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` },
-              miniBtn: { background: isDark ? '#334155' : '#e2e8f0', color: isDark ? '#e2e8f0' : '#475569', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' },
-              dangerBtn: { background: colors.error + '20', color: colors.error, border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' },
-              addItemBtn: { background: 'transparent', color: colors.primary, border: `1px dashed ${colors.primary}`, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit', marginTop: '8px' },
-              pairRow: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' },
-              smallInput: { ...styles.input, padding: '8px 12px', fontSize: '13px' },
-              smallTextarea: { ...styles.input, padding: '8px 12px', fontSize: '13px', minHeight: '60px', resize: 'vertical' },
-              typeTag: (color) => ({ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: color + '20', color })
-            };
-
-            const renderBlockEditor = (block, idx) => {
-              const cfg = block.config;
-              switch (block.type) {
-                case 'flashcards':
-                  return (
-                    <div>
-                      {cfg.cards.map((card, ci) => (
-                        <div key={ci} style={ibStyles.pairRow}>
-                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Recto (question)" value={card.front}
-                            onChange={e => { const nc = [...cfg.cards]; nc[ci] = { ...nc[ci], front: e.target.value }; updateConfig(idx, { cards: nc }); }} />
-                          <span style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '18px' }}>\u2192</span>
-                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Verso (r\u00e9ponse)" value={card.back}
-                            onChange={e => { const nc = [...cfg.cards]; nc[ci] = { ...nc[ci], back: e.target.value }; updateConfig(idx, { cards: nc }); }} />
-                          {cfg.cards.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const nc = cfg.cards.filter((_, i) => i !== ci); updateConfig(idx, { cards: nc }); }}>\u2715</button>}
-                        </div>
-                      ))}
-                      <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { cards: [...cfg.cards, { front: '', back: '' }] })}>+ Ajouter une carte</button>
-                    </div>
-                  );
-                case 'matching':
-                  return (
-                    <div>
-                      {cfg.pairs.map((pair, pi) => (
-                        <div key={pi} style={ibStyles.pairRow}>
-                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Terme" value={pair.left}
-                            onChange={e => { const np = [...cfg.pairs]; np[pi] = { ...np[pi], left: e.target.value }; updateConfig(idx, { pairs: np }); }} />
-                          <span style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '18px' }}>\u2194</span>
-                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="D\u00e9finition" value={pair.right}
-                            onChange={e => { const np = [...cfg.pairs]; np[pi] = { ...np[pi], right: e.target.value }; updateConfig(idx, { pairs: np }); }} />
-                          {cfg.pairs.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const np = cfg.pairs.filter((_, i) => i !== pi); updateConfig(idx, { pairs: np }); }}>\u2715</button>}
-                        </div>
-                      ))}
-                      <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { pairs: [...cfg.pairs, { left: '', right: '' }] })}>+ Ajouter une paire</button>
-                    </div>
-                  );
-                case 'mcq_cards':
-                  return (
-                    <div>
-                      <textarea style={{ ...ibStyles.smallTextarea, marginBottom: '10px' }} placeholder="Question..." value={cfg.question}
-                        onChange={e => updateConfig(idx, { question: e.target.value })} />
-                      <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>Options :</label>
-                      {cfg.options.map((opt, oi) => (
-                        <div key={oi} style={{ ...ibStyles.pairRow, flexWrap: 'wrap' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', minWidth: '24px' }}>
-                            <input type="checkbox" checked={opt.is_correct}
-                              onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], is_correct: e.target.checked }; updateConfig(idx, { options: no }); }} />
-                          </label>
-                          <input style={{ ...ibStyles.smallInput, flex: 2 }} placeholder="Texte de l'option" value={opt.text}
-                            onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], text: e.target.value }; updateConfig(idx, { options: no }); }} />
-                          <input style={{ ...ibStyles.smallInput, flex: 2 }} placeholder="Explication (optionnel)" value={opt.explanation}
-                            onChange={e => { const no = [...cfg.options]; no[oi] = { ...no[oi], explanation: e.target.value }; updateConfig(idx, { options: no }); }} />
-                          {cfg.options.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const no = cfg.options.filter((_, i) => i !== oi); updateConfig(idx, { options: no }); }}>\u2715</button>}
-                        </div>
-                      ))}
-                      <button style={ibStyles.addItemBtn} onClick={() => updateConfig(idx, { options: [...cfg.options, { text: '', is_correct: false, explanation: '' }] })}>+ Ajouter une option</button>
-                    </div>
-                  );
-                case 'ordering':
-                  return (
-                    <div>
-                      <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 0 8px' }}>Ajoutez les \u00e9l\u00e9ments dans l'ordre correct. L'apprenant devra les remettre en ordre.</p>
-                      {cfg.items.map((item, ii) => (
-                        <div key={ii} style={ibStyles.pairRow}>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: isDark ? '#64748b' : '#94a3b8', minWidth: '20px' }}>{ii + 1}.</span>
-                          <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder={`\u00c9l\u00e9ment ${ii + 1}`} value={item.text}
-                            onChange={e => { const ni = [...cfg.items]; ni[ii] = { text: e.target.value }; const co = ni.map((_, i) => i); updateConfig(idx, { items: ni, correct_order: co }); }} />
-                          {cfg.items.length > 1 && <button style={ibStyles.dangerBtn} onClick={() => { const ni = cfg.items.filter((_, i) => i !== ii); const co = ni.map((_, i) => i); updateConfig(idx, { items: ni, correct_order: co }); }}>\u2715</button>}
-                        </div>
-                      ))}
-                      <button style={ibStyles.addItemBtn} onClick={() => { const ni = [...cfg.items, { text: '' }]; updateConfig(idx, { items: ni, correct_order: ni.map((_, i) => i) }); }}>+ Ajouter un \u00e9l\u00e9ment</button>
-                    </div>
-                  );
-                case 'fill_gaps': {
-                  const detectedBlanks = (cfg.text || '').match(/\{blank\}/g) || [];
-                  const blanksArr = cfg.blanks || [];
-                  const syncedBlanks = detectedBlanks.map((_, bi) => blanksArr[bi] || { answer: '', hint: '' });
-                  return (
-                    <div>
-                      <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 0 6px' }}>Utilisez <code style={{ background: isDark ? '#334155' : '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>{'{blank}'}</code> pour marquer les trous.</p>
-                      <textarea style={{ ...ibStyles.smallTextarea, marginBottom: '10px' }} placeholder="Le {blank} est un animal {blank}." value={cfg.text}
-                        onChange={e => {
-                          const newText = e.target.value;
-                          const newDetected = (newText.match(/\{blank\}/g) || []);
-                          const newBlanks = newDetected.map((_, bi) => (cfg.blanks || [])[bi] || { answer: '', hint: '' });
-                          updateConfig(idx, { text: newText, blanks: newBlanks });
-                        }} />
-                      {syncedBlanks.length > 0 && (
-                        <div>
-                          <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>R\u00e9ponses des trous :</label>
-                          {syncedBlanks.map((blank, bi) => (
-                            <div key={bi} style={ibStyles.pairRow}>
-                              <span style={{ fontSize: '12px', fontWeight: '700', color: colors.primary, minWidth: '60px' }}>Trou {bi + 1}</span>
-                              <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="R\u00e9ponse" value={blank.answer}
-                                onChange={e => { const nb = [...syncedBlanks]; nb[bi] = { ...nb[bi], answer: e.target.value }; updateConfig(idx, { blanks: nb }); }} />
-                              <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Indice (optionnel)" value={blank.hint}
-                                onChange={e => { const nb = [...syncedBlanks]; nb[bi] = { ...nb[bi], hint: e.target.value }; updateConfig(idx, { blanks: nb }); }} />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                default: return null;
-              }
-            };
-
-            return (
-              <div>
-                <label style={styles.label}>Contenu Interactif</label>
-
-                {/* Block list */}
-                {blocks.map((block, idx) => {
-                  const info = blockTypeInfo(block.type);
-                  return (
-                    <div key={block.id} style={ibStyles.blockCard}>
-                      <div style={ibStyles.blockHeader}>
-                        <span style={{ fontSize: '20px' }}>{info.icon}</span>
-                        <span style={ibStyles.typeTag(colors.primary)}>{info.label}</span>
-                        <input style={{ ...ibStyles.smallInput, flex: 1 }} placeholder="Titre du bloc" value={block.title}
-                          onChange={e => updateBlock(idx, { title: e.target.value })} />
-                        <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
-                          <button style={ibStyles.miniBtn} onClick={() => moveBlock(idx, -1)} disabled={idx === 0} title="Monter">\u2191</button>
-                          <button style={ibStyles.miniBtn} onClick={() => moveBlock(idx, 1)} disabled={idx === blocks.length - 1} title="Descendre">\u2193</button>
-                          <button style={ibStyles.dangerBtn} onClick={() => removeBlock(idx)} title="Supprimer">\u2715</button>
-                        </div>
-                      </div>
-                      {renderBlockEditor(block, idx)}
-                    </div>
-                  );
-                })}
-
-                {/* Add block selector */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <select id="ib-add-block-select" style={{ ...styles.select, width: 'auto', padding: '10px 14px', fontSize: '13px' }} defaultValue="">
-                    <option value="" disabled>+ Ajouter un bloc interactif...</option>
-                    {BLOCK_TYPES.map(bt => (
-                      <option key={bt.type} value={bt.type}>{bt.icon} {bt.label}</option>
-                    ))}
-                  </select>
-                  <button style={{ ...styles.btnPrimary, fontSize: '13px', padding: '10px 18px' }} onClick={() => {
-                    const sel = document.getElementById('ib-add-block-select');
-                    if (sel && sel.value) { addBlock(sel.value); sel.value = ''; }
-                  }}>Ajouter</button>
-                </div>
-
-                {blocks.length === 0 && (
-                  <p style={{ color: isDark ? '#64748b' : '#94a3b8', fontSize: '13px', marginTop: '8px' }}>
-                    Aucun bloc interactif. Cliquez sur le bouton ci-dessus pour commencer.
-                  </p>
-                )}
-              </div>
-            );
-          })()}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Statut</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
-                <option value="draft">Brouillon</option>
-                <option value="published">Publié</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', paddingTop: '28px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.is_preview} onChange={e => setForm({ ...form, is_preview: e.target.checked })} />
-                <span style={{ fontSize: '14px' }}>Aperçu gratuit</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Quiz association */}
-          <div style={{
-            background: isDark ? '#0f172a' : '#f8fafc',
-            borderRadius: '10px',
-            padding: '16px',
-            border: `1px solid ${form.has_quiz ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`
-          }}>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-              marginBottom: form.has_quiz ? '16px' : '0'
-            }}>
-              <input type="checkbox" checked={form.has_quiz}
-                onChange={e => setForm({ ...form, has_quiz: e.target.checked, quiz_id: e.target.checked ? form.quiz_id : null })}
-                style={{ accentColor: colors.primary }} />
-              <FileQuestion size={18} color={form.has_quiz ? colors.primary : (isDark ? '#64748b' : '#94a3b8')} />
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Cette leçon a un quiz</span>
-            </label>
-
-            {form.has_quiz && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={styles.label}>Quiz associé</label>
-                  <select
-                    value={form.quiz_id || ''}
-                    onChange={e => setForm({ ...form, quiz_id: e.target.value ? parseInt(e.target.value) : null })}
-                    style={styles.select}
-                  >
-                    <option value="">-- Sélectionner un quiz --</option>
-                    {quizzes.map(quiz => (
-                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>Position du quiz</label>
-                  <select value={form.quiz_position} onChange={e => setForm({ ...form, quiz_position: e.target.value })} style={styles.select}>
-                    <option value="start">Début de leçon</option>
-                    <option value="middle">Milieu de leçon</option>
-                    <option value="end">Fin de leçon</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>Poids du quiz</label>
-                  <input type="number" value={form.quiz_weight} onChange={e => setForm({ ...form, quiz_weight: parseFloat(e.target.value) || 1 })}
-                    style={styles.input} min="0.1" max="10" step="0.1" />
-                  <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Coefficient dans la note du module
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Upload progress overlay message */}
-          {uploading && (
-            <div style={{
-              padding: '12px 16px',
-              background: isDark ? '#1e3a5f' : '#dbeafe',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <Loader size={18} color={colors.primary} style={{ animation: 'spin 1s linear infinite' }} />
-              <span style={{ fontSize: '13px', color: isDark ? '#93c5fd' : '#1e40af' }}>
-                Veuillez patienter, upload en cours ({uploadProgress}%)...
-              </span>
-            </div>
-          )}
-
-          <div style={{
-            display: 'flex', gap: '12px', justifyContent: 'flex-end',
-            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <button onClick={() => setShowLessonForm(false)} style={styles.btnSecondary} disabled={uploading}>Annuler</button>
-            <button
-              onClick={() => handleSaveLesson(form)}
-              style={{
-                ...styles.btnPrimary,
-                opacity: (!form.title_fr || uploading) ? 0.5 : 1,
-                cursor: (!form.title_fr || uploading) ? 'not-allowed' : 'pointer'
-              }}
-              disabled={!form.title_fr || uploading}
-            >
-              {uploading ? (
-                <>
-                  <Loader size={16} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
-                  Upload en cours...
-                </>
-              ) : (
-                editingLesson ? 'Enregistrer les modifications' : 'Créer la leçon'
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  const parseLessonBlocks = (lesson) => {
+    if (!lesson) return [];
+    let blocks = lesson.content_blocks;
+    if (typeof blocks === 'string') {
+      try { blocks = JSON.parse(blocks); } catch (e) { blocks = []; }
+    }
+    if (Array.isArray(blocks) && blocks.length) return blocks;
+    // Ancienne leçon "Mixte" : on reprend ses ressources sous forme de blocs
+    return lesson.content_type === 'mixed' ? legacyLessonToBlocks(lesson) : [];
   };
 
   // ============ PATH FORM INLINE ============
-  const PathFormInline = () => {
-    const [form, setForm] = useState({
-      title_fr: editingPath?.title_fr || '',
-      title_en: editingPath?.title_en || '',
-      description_fr: editingPath?.description_fr || '',
-      short_description_fr: editingPath?.short_description_fr || '',
-      level: editingPath?.level || 'beginner',
-      duration_hours: editingPath?.duration_hours || 0,
-      min_passing_score: editingPath?.min_passing_score || 70,
-      certificate_enabled: editingPath?.certificate_enabled !== false,
-      certificate_template: editingPath?.certificate_template || 'default',
-      status: editingPath?.status || 'draft',
-      require_final_exam: editingPath?.require_final_exam || false,
-      final_exam_id: editingPath?.final_exam_id || null,
-      final_quiz_weight: editingPath?.final_quiz_weight || 1.00,
-      courses_quizzes_weight: editingPath?.courses_quizzes_weight || 1.00
-    });
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header with title and Retour button */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `${colors.warning}15`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Award size={20} color={colors.warning} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-                {editingPath ? 'Modifier le Parcours' : 'Nouveau Parcours'}
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Configurez le parcours d'apprentissage
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowPathForm(false)}
-            style={{
-              ...styles.btnSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Retour
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Titre (Français) *</label>
-              <input type="text" value={form.title_fr} onChange={e => setForm({ ...form, title_fr: e.target.value })}
-                style={styles.input} placeholder="One Health Leadership" />
-            </div>
-            <div>
-              <label style={styles.label}>Titre (Anglais)</label>
-              <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })}
-                style={styles.input} />
-            </div>
-          </div>
-
-          <div>
-            <label style={styles.label}>Description courte</label>
-            <textarea value={form.short_description_fr} onChange={e => setForm({ ...form, short_description_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px' }} placeholder="Description du parcours..." />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Niveau</label>
-              <select value={form.level} onChange={e => setForm({ ...form, level: e.target.value })} style={styles.select}>
-                <option value="beginner">Débutant</option>
-                <option value="intermediate">Intermédiaire</option>
-                <option value="advanced">Avancé</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Durée (heures)</label>
-              <input type="number" value={form.duration_hours} onChange={e => setForm({ ...form, duration_hours: parseInt(e.target.value) || 0 })}
-                style={styles.input} min="0" />
-            </div>
-            <div>
-              <label style={styles.label}>Score min. (%)</label>
-              <input type="number" value={form.min_passing_score} onChange={e => setForm({ ...form, min_passing_score: parseInt(e.target.value) || 70 })}
-                style={styles.input} min="0" max="100" />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Statut</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
-                <option value="draft">Brouillon</option>
-                <option value="published">Publié</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', paddingTop: '28px' }}>
-                <input type="checkbox" checked={form.certificate_enabled} onChange={e => setForm({ ...form, certificate_enabled: e.target.checked })} />
-                <span style={{ fontSize: '14px' }}>Certificat activé</span>
-              </label>
-              {form.certificate_enabled && (
-                <div>
-                  <label style={styles.label}>Template de certificat</label>
-                  <select
-                    value={form.certificate_template}
-                    onChange={e => setForm({ ...form, certificate_template: e.target.value })}
-                    style={styles.select}
-                  >
-                    <option value="default">Par défaut</option>
-                    {certificateTemplates.map(template => (
-                      <option key={template.id} value={template.slug}>
-                        {template.name} {template.is_default ? '(Défaut)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Grade settings for path */}
-          <div style={{
-            background: isDark ? '#0f172a' : '#f8fafc',
-            borderRadius: '10px',
-            padding: '16px',
-            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={16} color={colors.warning} />
-                Pondération des notes
-              </span>
-            </label>
-
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-              marginBottom: form.require_final_exam ? '16px' : '0'
-            }}>
-              <input
-                type="checkbox"
-                checked={form.require_final_exam}
-                onChange={e => setForm({ ...form, require_final_exam: e.target.checked, final_exam_id: e.target.checked ? form.final_exam_id : null })}
-                style={{ accentColor: colors.primary }}
-              />
-              <span style={{ fontWeight: '600', fontSize: '13px' }}>Quiz final obligatoire pour le parcours</span>
-            </label>
-
-            {form.require_final_exam && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={styles.label}>Quiz final du parcours</label>
-                  <select
-                    value={form.final_exam_id || ''}
-                    onChange={e => setForm({ ...form, final_exam_id: e.target.value ? parseInt(e.target.value) : null })}
-                    style={styles.select}
-                  >
-                    <option value="">Sélectionner un quiz</option>
-                    {quizzes.filter(q => q.status === 'published').map(quiz => (
-                      <option key={quiz.id} value={quiz.id}>{quiz.title_fr} ({quiz.quiz_type === 'final_exam' ? 'Examen final' : quiz.quiz_type === 'chapter_quiz' ? 'Quiz chapitre' : 'Quiz'})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>Poids quiz final</label>
-                  <input
-                    type="number"
-                    value={form.final_quiz_weight}
-                    onChange={e => setForm({ ...form, final_quiz_weight: parseFloat(e.target.value) || 1 })}
-                    style={styles.input}
-                    min="0.1"
-                    max="10"
-                    step="0.1"
-                    disabled={!form.final_exam_id}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label style={styles.label}>Poids moyenne des cours</label>
-              <input
-                type="number"
-                value={form.courses_quizzes_weight}
-                onChange={e => setForm({ ...form, courses_quizzes_weight: parseFloat(e.target.value) || 1 })}
-                style={styles.input}
-                min="0.1"
-                max="10"
-                step="0.1"
-              />
-              <p style={{ margin: '4px 0 0', fontSize: '10px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Coefficient de la moyenne des notes de cours dans la note finale du parcours
-              </p>
-            </div>
-          </div>
-
-          <div style={{
-            display: 'flex', gap: '12px', justifyContent: 'flex-end',
-            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <button onClick={() => setShowPathForm(false)} style={styles.btnSecondary}>Annuler</button>
-            <button onClick={() => handleSavePath(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingPath ? 'Enregistrer les modifications' : 'Créer le parcours'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ============ QUESTION FORM INLINE ============
-  const QuestionFormInline = () => {
-    // Parser les options si c'est une chaîne JSON
-    const parseOptions = (opts, type) => {
-      if (!opts) {
-        if (type === 'matching') return [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
-        if (type === 'ordering') return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
-        return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
-      }
-      if (Array.isArray(opts)) return opts;
-      try { return JSON.parse(opts); } catch { return [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }]; }
-    };
-    const parseCorrectAnswer = (ans, type) => {
-      if (ans === null || ans === undefined) {
-        if (type === 'multiple_select' || type === 'fill_blank') return [];
-        if (type === 'true_false') return true;
-        if (type === 'ordering') return [];
-        return 0;
-      }
-      if (typeof ans === 'number' || typeof ans === 'boolean' || Array.isArray(ans)) return ans;
-      try { return JSON.parse(ans); } catch { return type === 'fill_blank' || type === 'multiple_select' ? [] : 0; }
-    };
-
-    const [form, setForm] = useState({
-      question_text_fr: editingQuestion?.question_text_fr || '',
-      question_text_en: editingQuestion?.question_text_en || '',
-      question_type: editingQuestion?.question_type || 'mcq',
-      explanation_fr: editingQuestion?.explanation_fr || '',
-      explanation_en: editingQuestion?.explanation_en || '',
-      options: parseOptions(editingQuestion?.options, editingQuestion?.question_type),
-      correct_answer: parseCorrectAnswer(editingQuestion?.correct_answer, editingQuestion?.question_type),
-      points: editingQuestion?.points || 1,
-      difficulty: editingQuestion?.difficulty || 'medium',
-      is_active: editingQuestion?.is_active !== false
-    });
-
-    const handleOptionChange = (index, field, value) => {
-      const newOptions = [...form.options];
-      newOptions[index] = { ...newOptions[index], [field]: value };
-      setForm({ ...form, options: newOptions });
-    };
-
-    const addOption = () => {
-      if (form.question_type === 'matching') {
-        setForm({ ...form, options: [...form.options, { left_fr: '', left_en: '', right_fr: '', right_en: '' }] });
-      } else {
-        setForm({ ...form, options: [...form.options, { text_fr: '', text_en: '' }] });
-      }
-    };
-
-    const removeOption = (index) => {
-      const newOptions = form.options.filter((_, i) => i !== index);
-      setForm({
-        ...form,
-        options: newOptions,
-        correct_answer: form.correct_answer >= newOptions.length ? 0 : form.correct_answer
-      });
-    };
-
-    const toggleMultipleAnswer = (index) => {
-      if (form.question_type !== 'multiple_select') return;
-      const currentAnswers = Array.isArray(form.correct_answer) ? form.correct_answer : [];
-      if (currentAnswers.includes(index)) {
-        setForm({ ...form, correct_answer: currentAnswers.filter(i => i !== index) });
-      } else {
-        setForm({ ...form, correct_answer: [...currentAnswers, index] });
-      }
-    };
-
-    // Handle fill_blank answer change
-    const handleFillBlankAnswer = (index, value) => {
-      const newAnswers = [...(Array.isArray(form.correct_answer) ? form.correct_answer : [])];
-      newAnswers[index] = value;
-      setForm({ ...form, correct_answer: newAnswers });
-    };
-
-    const addFillBlankSlot = () => {
-      const newAnswers = [...(Array.isArray(form.correct_answer) ? form.correct_answer : []), ''];
-      setForm({ ...form, correct_answer: newAnswers });
-    };
-
-    const removeFillBlankSlot = (index) => {
-      const newAnswers = (Array.isArray(form.correct_answer) ? form.correct_answer : []).filter((_, i) => i !== index);
-      setForm({ ...form, correct_answer: newAnswers });
-    };
-
-    // Count blanks in question text for fill_blank type
-    const countBlanks = (text) => {
-      const matches = text.match(/_{3,}|\[___\]|\{\{blank\}\}/g);
-      return matches ? matches.length : 0;
-    };
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header with title and Retour button */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `${colors.primary}15`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <HelpCircle size={20} color={colors.primary} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-                {editingQuestion ? 'Modifier la Question' : 'Nouvelle Question'}
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Remplissez les informations pour créer une question
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowQuestionForm(false)}
-            style={{
-              ...styles.btnSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Retour
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Question Type */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Type de question *</label>
-              <select
-                value={form.question_type}
-                onChange={e => {
-                  const type = e.target.value;
-                  let newOptions = form.options;
-                  let newAnswer = form.correct_answer;
-
-                  if (type === 'matching') {
-                    newOptions = [{ left_fr: '', left_en: '', right_fr: '', right_en: '' }, { left_fr: '', left_en: '', right_fr: '', right_en: '' }];
-                    newAnswer = null; // Matching uses options order as answer
-                  } else if (type === 'ordering') {
-                    newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
-                    newAnswer = [0, 1, 2];
-                  } else if (type === 'fill_blank') {
-                    newOptions = [];
-                    newAnswer = [''];
-                  } else if (type === 'multiple_select') {
-                    newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
-                    newAnswer = [];
-                  } else if (type === 'true_false') {
-                    newOptions = [];
-                    newAnswer = true;
-                  } else if (type === 'short_answer') {
-                    newOptions = [];
-                    newAnswer = [];
-                  } else {
-                    newOptions = [{ text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }, { text_fr: '', text_en: '' }];
-                    newAnswer = 0;
-                  }
-
-                  setForm({ ...form, question_type: type, options: newOptions, correct_answer: newAnswer });
-                }}
-                style={styles.select}
-              >
-                <option value="mcq">QCM (choix unique)</option>
-                <option value="multiple_select">Sélection multiple</option>
-                <option value="true_false">Vrai/Faux</option>
-                <option value="short_answer">Réponse courte</option>
-                <option value="matching">Association (paires)</option>
-                <option value="fill_blank">Texte à trous</option>
-                <option value="ordering">Ordre / Classement</option>
-              </select>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={styles.label}>Difficulté</label>
-                <select value={form.difficulty} onChange={e => setForm({ ...form, difficulty: e.target.value })} style={styles.select}>
-                  <option value="easy">Facile</option>
-                  <option value="medium">Moyen</option>
-                  <option value="hard">Difficile</option>
-                </select>
-              </div>
-              <div>
-                <label style={styles.label}>Points</label>
-                <input
-                  type="number"
-                  value={form.points}
-                  onChange={e => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
-                  style={styles.input}
-                  min="1"
-                  max="10"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Question Text */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>
-                Question (Français) *
-                {form.question_type === 'fill_blank' && (
-                  <span style={{ fontSize: '11px', color: colors.primary, marginLeft: '8px' }}>
-                    Utilisez ___ ou [___] pour les trous
-                  </span>
-                )}
-              </label>
-              <textarea
-                value={form.question_text_fr}
-                onChange={e => setForm({ ...form, question_text_fr: e.target.value })}
-                style={{ ...styles.input, minHeight: '120px' }}
-                placeholder={form.question_type === 'fill_blank'
-                  ? "Ex: Le capital de France est ___. La monnaie est ___."
-                  : "Entrez la question..."
-                }
-              />
-              {form.question_type === 'fill_blank' && (
-                <p style={{ margin: '6px 0 0', fontSize: '12px', color: colors.primary }}>
-                  {countBlanks(form.question_text_fr)} trou(s) détecté(s)
-                </p>
-              )}
-            </div>
-            <div>
-              <label style={styles.label}>Question (Anglais)</label>
-              <textarea
-                value={form.question_text_en}
-                onChange={e => setForm({ ...form, question_text_en: e.target.value })}
-                style={{ ...styles.input, minHeight: '120px' }}
-                placeholder="Enter question in English..."
-              />
-            </div>
-          </div>
-
-          {/* Options for MCQ/Multiple Select */}
-          {(form.question_type === 'mcq' || form.question_type === 'multiple_select') && (
-            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ListChecks size={16} color={colors.primary} />
-                  Options {form.question_type === 'multiple_select' ? '(cochez les bonnes réponses)' : '(sélectionnez la bonne réponse)'}
-                </span>
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {form.options.map((option, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex', gap: '12px', alignItems: 'center',
-                    padding: '12px', borderRadius: '10px',
-                    background: isDark ? '#1e293b' : 'white',
-                    border: `1px solid ${
-                      (form.question_type === 'mcq' && form.correct_answer === idx) ||
-                      (form.question_type === 'multiple_select' && Array.isArray(form.correct_answer) && form.correct_answer.includes(idx))
-                        ? colors.success : (isDark ? '#334155' : '#e2e8f0')
-                    }`
-                  }}>
-                    {form.question_type === 'mcq' ? (
-                      <input
-                        type="radio"
-                        name="correct_answer"
-                        checked={form.correct_answer === idx}
-                        onChange={() => setForm({ ...form, correct_answer: idx })}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: colors.success }}
-                      />
-                    ) : (
-                      <input
-                        type="checkbox"
-                        checked={Array.isArray(form.correct_answer) && form.correct_answer.includes(idx)}
-                        onChange={() => toggleMultipleAnswer(idx)}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: colors.success }}
-                      />
-                    )}
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', minWidth: '20px' }}>
-                      {String.fromCharCode(65 + idx)}.
-                    </span>
-                    <input
-                      type="text"
-                      value={option.text_fr || ''}
-                      onChange={e => handleOptionChange(idx, 'text_fr', e.target.value)}
-                      style={{ ...styles.input, flex: 1 }}
-                      placeholder={`Option ${idx + 1} (FR)`}
-                    />
-                    <input
-                      type="text"
-                      value={option.text_en || ''}
-                      onChange={e => handleOptionChange(idx, 'text_en', e.target.value)}
-                      style={{ ...styles.input, flex: 1 }}
-                      placeholder={`Option ${idx + 1} (EN)`}
-                    />
-                    {form.options.length > 2 && (
-                      <button onClick={() => removeOption(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {form.options.length < 6 && (
-                <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
-                  <Plus size={14} /> Ajouter une option
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* True/False */}
-          {form.question_type === 'true_false' && (
-            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ToggleLeft size={16} color={colors.teal} />
-                  Bonne réponse
-                </span>
-              </label>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <label style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-                  cursor: 'pointer', padding: '20px', borderRadius: '12px',
-                  background: form.correct_answer === true ? `${colors.success}15` : (isDark ? '#1e293b' : 'white'),
-                  border: form.correct_answer === true ? `2px solid ${colors.success}` : `2px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                }}>
-                  <input type="radio" name="tf_answer" checked={form.correct_answer === true} onChange={() => setForm({ ...form, correct_answer: true })} style={{ display: 'none' }} />
-                  <CheckCircle2 size={24} color={form.correct_answer === true ? colors.success : '#94a3b8'} />
-                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Vrai</span>
-                </label>
-                <label style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-                  cursor: 'pointer', padding: '20px', borderRadius: '12px',
-                  background: form.correct_answer === false ? `${colors.error}15` : (isDark ? '#1e293b' : 'white'),
-                  border: form.correct_answer === false ? `2px solid ${colors.error}` : `2px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                }}>
-                  <input type="radio" name="tf_answer" checked={form.correct_answer === false} onChange={() => setForm({ ...form, correct_answer: false })} style={{ display: 'none' }} />
-                  <XCircle size={24} color={form.correct_answer === false ? colors.error : '#94a3b8'} />
-                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Faux</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Short Answer */}
-          {form.question_type === 'short_answer' && (
-            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Type size={16} color={colors.warning} />
-                  Réponse(s) acceptée(s)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={Array.isArray(form.correct_answer) ? form.correct_answer.join(', ') : (form.correct_answer || '')}
-                onChange={e => setForm({ ...form, correct_answer: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
-                style={styles.input}
-                placeholder="réponse1, réponse2, réponse3..."
-              />
-              <p style={{ margin: '8px 0 0', fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Séparez les réponses alternatives par des virgules. La comparaison est insensible à la casse.
-              </p>
-            </div>
-          )}
-
-          {/* Matching - Association de paires */}
-          {form.question_type === 'matching' && (
-            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ArrowRightLeft size={16} color={colors.success} />
-                  Paires à associer
-                </span>
-              </label>
-              <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Créez les paires correctes. Les éléments de droite seront mélangés lors du quiz.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {form.options.map((pair, idx) => (
-                  <div key={idx} style={{
-                    display: 'grid', gridTemplateColumns: '1fr auto 1fr auto', gap: '12px', alignItems: 'center',
-                    padding: '12px', borderRadius: '10px',
-                    background: isDark ? '#1e293b' : 'white',
-                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                  }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <input
-                        type="text"
-                        value={pair.left_fr || ''}
-                        onChange={e => handleOptionChange(idx, 'left_fr', e.target.value)}
-                        style={styles.input}
-                        placeholder={`Élément gauche ${idx + 1} (FR)`}
-                      />
-                      <input
-                        type="text"
-                        value={pair.left_en || ''}
-                        onChange={e => handleOptionChange(idx, 'left_en', e.target.value)}
-                        style={{ ...styles.input, fontSize: '12px' }}
-                        placeholder="(EN)"
-                      />
-                    </div>
-                    <ArrowRightLeft size={20} color={colors.success} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <input
-                        type="text"
-                        value={pair.right_fr || ''}
-                        onChange={e => handleOptionChange(idx, 'right_fr', e.target.value)}
-                        style={styles.input}
-                        placeholder={`Élément droit ${idx + 1} (FR)`}
-                      />
-                      <input
-                        type="text"
-                        value={pair.right_en || ''}
-                        onChange={e => handleOptionChange(idx, 'right_en', e.target.value)}
-                        style={{ ...styles.input, fontSize: '12px' }}
-                        placeholder="(EN)"
-                      />
-                    </div>
-                    {form.options.length > 2 && (
-                      <button onClick={() => removeOption(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {form.options.length < 8 && (
-                <button onClick={addOption} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
-                  <Plus size={14} /> Ajouter une paire
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Ordering - Classement */}
-          {form.question_type === 'ordering' && (
-            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ListChecks size={16} color={colors.info || '#3b82f6'} />
-                  Éléments à ordonner (dans l'ordre correct)
-                </span>
-              </label>
-              <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Ajoutez les éléments dans l'ordre correct. L'apprenant devra les remettre dans cet ordre.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(form.options || []).map((opt, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{
-                      background: colors.info || '#3b82f6', color: '#fff', borderRadius: '50%',
-                      width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 12, fontWeight: 'bold', flexShrink: 0
-                    }}>{idx + 1}</span>
-                    <input
-                      value={opt.text_fr || ''}
-                      onChange={e => {
-                        const newOpts = [...form.options];
-                        newOpts[idx] = { ...newOpts[idx], text_fr: e.target.value };
-                        setForm({ ...form, options: newOpts });
-                      }}
-                      placeholder={`Élément ${idx + 1} (FR)`}
-                      style={{ ...styles.input, flex: 1 }}
-                    />
-                    <input
-                      value={opt.text_en || ''}
-                      onChange={e => {
-                        const newOpts = [...form.options];
-                        newOpts[idx] = { ...newOpts[idx], text_en: e.target.value };
-                        setForm({ ...form, options: newOpts });
-                      }}
-                      placeholder="(EN)"
-                      style={{ ...styles.input, flex: 1, fontSize: '12px' }}
-                    />
-                    <button
-                      onClick={() => {
-                        if (idx > 0) {
-                          const newOpts = [...form.options];
-                          [newOpts[idx-1], newOpts[idx]] = [newOpts[idx], newOpts[idx-1]];
-                          setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
-                        }
-                      }}
-                      disabled={idx === 0}
-                      style={{ ...styles.btnIcon, opacity: idx === 0 ? 0.3 : 1 }}
-                      title="Monter"
-                    >&#8593;</button>
-                    <button
-                      onClick={() => {
-                        if (idx < form.options.length - 1) {
-                          const newOpts = [...form.options];
-                          [newOpts[idx], newOpts[idx+1]] = [newOpts[idx+1], newOpts[idx]];
-                          setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
-                        }
-                      }}
-                      disabled={idx === form.options.length - 1}
-                      style={{ ...styles.btnIcon, opacity: idx === form.options.length - 1 ? 0.3 : 1 }}
-                      title="Descendre"
-                    >&#8595;</button>
-                    {form.options.length > 2 && (
-                      <button
-                        onClick={() => {
-                          const newOpts = form.options.filter((_, i) => i !== idx);
-                          setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
-                        }}
-                        style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}
-                        title="Supprimer"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {form.options.length < 10 && (
-                <button
-                  onClick={() => {
-                    const newOpts = [...(form.options || []), { text_fr: '', text_en: '' }];
-                    setForm({ ...form, options: newOpts, correct_answer: newOpts.map((_, i) => i) });
-                  }}
-                  style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}
-                >
-                  <Plus size={14} /> Ajouter un élément
-                </button>
-              )}
-              <p style={{ margin: '8px 0 0', fontSize: '11px', color: isDark ? '#6b7280' : '#9ca3af' }}>
-                L'ordre actuel sera considéré comme l'ordre correct.
-              </p>
-            </div>
-          )}
-
-          {/* Fill Blank - Texte à trous */}
-          {form.question_type === 'fill_blank' && (
-            <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-              <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <TextCursorInput size={16} color={colors.error} />
-                  Réponses pour chaque trou
-                </span>
-              </label>
-              <p style={{ margin: '0 0 16px', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Entrez la réponse attendue pour chaque trou dans l'ordre d'apparition dans le texte.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(Array.isArray(form.correct_answer) ? form.correct_answer : ['']).map((answer, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: '28px', height: '28px', borderRadius: '8px',
-                      background: colors.primary, color: 'white', fontSize: '12px', fontWeight: '700'
-                    }}>
-                      {idx + 1}
-                    </span>
-                    <input
-                      type="text"
-                      value={answer || ''}
-                      onChange={e => handleFillBlankAnswer(idx, e.target.value)}
-                      style={{ ...styles.input, flex: 1 }}
-                      placeholder={`Réponse pour le trou ${idx + 1}`}
-                    />
-                    {(Array.isArray(form.correct_answer) ? form.correct_answer : []).length > 1 && (
-                      <button onClick={() => removeFillBlankSlot(idx)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button onClick={addFillBlankSlot} style={{ ...styles.btnSecondary, marginTop: '12px', fontSize: '13px' }}>
-                <Plus size={14} /> Ajouter un trou
-              </button>
-            </div>
-          )}
-
-          {/* Explanation */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Explication (FR) - Affichée après la réponse</label>
-              <textarea
-                value={form.explanation_fr}
-                onChange={e => setForm({ ...form, explanation_fr: e.target.value })}
-                style={{ ...styles.input, minHeight: '100px' }}
-                placeholder="Explication de la bonne réponse..."
-              />
-            </div>
-            <div>
-              <label style={styles.label}>Explication (EN)</label>
-              <textarea
-                value={form.explanation_en}
-                onChange={e => setForm({ ...form, explanation_en: e.target.value })}
-                style={{ ...styles.input, minHeight: '100px' }}
-                placeholder="Explanation in English..."
-              />
-            </div>
-          </div>
-
-          {/* Active checkbox */}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} style={{ width: '18px', height: '18px' }} />
-              <span style={{ fontSize: '14px' }}>Question active (visible dans les quiz)</span>
-            </label>
-          </div>
-
-          {/* Actions */}
-          <div style={{
-            display: 'flex', gap: '12px', justifyContent: 'flex-end',
-            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <button onClick={() => setShowQuestionForm(false)} style={styles.btnSecondary}>
-              Annuler
-            </button>
-            <button onClick={() => handleSaveQuestion(form)} style={styles.btnPrimary} disabled={!form.question_text_fr}>
-              {editingQuestion ? 'Enregistrer les modifications' : 'Créer la question'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ============ QUIZ MODAL ============
   // ============ QUIZ FORM INLINE ============
-  const QuizFormInline = () => {
-    const [form, setForm] = useState({
-      title_fr: editingQuiz?.title_fr || '',
-      title_en: editingQuiz?.title_en || '',
-      description_fr: editingQuiz?.description_fr || '',
-      description_en: editingQuiz?.description_en || '',
-      quiz_type: editingQuiz?.quiz_type || 'graded',
-      time_limit_minutes: editingQuiz?.time_limit_minutes || null,
-      passing_score: editingQuiz?.passing_score || 70,
-      max_attempts: editingQuiz?.max_attempts || 3,
-      shuffle_questions: editingQuiz?.shuffle_questions !== false,
-      shuffle_options: editingQuiz?.shuffle_options !== false,
-      show_correct_answers: editingQuiz?.show_correct_answers !== false,
-      show_explanation: editingQuiz?.show_explanation !== false,
-      allow_retake: editingQuiz?.allow_retake !== false,
-      status: editingQuiz?.status || 'draft',
-      contributes_to_grade: editingQuiz?.contributes_to_grade !== false,
-      grade_weight: editingQuiz?.grade_weight || 1.00,
-      random_selection: editingQuiz?.random_selection || false,
-      question_count: editingQuiz?.question_count || null
-    });
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header with title and Retour button */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `${colors.purple}15`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <FileQuestion size={20} color={colors.purple} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-                {editingQuiz ? 'Modifier le Quiz' : 'Nouveau Quiz'}
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Configurez les paramètres du quiz
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowQuizForm(false)}
-            style={{
-              ...styles.btnSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Retour
-          </button>
-        </div>
-
-        {/* Form Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Title FR/EN side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Titre (Français) *</label>
-              <input
-                type="text"
-                value={form.title_fr}
-                onChange={e => setForm({ ...form, title_fr: e.target.value })}
-                style={styles.input}
-                placeholder="Quiz Module 1"
-              />
-            </div>
-            <div>
-              <label style={styles.label}>Titre (Anglais)</label>
-              <input
-                type="text"
-                value={form.title_en}
-                onChange={e => setForm({ ...form, title_en: e.target.value })}
-                style={styles.input}
-                placeholder="Module 1 Quiz"
-              />
-            </div>
-          </div>
-
-          {/* Description FR/EN side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Description (Français)</label>
-              <textarea
-                value={form.description_fr}
-                onChange={e => setForm({ ...form, description_fr: e.target.value })}
-                style={{ ...styles.input, minHeight: '100px' }}
-                placeholder="Description du quiz..."
-              />
-            </div>
-            <div>
-              <label style={styles.label}>Description (Anglais)</label>
-              <textarea
-                value={form.description_en}
-                onChange={e => setForm({ ...form, description_en: e.target.value })}
-                style={{ ...styles.input, minHeight: '100px' }}
-                placeholder="Quiz description..."
-              />
-            </div>
-          </div>
-
-          {/* Type, Status, and Settings all on same row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Type de quiz</label>
-              <select value={form.quiz_type} onChange={e => setForm({ ...form, quiz_type: e.target.value })} style={styles.select}>
-                <option value="practice">Pratique (non noté)</option>
-                <option value="graded">Noté</option>
-                <option value="final_exam">Examen Final</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Statut</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={styles.select}>
-                <option value="draft">Brouillon</option>
-                <option value="published">Publié</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Seuil réussite (%)</label>
-              <input
-                type="number"
-                value={form.passing_score}
-                onChange={e => setForm({ ...form, passing_score: parseInt(e.target.value) || 70 })}
-                style={styles.input}
-                min="0"
-                max="100"
-              />
-            </div>
-            <div>
-              <label style={styles.label}>Limite temps (min)</label>
-              <input
-                type="number"
-                value={form.time_limit_minutes || ''}
-                onChange={e => setForm({ ...form, time_limit_minutes: e.target.value ? parseInt(e.target.value) : null })}
-                style={styles.input}
-                min="1"
-                placeholder="∞"
-              />
-            </div>
-            <div>
-              <label style={styles.label}>Tentatives max</label>
-              <input
-                type="number"
-                value={form.max_attempts}
-                onChange={e => setForm({ ...form, max_attempts: parseInt(e.target.value) || 1 })}
-                style={styles.input}
-                min="1"
-                max="10"
-              />
-            </div>
-          </div>
-
-          {/* Grade weighting settings */}
-          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc', padding: '16px' }}>
-            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={16} color={colors.warning} />
-                Pondération de la Note
-              </span>
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.contributes_to_grade ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.contributes_to_grade ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input
-                  type="checkbox"
-                  checked={form.contributes_to_grade}
-                  onChange={e => setForm({ ...form, contributes_to_grade: e.target.checked })}
-                  style={{ accentColor: colors.success }}
-                />
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Compte dans la note finale</span>
-                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Ce quiz sera inclus dans le calcul de la moyenne
-                  </p>
-                </div>
-              </label>
-              <div>
-                <label style={styles.label}>Coefficient (poids)</label>
-                <input
-                  type="number"
-                  value={form.grade_weight}
-                  onChange={e => setForm({ ...form, grade_weight: parseFloat(e.target.value) || 1 })}
-                  style={styles.input}
-                  min="0.1"
-                  max="10"
-                  step="0.1"
-                  disabled={!form.contributes_to_grade}
-                />
-                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                  Ex: 2.0 = compte double dans la moyenne
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Banque de Questions */}
-          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc', padding: '16px' }}>
-            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Shuffle size={16} color={colors.info} />
-                Banque de Questions (Sélection Aléatoire)
-              </span>
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.random_selection ? `${colors.info}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.random_selection ? colors.info : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input
-                  type="checkbox"
-                  checked={form.random_selection}
-                  onChange={e => setForm({ ...form, random_selection: e.target.checked })}
-                  style={{ accentColor: colors.info }}
-                />
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: '600' }}>Activer la banque de questions</span>
-                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                    Sélectionne aléatoirement un nombre limité de questions
-                  </p>
-                </div>
-              </label>
-              <div>
-                <label style={styles.label}>Nombre de questions à afficher</label>
-                <input
-                  type="number"
-                  value={form.question_count || ''}
-                  onChange={e => setForm({ ...form, question_count: e.target.value ? parseInt(e.target.value) : null })}
-                  style={styles.input}
-                  min="1"
-                  placeholder={editingQuiz?.total_questions ? `Max: ${editingQuiz.total_questions}` : 'Ex: 20'}
-                  disabled={!form.random_selection}
-                />
-                <p style={{ margin: '4px 0 0', fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                  {editingQuiz?.total_questions
-                    ? `${form.question_count || editingQuiz.total_questions} questions sur ${editingQuiz.total_questions} dans la banque`
-                    : 'Ajoutez des questions au quiz pour définir la banque'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Options */}
-          <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-            <label style={{ ...styles.label, marginBottom: '12px', display: 'block' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings size={16} color={colors.primary} />
-                Options du Quiz
-              </span>
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.shuffle_questions ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.shuffle_questions ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input type="checkbox" checked={form.shuffle_questions} onChange={e => setForm({ ...form, shuffle_questions: e.target.checked })} style={{ accentColor: colors.success }} />
-                <span style={{ fontSize: '13px' }}>Mélanger les questions</span>
-              </label>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.shuffle_options ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.shuffle_options ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input type="checkbox" checked={form.shuffle_options} onChange={e => setForm({ ...form, shuffle_options: e.target.checked })} style={{ accentColor: colors.success }} />
-                <span style={{ fontSize: '13px' }}>Mélanger les options</span>
-              </label>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.show_correct_answers ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.show_correct_answers ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input type="checkbox" checked={form.show_correct_answers} onChange={e => setForm({ ...form, show_correct_answers: e.target.checked })} style={{ accentColor: colors.success }} />
-                <span style={{ fontSize: '13px' }}>Afficher bonnes réponses</span>
-              </label>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.show_explanation ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.show_explanation ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input type="checkbox" checked={form.show_explanation} onChange={e => setForm({ ...form, show_explanation: e.target.checked })} style={{ accentColor: colors.success }} />
-                <span style={{ fontSize: '13px' }}>Afficher explications</span>
-              </label>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                padding: '14px', borderRadius: '10px',
-                background: form.allow_retake ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                border: `1px solid ${form.allow_retake ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-              }}>
-                <input type="checkbox" checked={form.allow_retake} onChange={e => setForm({ ...form, allow_retake: e.target.checked })} style={{ accentColor: colors.success }} />
-                <span style={{ fontSize: '13px' }}>Permettre les reprises</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{
-            display: 'flex', gap: '12px', justifyContent: 'flex-end',
-            paddingTop: '20px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-          }}>
-            <button onClick={() => setShowQuizForm(false)} style={styles.btnSecondary}>
-              Annuler
-            </button>
-            <button onClick={() => handleSaveQuiz(form)} style={styles.btnPrimary} disabled={!form.title_fr}>
-              {editingQuiz ? 'Enregistrer les modifications' : 'Créer le quiz'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ============ CERTIFICATE TEMPLATE EDITOR ============
-  const CertificateTemplateEditor = () => {
-    const [activeTab, setActiveTab] = useState('templates'); // templates, design, preview
-    const [selectedTemplate, setSelectedTemplate] = useState(editingTemplate || certificateTemplates.find(t => t.is_default) || null);
-
-    // Parse logos and signatories from template
-    const parseLogos = (template) => {
-      if (template?.logos) {
-        try { return JSON.parse(template.logos); } catch (e) { return []; }
-      }
-      // Fallback to legacy single logo
-      if (template?.logo_url) {
-        return [{ url: template.logo_url, position: template.logo_position || 'top-center', width: template.logo_width || 100 }];
-      }
-      return [];
-    };
-
-    const parseSignatories = (template) => {
-      if (template?.signatories) {
-        try { return JSON.parse(template.signatories); } catch (e) { return []; }
-      }
-      // Fallback to legacy single signatory
-      if (template?.signatory_name) {
-        return [{ name: template.signatory_name, title: template.signatory_title || '', position: 'center' }];
-      }
-      return [];
-    };
-
-    const [form, setForm] = useState({
-      name: selectedTemplate?.name || '',
-      description: selectedTemplate?.description || '',
-      background_image: selectedTemplate?.background_image || '',
-      background_color: selectedTemplate?.background_color || '#ffffff',
-      logos: parseLogos(selectedTemplate),
-      title_text: selectedTemplate?.title_text || 'CERTIFICAT DE RÉUSSITE',
-      title_font: selectedTemplate?.title_font || 'serif',
-      title_size: selectedTemplate?.title_size || 36,
-      title_color: selectedTemplate?.title_color || '#1a365d',
-      body_font: selectedTemplate?.body_font || 'sans-serif',
-      body_color: selectedTemplate?.body_color || '#2d3748',
-      border_style: selectedTemplate?.border_style || 'ornate',
-      border_color: selectedTemplate?.border_color || '#c5a572',
-      border_width: selectedTemplate?.border_width || 10,
-      signatories: parseSignatories(selectedTemplate),
-      show_signature: selectedTemplate?.show_signature !== false,
-      show_qr_code: selectedTemplate?.show_qr_code !== false,
-      qr_position: selectedTemplate?.qr_position || 'bottom-right',
-      show_score: selectedTemplate?.show_score !== false,
-      show_date: selectedTemplate?.show_date !== false,
-      show_hours: selectedTemplate?.show_hours !== false,
-      is_default: selectedTemplate?.is_default || false
-    });
-
-    const [uploading, setUploading] = useState(false);
-
-    const handleBackgroundUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append('image', file);
-        const res = await api.upload('/elearning/certificate-templates/upload-background', formData, token);
-        if (res.success) {
-          setForm({ ...form, background_image: res.data.url });
-          setToast({ message: 'Image uploadée', type: 'success' });
-        }
-      } catch (error) {
-        setToast({ message: 'Erreur upload', type: 'error' });
-      } finally {
-        setUploading(false);
-      }
-    };
-
-    const handleLogoUpload = async (e, logoIndex = null) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append('image', file);
-        const res = await api.upload('/elearning/certificate-templates/upload-background', formData, token);
-        if (res.success) {
-          const newLogos = [...form.logos];
-          if (logoIndex !== null && logoIndex < newLogos.length) {
-            newLogos[logoIndex] = { ...newLogos[logoIndex], url: res.data.url };
-          } else {
-            // Add new logo
-            const positions = ['top-left', 'top-center', 'top-right'];
-            const usedPositions = newLogos.map(l => l.position);
-            const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'top-center';
-            newLogos.push({ url: res.data.url, position: availablePosition, width: 90 });
-          }
-          setForm({ ...form, logos: newLogos });
-          setToast({ message: 'Logo uploadé', type: 'success' });
-        }
-      } catch (error) {
-        setToast({ message: 'Erreur upload', type: 'error' });
-      } finally {
-        setUploading(false);
-      }
-    };
-
-    const removeLogo = (index) => {
-      const newLogos = form.logos.filter((_, i) => i !== index);
-      setForm({ ...form, logos: newLogos });
-    };
-
-    const updateLogo = (index, field, value) => {
-      const newLogos = [...form.logos];
-      newLogos[index] = { ...newLogos[index], [field]: value };
-      setForm({ ...form, logos: newLogos });
-    };
-
-    const addSignatory = () => {
-      if (form.signatories.length >= 3) return;
-      const positions = ['left', 'center', 'right'];
-      const usedPositions = form.signatories.map(s => s.position);
-      const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'center';
-      setForm({
-        ...form,
-        signatories: [...form.signatories, { name: '', title: '', position: availablePosition }]
-      });
-    };
-
-    const removeSignatory = (index) => {
-      const newSignatories = form.signatories.filter((_, i) => i !== index);
-      setForm({ ...form, signatories: newSignatories });
-    };
-
-    const updateSignatory = (index, field, value) => {
-      const newSignatories = [...form.signatories];
-      newSignatories[index] = { ...newSignatories[index], [field]: value };
-      setForm({ ...form, signatories: newSignatories });
-    };
-
-    const handleSaveTemplate = async () => {
-      try {
-        const endpoint = selectedTemplate?.id
-          ? `/elearning/certificate-templates/${selectedTemplate.id}`
-          : '/elearning/certificate-templates';
-        const method = selectedTemplate?.id ? 'put' : 'post';
-
-        // Prepare data with JSON stringified logos and signatories
-        const saveData = {
-          ...form,
-          logos: JSON.stringify(form.logos),
-          signatories: JSON.stringify(form.signatories),
-          // Legacy fields for backward compatibility
-          logo_url: form.logos[0]?.url || '',
-          logo_position: form.logos[0]?.position || 'top-center',
-          logo_width: form.logos[0]?.width || 100,
-          signatory_name: form.signatories[0]?.name || '',
-          signatory_title: form.signatories[0]?.title || ''
-        };
-
-        const res = await api[method](endpoint, saveData, token);
-        if (res.success) {
-          setToast({ message: 'Template sauvegardé', type: 'success' });
-          fetchCertificateTemplates();
-          if (!selectedTemplate?.id) {
-            setSelectedTemplate({ ...form, id: res.data?.id });
-          }
-        }
-      } catch (error) {
-        setToast({ message: 'Erreur de sauvegarde', type: 'error' });
-      }
-    };
-
-    const handleSetDefault = async (templateId) => {
-      try {
-        await api.put(`/elearning/certificate-templates/${templateId}`, { is_default: true }, token);
-        setToast({ message: 'Template par défaut mis à jour', type: 'success' });
-        fetchCertificateTemplates();
-      } catch (error) {
-        setToast({ message: 'Erreur', type: 'error' });
-      }
-    };
-
-    const borderStyles = [
-      { value: 'none', label: 'Aucune', preview: 'transparent' },
-      { value: 'simple', label: 'Simple', preview: '#e2e8f0' },
-      { value: 'double', label: 'Double', preview: '#94a3b8' },
-      { value: 'ornate', label: 'Ornée', preview: '#c5a572' },
-      { value: 'gold', label: 'Dorée', preview: '#d4af37' }
-    ];
-
-    return (
-      <div style={{ ...styles.card, padding: '0' }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '20px 24px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? '#1e293b' : '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: `linear-gradient(135deg, ${colors.purple}20 0%, ${colors.primary}20 100%)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Award size={20} color={colors.purple} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>Personnaliser le Diplôme</h2>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                Configurez l'apparence de vos certificats
-              </p>
-            </div>
-          </div>
-          <button onClick={() => setShowTemplateEditor(false)} style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ArrowLeft size={16} /> Retour
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-          {[
-            { id: 'templates', label: 'Templates', icon: LayoutTemplate },
-            { id: 'design', label: 'Design', icon: Palette },
-            { id: 'preview', label: 'Aperçu', icon: Eye }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '14px 24px', border: 'none', cursor: 'pointer',
-                background: 'transparent', fontSize: '14px', fontWeight: '500',
-                color: activeTab === tab.id ? colors.primary : (isDark ? '#94a3b8' : '#64748b'),
-                borderBottom: activeTab === tab.id ? `2px solid ${colors.primary}` : '2px solid transparent',
-                marginBottom: '-1px', transition: 'all 0.2s'
-              }}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div style={{ padding: '24px' }}>
-          {/* Templates Tab */}
-          {activeTab === 'templates' && (
-            <div>
-              <p style={{ margin: '0 0 20px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                Sélectionnez un template prédéfini ou créez le vôtre
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                {certificateTemplates.map(template => (
-                  <div
-                    key={template.id}
-                    onClick={() => {
-                      setSelectedTemplate(template);
-                      setForm({
-                        ...form,
-                        name: template.name,
-                        description: template.description,
-                        background_image: template.background_image,
-                        background_color: template.background_color,
-                        logos: parseLogos(template),
-                        border_style: template.border_style,
-                        border_color: template.border_color,
-                        title_text: template.title_text,
-                        title_color: template.title_color,
-                        signatories: parseSignatories(template),
-                        is_default: template.is_default
-                      });
-                    }}
-                    style={{
-                      padding: '20px', borderRadius: '12px', cursor: 'pointer',
-                      border: `2px solid ${selectedTemplate?.id === template.id ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
-                      background: selectedTemplate?.id === template.id ? `${colors.primary}10` : (isDark ? '#1e293b' : 'white'),
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {/* Mini Preview */}
-                    <div style={{
-                      height: '120px', borderRadius: '8px', marginBottom: '12px',
-                      background: template.background_image ? `url(${template.background_image}) center/cover` : template.background_color || '#f8fafc',
-                      border: template.border_style !== 'none' ? `3px ${template.border_style === 'double' ? 'double' : 'solid'} ${template.border_color || '#c5a572'}` : 'none',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      position: 'relative'
-                    }}>
-                      <Award size={32} color={template.title_color || '#1a365d'} style={{ opacity: 0.3 }} />
-                      {template.is_default && (
-                        <span style={{
-                          position: 'absolute', top: '8px', right: '8px',
-                          padding: '2px 8px', borderRadius: '10px', fontSize: '10px',
-                          background: colors.success, color: 'white', fontWeight: '600'
-                        }}>
-                          Défaut
-                        </span>
-                      )}
-                    </div>
-                    <h4 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: '600' }}>{template.name}</h4>
-                    <p style={{ margin: 0, fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                      {template.description || 'Aucune description'}
-                    </p>
-                    {!template.is_default && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleSetDefault(template.id); }}
-                        style={{ ...styles.btnSecondary, marginTop: '12px', width: '100%', fontSize: '12px', padding: '8px' }}
-                      >
-                        Définir par défaut
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                {/* New Template Card */}
-                <div
-                  onClick={() => {
-                    setSelectedTemplate(null);
-                    setForm({
-                      name: 'Nouveau Template',
-                      description: '',
-                      background_image: '',
-                      background_color: '#ffffff',
-                      logos: [],
-                      title_text: 'CERTIFICAT DE RÉUSSITE',
-                      title_font: 'serif',
-                      title_size: 36,
-                      title_color: '#1a365d',
-                      body_font: 'sans-serif',
-                      body_color: '#2d3748',
-                      border_style: 'ornate',
-                      border_color: '#c5a572',
-                      border_width: 10,
-                      signatories: [],
-                      show_signature: true,
-                      show_qr_code: true,
-                      qr_position: 'bottom-right',
-                      show_score: true,
-                      show_date: true,
-                      show_hours: true,
-                      is_default: false
-                    });
-                    setActiveTab('design');
-                  }}
-                  style={{
-                    padding: '20px', borderRadius: '12px', cursor: 'pointer',
-                    border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`,
-                    background: isDark ? '#0f172a' : '#f8fafc',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    minHeight: '200px', transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{
-                    width: '48px', height: '48px', borderRadius: '50%',
-                    background: `${colors.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginBottom: '12px'
-                  }}>
-                    <Plus size={24} color={colors.primary} />
-                  </div>
-                  <span style={{ fontWeight: '500', color: colors.primary }}>Créer un Template</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Design Tab */}
-          {activeTab === 'design' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* Left Column - Settings */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Basic Info */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FileText size={16} color={colors.primary} /> Informations
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <label style={styles.label}>Nom du template</label>
-                      <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={styles.input} />
-                    </div>
-                    <div>
-                      <label style={styles.label}>Titre du certificat</label>
-                      <input type="text" value={form.title_text} onChange={e => setForm({ ...form, title_text: e.target.value })} style={styles.input} placeholder="CERTIFICAT DE RÉUSSITE" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Background */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ImageIcon size={16} color={colors.primary} /> Arrière-plan
-                  </h4>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={styles.label}>Couleur</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="color" value={form.background_color} onChange={e => setForm({ ...form, background_color: e.target.value })} style={{ width: '50px', height: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
-                        <input type="text" value={form.background_color} onChange={e => setForm({ ...form, background_color: e.target.value })} style={{ ...styles.input, flex: 1 }} />
-                      </div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={styles.label}>Image (optionnel)</label>
-                      <input type="file" accept="image/*" onChange={handleBackgroundUpload} style={{ display: 'none' }} id="bg-upload" />
-                      <label htmlFor="bg-upload" style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', justifyContent: 'center' }}>
-                        {uploading ? <Loader size={14} className="spin" /> : <Upload size={14} />}
-                        {form.background_image ? 'Changer' : 'Uploader'}
-                      </label>
-                    </div>
-                  </div>
-                  {form.background_image && (
-                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <img src={form.background_image} alt="bg" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
-                      <button onClick={() => setForm({ ...form, background_image: '' })} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Border */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Square size={16} color={colors.primary} /> Bordure
-                  </h4>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {borderStyles.map(style => (
-                      <button
-                        key={style.value}
-                        onClick={() => setForm({ ...form, border_style: style.value })}
-                        style={{
-                          padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
-                          border: `2px solid ${form.border_style === style.value ? colors.primary : (isDark ? '#334155' : '#e2e8f0')}`,
-                          background: form.border_style === style.value ? `${colors.primary}15` : 'transparent',
-                          color: form.border_style === style.value ? colors.primary : (isDark ? '#e2e8f0' : '#1e293b'),
-                          fontSize: '13px', fontWeight: '500'
-                        }}
-                      >
-                        {style.label}
-                      </button>
-                    ))}
-                  </div>
-                  {form.border_style !== 'none' && (
-                    <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <label style={{ fontSize: '13px', color: isDark ? '#94a3b8' : '#64748b' }}>Couleur:</label>
-                      <input type="color" value={form.border_color} onChange={e => setForm({ ...form, border_color: e.target.value })} style={{ width: '40px', height: '30px', border: 'none', borderRadius: '6px', cursor: 'pointer' }} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Logos (Multiple) */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ImageIcon size={16} color={colors.primary} /> Logos ({form.logos.length}/3)
-                  </h4>
-
-                  {/* Logos ajoutés */}
-                  {form.logos.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                      {form.logos.map((logo, index) => (
-                        <div key={index} style={{
-                          display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: '10px', borderRadius: '8px',
-                          background: isDark ? '#1e293b' : 'white',
-                          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                        }}>
-                          <div style={{ width: '50px', height: '35px', background: '#f1f5f9', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                            <img src={logo.url.startsWith('/') ? `http://localhost:3003${logo.url}` : logo.url} alt={`Logo ${index + 1}`} style={{ maxHeight: '32px', maxWidth: '48px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                          </div>
-                          <select
-                            value={logo.position}
-                            onChange={(e) => updateLogo(index, 'position', e.target.value)}
-                            style={{ ...styles.select, width: '90px', fontSize: '11px', padding: '6px 8px' }}
-                          >
-                            <option value="top-left">Gauche</option>
-                            <option value="top-center">Centre</option>
-                            <option value="top-right">Droite</option>
-                          </select>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>Taille:</span>
-                            <input
-                              type="number"
-                              value={logo.width}
-                              onChange={(e) => updateLogo(index, 'width', parseInt(e.target.value) || 80)}
-                              style={{ ...styles.input, width: '55px', fontSize: '11px', padding: '6px 8px' }}
-                              min="40"
-                              max="200"
-                            />
-                          </div>
-                          <button onClick={() => removeLogo(index)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error, padding: '6px' }}>
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Sélection de logos prédéfinis */}
-                  {form.logos.length < 3 && (
-                    <div>
-                      <p style={{ margin: '0 0 10px', fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                        Sélectionnez un logo :
-                      </p>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
-                        {[
-                          { url: '/uploads/images/Logo_Programme_Zoonoses.png', name: 'Programme Zoonoses' },
-                          { url: '/uploads/images/partners/minsante.png', name: 'MINSANTE' },
-                          { url: '/uploads/images/partners/minepia.png', name: 'MINEPIA' },
-                          { url: '/uploads/images/partners/oms.png', name: 'OMS' },
-                          { url: '/uploads/images/partners/fao.png', name: 'FAO' },
-                          { url: '/uploads/images/partners/cdc100.png', name: 'CDC' },
-                          { url: '/uploads/images/partners/usaid.jpg', name: 'USAID' },
-                          { url: '/uploads/images/partners/afrohun100.png', name: 'AFROHUN' }
-                        ].map((preset, idx) => {
-                          const isSelected = form.logos.some(l => l.url === preset.url);
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                if (isSelected) return;
-                                const positions = ['top-left', 'top-center', 'top-right'];
-                                const usedPositions = form.logos.map(l => l.position);
-                                const availablePosition = positions.find(p => !usedPositions.includes(p)) || 'top-center';
-                                setForm({ ...form, logos: [...form.logos, { url: preset.url, position: availablePosition, width: 90 }] });
-                              }}
-                              disabled={isSelected}
-                              style={{
-                                padding: '8px', borderRadius: '8px', cursor: isSelected ? 'not-allowed' : 'pointer',
-                                border: `2px solid ${isSelected ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`,
-                                background: isSelected ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                                opacity: isSelected ? 0.6 : 1,
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
-                              }}
-                              title={preset.name}
-                            >
-                              <div style={{ width: '40px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <img
-                                  src={`http://localhost:3003${preset.url}`}
-                                  alt={preset.name}
-                                  style={{ maxWidth: '38px', maxHeight: '28px', objectFit: 'contain' }}
-                                  onError={(e) => { e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="gray" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'; }}
-                                />
-                              </div>
-                              <span style={{ fontSize: '9px', color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center', lineHeight: 1.1 }}>{preset.name}</span>
-                              {isSelected && <Check size={10} color={colors.success} />}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Upload personnalisé */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '8px', borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
-                        <span style={{ fontSize: '12px', color: isDark ? '#94a3b8' : '#64748b' }}>Ou :</span>
-                        <input type="file" accept="image/*" onChange={(e) => handleLogoUpload(e)} style={{ display: 'none' }} id="add-logo-upload" />
-                        <label htmlFor="add-logo-upload" style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', padding: '6px 12px' }}>
-                          {uploading ? <Loader size={12} className="spin" /> : <Upload size={12} />}
-                          Uploader un logo
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Signatories (Multiple) */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Edit3 size={16} color={colors.primary} /> Signataires ({form.signatories.length}/3)
-                    </h4>
-                    {form.signatories.length < 3 && (
-                      <button onClick={addSignatory} style={{ ...styles.btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}>
-                        <Plus size={12} /> Ajouter
-                      </button>
-                    )}
-                  </div>
-
-                  {form.signatories.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', background: isDark ? '#1e293b' : '#f1f5f9', borderRadius: '8px' }}>
-                      <Edit3 size={24} color={isDark ? '#64748b' : '#94a3b8'} style={{ marginBottom: '8px' }} />
-                      <p style={{ margin: 0, fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                        Aucun signataire. Cliquez sur "Ajouter".
-                      </p>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {form.signatories.map((sig, index) => (
-                        <div key={index} style={{
-                          padding: '12px', borderRadius: '8px',
-                          background: isDark ? '#1e293b' : 'white',
-                          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                        }}>
-                          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                            <div style={{ flex: 1 }}>
-                              <input
-                                type="text"
-                                value={sig.name}
-                                onChange={(e) => updateSignatory(index, 'name', e.target.value)}
-                                style={{ ...styles.input, fontSize: '13px' }}
-                                placeholder="Nom du signataire"
-                              />
-                            </div>
-                            <select
-                              value={sig.position}
-                              onChange={(e) => updateSignatory(index, 'position', e.target.value)}
-                              style={{ ...styles.select, width: '100px', fontSize: '12px' }}
-                            >
-                              <option value="left">Gauche</option>
-                              <option value="center">Centre</option>
-                              <option value="right">Droite</option>
-                            </select>
-                            <button onClick={() => removeSignatory(index)} style={{ ...styles.btnIcon, background: `${colors.error}15`, color: colors.error }}>
-                              <X size={14} />
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            value={sig.title}
-                            onChange={(e) => updateSignatory(index, 'title', e.target.value)}
-                            style={{ ...styles.input, fontSize: '12px' }}
-                            placeholder="Titre/Fonction"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column - Options & Preview */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Display Options */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Settings size={16} color={colors.primary} /> Options d'affichage
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {[
-                      { key: 'show_score', label: 'Afficher le score' },
-                      { key: 'show_date', label: 'Afficher la date' },
-                      { key: 'show_hours', label: 'Afficher les heures' },
-                      { key: 'show_qr_code', label: 'Afficher QR Code' },
-                      { key: 'show_signature', label: 'Afficher signature' }
-                    ].map(opt => (
-                      <label key={opt.key} style={{
-                        display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                        padding: '12px', borderRadius: '8px',
-                        background: form[opt.key] ? `${colors.success}10` : (isDark ? '#1e293b' : 'white'),
-                        border: `1px solid ${form[opt.key] ? colors.success : (isDark ? '#334155' : '#e2e8f0')}`
-                      }}>
-                        <input type="checkbox" checked={form[opt.key]} onChange={e => setForm({ ...form, [opt.key]: e.target.checked })} style={{ accentColor: colors.success }} />
-                        <span style={{ fontSize: '13px' }}>{opt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mini Preview */}
-                <div style={{ ...styles.card, background: isDark ? '#0f172a' : '#f8fafc' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Eye size={16} color={colors.primary} /> Aperçu
-                  </h4>
-                  <div style={{
-                    aspectRatio: '1.4/1', borderRadius: '12px',
-                    background: form.background_image ? `url(${form.background_image}) center/cover` : form.background_color,
-                    border: form.border_style !== 'none' ? `${Math.max(form.border_width / 3, 3)}px ${form.border_style === 'double' ? 'double' : 'solid'} ${form.border_color}` : 'none',
-                    padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    position: 'relative', textAlign: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-                  }}>
-                    {/* Multiple Logos */}
-                    {form.logos.map((logo, idx) => (
-                      <img key={idx} src={logo.url} alt={`logo-${idx}`} style={{
-                        position: 'absolute',
-                        top: '8px',
-                        [logo.position === 'top-left' ? 'left' : logo.position === 'top-right' ? 'right' : 'left']: logo.position === 'top-center' ? '50%' : '8px',
-                        transform: logo.position === 'top-center' ? 'translateX(-50%)' : 'none',
-                        height: `${Math.min(logo.width / 3, 25)}px`, objectFit: 'contain'
-                      }} />
-                    ))}
-                    <Award size={20} color={form.title_color} style={{ marginBottom: '6px', opacity: 0.5, marginTop: form.logos.length > 0 ? '20px' : 0 }} />
-                    <h3 style={{ margin: 0, fontSize: '11px', fontFamily: form.title_font, color: form.title_color, fontWeight: '700' }}>
-                      {form.title_text}
-                    </h3>
-                    <p style={{ margin: '4px 0', fontSize: '8px', color: form.body_color }}>
-                      Décerné à <strong>Jean Exemple</strong>
-                    </p>
-                    {form.show_score && <p style={{ margin: '2px 0', fontSize: '7px', color: form.body_color }}>Score: 95%</p>}
-                    {/* Multiple Signatories */}
-                    {form.signatories.length > 0 && (
-                      <div style={{
-                        position: 'absolute', bottom: '8px', left: 0, right: 0,
-                        display: 'flex', justifyContent: form.signatories.length === 1 ? 'center' : 'space-around',
-                        padding: '0 10px'
-                      }}>
-                        {form.signatories.slice(0, 3).map((sig, idx) => (
-                          <div key={idx} style={{ textAlign: 'center', maxWidth: '60px' }}>
-                            <p style={{ margin: 0, fontSize: '6px', fontWeight: '600', color: form.body_color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sig.name}</p>
-                            <p style={{ margin: 0, fontSize: '5px', color: form.body_color, opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sig.title}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {form.show_qr_code && (
-                      <div style={{
-                        position: 'absolute', bottom: '8px',
-                        [form.qr_position === 'bottom-left' ? 'left' : 'right']: '8px',
-                        width: '20px', height: '20px',
-                        background: '#f0f0f0', borderRadius: '3px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <QrCode size={12} color="#333" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Save Button */}
-                <button onClick={handleSaveTemplate} style={{ ...styles.btnPrimary, width: '100%', padding: '14px', fontSize: '15px' }}>
-                  <Save size={18} />
-                  Sauvegarder le Template
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Preview Tab */}
-          {activeTab === 'preview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
-              <p style={{ color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center' }}>
-                Aperçu du certificat avec le template "{form.name || 'sélectionné'}"
-              </p>
-              {/* Full Preview */}
-              <div style={{
-                width: '100%', maxWidth: '700px', aspectRatio: '1.414/1',
-                background: form.background_image ? `url(${form.background_image}) center/cover` : form.background_color,
-                border: form.border_style !== 'none' ? `${form.border_width}px ${form.border_style === 'double' ? 'double' : 'solid'} ${form.border_color}` : 'none',
-                borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-                position: 'relative', textAlign: 'center',
-                overflow: 'hidden'
-              }}>
-                {/* Decorative background bubbles */}
-                <div style={{ position: 'absolute', top: '-50px', left: '-50px', width: '200px', height: '200px', borderRadius: '50%', background: `${form.border_color}10`, pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', bottom: '-80px', right: '-80px', width: '250px', height: '250px', borderRadius: '50%', background: `${form.title_color}08`, pointerEvents: 'none' }} />
-
-                {/* Multiple Logos */}
-                {form.logos.map((logo, idx) => (
-                  <img key={idx} src={logo.url} alt={`logo-${idx}`} style={{
-                    position: 'absolute', top: '25px',
-                    [logo.position === 'top-left' ? 'left' : logo.position === 'top-right' ? 'right' : 'left']: logo.position === 'top-center' ? '50%' : '25px',
-                    transform: logo.position === 'top-center' ? 'translateX(-50%)' : 'none',
-                    height: `${logo.width / 2}px`, maxHeight: '60px', objectFit: 'contain'
-                  }} />
-                ))}
-                <div style={{ marginTop: form.logos.length > 0 ? '50px' : '20px' }}>
-                  <Award size={40} color={form.title_color} style={{ marginBottom: '12px', opacity: 0.6 }} />
-                </div>
-                <h1 style={{ margin: 0, fontSize: `${form.title_size / 1.5}px`, fontFamily: form.title_font, color: form.title_color, fontWeight: '700', letterSpacing: '2px' }}>
-                  {form.title_text}
-                </h1>
-                <p style={{ margin: '16px 0 6px', fontSize: '13px', color: form.body_color, fontFamily: form.body_font }}>
-                  Ce certificat est décerné à
-                </p>
-                <h2 style={{ margin: '0 0 16px', fontSize: '26px', color: form.title_color, fontFamily: form.body_font, fontWeight: '700' }}>
-                  Jean-Pierre Exemple
-                </h2>
-                <div style={{ width: '120px', height: '2px', background: form.border_color, margin: '0 auto 16px', borderRadius: '1px' }} />
-                <p style={{ margin: 0, fontSize: '13px', color: form.body_color, fontFamily: form.body_font, maxWidth: '80%' }}>
-                  Pour avoir complété avec succès la formation<br />
-                  <strong style={{ color: form.title_color }}>"Introduction à l'Approche One Health"</strong>
-                </p>
-                {form.show_score && (
-                  <div style={{ marginTop: '14px', padding: '8px 20px', background: `${colors.success}10`, borderRadius: '20px', display: 'inline-block' }}>
-                    <span style={{ fontSize: '14px', color: form.body_color, fontFamily: form.body_font }}>
-                      Score final: <strong style={{ color: colors.success }}>95%</strong>
-                    </span>
-                  </div>
-                )}
-                {form.show_date && (
-                  <p style={{ margin: '10px 0 0', fontSize: '11px', color: form.body_color, fontFamily: form.body_font, opacity: 0.7 }}>
-                    Délivré le {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </p>
-                )}
-                {/* Multiple Signatories */}
-                {form.signatories.length > 0 && form.show_signature && (
-                  <div style={{
-                    position: 'absolute', bottom: '35px', left: 0, right: 0,
-                    display: 'flex',
-                    justifyContent: form.signatories.length === 1 ? 'center' :
-                                   form.signatories.length === 2 ? 'space-around' : 'space-between',
-                    padding: '0 50px'
-                  }}>
-                    {form.signatories.slice(0, 3).map((sig, idx) => (
-                      <div key={idx} style={{ textAlign: 'center', minWidth: '120px' }}>
-                        <div style={{ width: '80px', height: '1px', background: form.body_color, opacity: 0.3, margin: '0 auto 6px' }} />
-                        <p style={{ margin: 0, fontSize: '12px', fontWeight: '600', color: form.body_color }}>{sig.name || 'Signataire'}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: form.body_color, opacity: 0.7 }}>{sig.title}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {form.show_qr_code && (
-                  <div style={{
-                    position: 'absolute', bottom: '25px',
-                    [form.qr_position === 'bottom-left' ? 'left' : 'right']: '25px',
-                    width: '55px', height: '55px',
-                    background: 'white', borderRadius: '8px', padding: '4px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                  }}>
-                    <QrCode size={47} color="#333" />
-                  </div>
-                )}
-              </div>
-              <button onClick={handleSaveTemplate} style={{ ...styles.btnPrimary, padding: '14px 32px', fontSize: '15px' }}>
-                <Save size={18} />
-                Sauvegarder ce Template
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   // ============ QUIZ QUESTIONS MODAL ============
-  const QuizQuestionsModal = () => {
-    const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [typeFilter, setTypeFilter] = useState('all');
-
-    // Get questions already in quiz
-    const quizQuestionIds = selectedQuiz?.questions?.map(q => q.id) || [];
-
-    // Filter available questions
-    const availableQuestions = questions.filter(q => {
-      if (!q.is_active) return false;
-      if (quizQuestionIds.includes(q.id)) return false;
-      if (searchQuery && !q.question_text_fr?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (typeFilter !== 'all' && q.question_type !== typeFilter) return false;
-      return true;
-    });
-
-    const toggleQuestion = (questionId) => {
-      if (selectedQuestionIds.includes(questionId)) {
-        setSelectedQuestionIds(selectedQuestionIds.filter(id => id !== questionId));
-      } else {
-        setSelectedQuestionIds([...selectedQuestionIds, questionId]);
-      }
-    };
-
-    const handleAdd = () => {
-      if (selectedQuestionIds.length > 0 && selectedQuiz) {
-        handleAddQuizQuestions(selectedQuiz.id, selectedQuestionIds);
-        setSelectedQuestionIds([]);
-      }
-    };
-
-    return (
-      <Modal isOpen={showQuizQuestionsModal} onClose={() => { setShowQuizQuestionsModal(false); setSelectedQuiz(null); }} title={`Gérer les questions - ${selectedQuiz?.title_fr || ''}`} isDark={isDark} width="900px">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxHeight: '70vh' }}>
-          {/* Left: Questions in Quiz */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: colors.primary }}>
-              Questions dans le quiz ({selectedQuiz?.questions?.length || 0})
-            </h4>
-            <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px' }}>
-              {selectedQuiz?.questions?.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {selectedQuiz.questions.map((q, idx) => (
-                    <div key={q.id} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px',
-                      borderRadius: '10px', background: isDark ? '#1e293b' : '#f8fafc'
-                    }}>
-                      <span style={{
-                        width: '24px', height: '24px', borderRadius: '6px', background: colors.primary,
-                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '12px', fontWeight: '700', flexShrink: 0
-                      }}>
-                        {idx + 1}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '500' }}>
-                          {q.question_text_fr?.substring(0, 80)}...
-                        </p>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {getQuestionTypeBadge(q.question_type)}
-                          <span style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                            {q.points} pt{q.points > 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveQuizQuestion(selectedQuiz.id, q.id)}
-                        style={{ ...styles.btnIcon, width: '28px', height: '28px', background: `${colors.error}15`, color: colors.error }}
-                        title="Retirer"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                  <FileQuestion size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                  <p style={{ margin: 0, fontSize: '13px' }}>Aucune question dans ce quiz</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Available Questions */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: colors.success }}>
-              Banque de questions ({availableQuestions.length})
-            </h4>
-            {/* Search & Filter */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8' }} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Rechercher..."
-                  style={{ ...styles.input, paddingLeft: '36px', fontSize: '13px' }}
-                />
-              </div>
-              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ ...styles.select, width: '140px', fontSize: '13px' }}>
-                <option value="all">Tous types</option>
-                <option value="mcq">QCM</option>
-                <option value="multiple_select">Multiple</option>
-                <option value="true_false">Vrai/Faux</option>
-                <option value="short_answer">Courte</option>
-                <option value="matching">Association</option>
-                <option value="fill_blank">Texte à trous</option>
-                <option value="ordering">Classement</option>
-              </select>
-            </div>
-            {/* Questions List */}
-            <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px' }}>
-              {availableQuestions.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {availableQuestions.slice(0, 50).map(q => (
-                    <label
-                      key={q.id}
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px',
-                        borderRadius: '10px', cursor: 'pointer',
-                        background: selectedQuestionIds.includes(q.id)
-                          ? `${colors.success}15`
-                          : (isDark ? '#1e293b' : '#f8fafc'),
-                        border: `2px solid ${selectedQuestionIds.includes(q.id) ? colors.success : 'transparent'}`,
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedQuestionIds.includes(q.id)}
-                        onChange={() => toggleQuestion(q.id)}
-                        style={{ width: '18px', height: '18px', marginTop: '2px' }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '500' }}>
-                          {q.question_text_fr?.substring(0, 80)}...
-                        </p>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {getQuestionTypeBadge(q.question_type)}
-                          {getDifficultyBadge(q.difficulty)}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#64748b' : '#94a3b8' }}>
-                  <p style={{ margin: 0, fontSize: '13px' }}>Aucune question disponible</p>
-                </div>
-              )}
-            </div>
-            {/* Add Button */}
-            {selectedQuestionIds.length > 0 && (
-              <button onClick={handleAdd} style={{ ...styles.btnPrimary, marginTop: '12px', background: colors.success }}>
-                <Plus size={18} /> Ajouter {selectedQuestionIds.length} question{selectedQuestionIds.length > 1 ? 's' : ''}
-              </button>
-            )}
-          </div>
-        </div>
-      </Modal>
-    );
-  };
-
   // ============ CATEGORY MODAL ============
-  const CategoryModal = () => {
-    const [form, setForm] = useState({
-      name_fr: editingCategory?.name_fr || '',
-      name_en: editingCategory?.name_en || '',
-      description_fr: editingCategory?.description_fr || '',
-      color: editingCategory?.color || '#2196F3',
-      icon: editingCategory?.icon || ''
-    });
-
-    return (
-      <Modal isOpen={showCategoryModal} onClose={() => setShowCategoryModal(false)} title={editingCategory ? 'Modifier la Catégorie' : 'Nouvelle Catégorie'} isDark={isDark} width="500px">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={styles.label}>Nom (Français) *</label>
-            <input type="text" value={form.name_fr} onChange={e => setForm({ ...form, name_fr: e.target.value })}
-              style={styles.input} placeholder="Santé Humaine" />
-          </div>
-          <div>
-            <label style={styles.label}>Nom (Anglais)</label>
-            <input type="text" value={form.name_en} onChange={e => setForm({ ...form, name_en: e.target.value })}
-              style={styles.input} placeholder="Human Health" />
-          </div>
-          <div>
-            <label style={styles.label}>Description</label>
-            <textarea value={form.description_fr} onChange={e => setForm({ ...form, description_fr: e.target.value })}
-              style={{ ...styles.input, minHeight: '80px' }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>Couleur</label>
-              <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}
-                style={{ ...styles.input, padding: '4px', height: '44px' }} />
-            </div>
-            <div>
-              <label style={styles.label}>Icône (emoji)</label>
-              <input type="text" value={form.icon} onChange={e => setForm({ ...form, icon: e.target.value })}
-                style={styles.input} placeholder="🏥" maxLength={2} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <button onClick={() => setShowCategoryModal(false)} style={styles.btnSecondary}>Annuler</button>
-            <button onClick={() => handleSaveCategory(form)} style={styles.btnPrimary} disabled={!form.name_fr}>
-              {editingCategory ? 'Enregistrer' : 'Créer'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    );
-  };
-
   // ============ MAIN RENDER ============
   return (
     <div>
@@ -21177,8 +21376,8 @@ const OHELearningPage = ({ isDark, token }) => {
       )}
 
       {/* Modals */}
-      {showCategoryModal && <CategoryModal />}
-      {showQuizQuestionsModal && <QuizQuestionsModal />}
+      {showCategoryModal && <CategoryModal editingCategory={editingCategory} handleSaveCategory={handleSaveCategory} isDark={isDark} setShowCategoryModal={setShowCategoryModal} showCategoryModal={showCategoryModal} styles={styles} />}
+      {showQuizQuestionsModal && <QuizQuestionsModal getDifficultyBadge={getDifficultyBadge} getQuestionTypeBadge={getQuestionTypeBadge} handleAddQuizQuestions={handleAddQuizQuestions} handleRemoveQuizQuestion={handleRemoveQuizQuestion} isDark={isDark} questions={questions} selectedQuiz={selectedQuiz} setSelectedQuiz={setSelectedQuiz} setShowQuizQuestionsModal={setShowQuizQuestionsModal} showQuizQuestionsModal={showQuizQuestionsModal} styles={styles} />}
 
       {/* Header */}
       <div style={{

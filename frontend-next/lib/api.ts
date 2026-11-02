@@ -447,7 +447,7 @@ export async function getUserLearningStats(token: string): Promise<ApiResponse<U
 // Progress (requires auth)
 export async function updateLessonProgress(
   lessonId: number,
-  data: { progress_percent?: number; video_position?: number; time_spent?: number },
+  data: { progress_percent?: number; video_position?: number; time_spent?: number; completed_blocks?: string[] },
   token: string
 ): Promise<ApiResponse<{ message: string }>> {
   // Mapper les noms de paramètres vers ceux attendus par le backend
@@ -455,12 +455,25 @@ export async function updateLessonProgress(
     progress_percent: data.progress_percent,
     video_last_position_seconds: data.video_position,
     video_watch_time_seconds: data.time_spent,
-    time_spent_seconds: data.time_spent
+    time_spent_seconds: data.time_spent,
+    completed_blocks: data.completed_blocks
   };
   return fetchApi<{ message: string }>(`/elearning/lessons/${lessonId}/progress`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(backendData)
+  });
+}
+
+export async function saveLessonNotes(
+  lessonId: number,
+  data: { notes?: string; bookmarked?: boolean },
+  token: string
+): Promise<ApiResponse<{ message: string }>> {
+  return fetchApi<{ message: string }>(`/elearning/lessons/${lessonId}/notes`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
   });
 }
 
